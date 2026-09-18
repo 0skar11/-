@@ -70,17 +70,19 @@ export async function handleArabicModerationShortcut(message) {
       if (!targetMember) return reply(message, '❌ العضو غير موجود في السيرفر.');
       const [durationText, ...reasonParts] = tail.split(/\s+/u);
       const durationMs = parseDuration(durationText);
+      const reason = reasonParts.join(' ') || 'لم يتم تحديد سبب';
       if (!durationMs) return reply(message, '❌ اكتب المدة هكذا: `5m` أو `1h` أو `1d` (حتى 28 يوم).');
       ModerationService.assertModerationHierarchy(actor, targetMember, 'timeout');
-      await ModerationService.timeoutUser({ guild, member: targetMember, moderator: actor, durationMs, reason: reasonParts.join(' ') || 'لم يتم تحديد سبب' });
-      return reply(message, `⏳ ${targetMember} Has Been Timed Out for ${durationText}.`);
+      await ModerationService.timeoutUser({ guild, member: targetMember, moderator: actor, durationMs, reason });
+      return reply(message, `⏳ ${targetMember} Has Been Timed Out for ${durationText}, Reason: ${reason}`);
     }
 
     if (command === 'انتايم') {
       if (!hasPermission(actor, PermissionFlagsBits.ModerateMembers)) return reply(message, '❌ ليس لديك صلاحية إزالة التايم.');
       if (!targetMember) return reply(message, '❌ العضو غير موجود في السيرفر.');
-      await ModerationService.removeTimeoutUser({ guild, member: targetMember, moderator: actor });
-      return reply(message, `🔓 تم إلغاء التايم عن ${targetMember}.`);
+      const reason = tail || 'لم يتم تحديد سبب';
+      await ModerationService.removeTimeoutUser({ guild, member: targetMember, moderator: actor, reason });
+      return reply(message, `🔓 تم إلغاء التايم عن ${targetMember}, Reason: ${reason}`);
     }
 
     if (command === 'بان') {
@@ -94,16 +96,18 @@ export async function handleArabicModerationShortcut(message) {
     if (command === 'انبان') {
       if (!hasPermission(actor, PermissionFlagsBits.BanMembers)) return reply(message, '❌ ليس لديك صلاحية إلغاء البان.');
       if (!targetUser) return reply(message, '❌ اكتب User ID صحيح.');
-      await ModerationService.unbanUser({ guild, user: targetUser, moderator: actor, reason: tail || 'لم يتم تحديد سبب' });
-      return reply(message, `✅ تم إلغاء البان عن ${targetUser}.`);
+      const reason = tail || 'لم يتم تحديد سبب';
+      await ModerationService.unbanUser({ guild, user: targetUser, moderator: actor, reason });
+      return reply(message, `✅ تم إلغاء البان عن ${targetUser}, Reason: ${reason}`);
     }
 
     if (command === 'كلير') {
       if (!hasPermission(actor, PermissionFlagsBits.ModerateMembers)) return reply(message, '❌ ليس لديك صلاحية مسح التحذيرات.');
       if (!targetMember) return reply(message, '❌ العضو غير موجود في السيرفر.');
       ModerationService.assertModerationHierarchy(actor, targetMember, 'clear warnings for');
+      const reason = tail || 'لم يتم تحديد سبب';
       const result = await WarningService.clearWarnings(guild.id, targetId);
-      return reply(message, `🧹 تم مسح كل تحذيرات ${targetMember}.\nعدد التحذيرات المحذوفة: ${result.count}`);
+      return reply(message, `🧹 تم مسح كل تحذيرات ${targetMember}. Reason: ${reason}\nعدد التحذيرات المحذوفة: ${result.count}`);
     }
 
     if (command === 'رتبة' || command === 'ازالةرتبة') {
