@@ -5,14 +5,14 @@ import { logger } from '../utils/logger.js';
 export const AUDIT_LOG_CATEGORY_ID = '1547320311626731562';
 
 const LOG_CHANNELS = {
-  moderation: 'audit-moderation',
-  timeout: 'audit-timeout',
-  ban: 'audit-ban',
-  message: 'audit-message-deleted',
-  voice: 'audit-voice',
-  roles: 'audit-roles',
-  join: 'audit-join',
-  leave: 'audit-leave',
+  moderation: 'moderation',
+  timeout: 'timeout',
+  ban: 'ban',
+  message: 'message-deleted',
+  voice: 'voice',
+  roles: 'roles',
+  join: 'join',
+  leave: 'leave',
 };
 
 export async function ensureAuditLogChannels(client) {
@@ -37,7 +37,7 @@ export async function ensureAuditLogChannels(client) {
             name,
             type: ChannelType.GuildText,
             parent: category.id,
-            reason: 'Create dedicated audit log channel',
+            reason: 'Create dedicated log channel',
             permissionOverwrites: [
               {
                 id: guild.id,
@@ -58,9 +58,9 @@ export async function ensureAuditLogChannels(client) {
       }
 
       await updateGuildConfig(client, guild.id, { auditChannels: channels });
-      logger.info(`Dedicated audit log channels are ready in ${guild.name}.`);
+      logger.info(`Dedicated log channels are ready in ${guild.name}.`);
     } catch (error) {
-      logger.error(`Failed to prepare audit log channels in ${guild.name}:`, error);
+      logger.error(`Failed to prepare log channels in ${guild.name}:`, error);
     }
   }
 }
