@@ -1,147 +1,154 @@
-import { Events } from 'discord.js';
-import { inspectMemberRemoval } from '../utils/antiRaid.js';
-
-export default {
-  name: Events.GuildBanAdd,
-  async execute(ban) {
-    await inspectMemberRemoval(ban, Events.GuildBanAdd);
-  },
-};
-import { Events } from 'discord.js';
-import { inspectChannelDelete } from '../utils/antiRaid.js';
-
-export default {
-  name: Events.ChannelDelete,
-  async execute(channel) {
-    if (channel.guild) await inspectChannelDelete(channel);
-  },
-};
-import { Events } from 'discord.js';
-import { inspectMemberRemoval } from '../utils/antiRaid.js';
-
-export default {
-  name: Events.GuildMemberRemove,
-  async execute(member) {
-    await inspectMemberRemoval(member);
-  },
-};
-import { Events } from 'discord.js';
-import { handleAntiRaidCommand } from '../utils/antiRaid.js';
-
-export default {
-  name: Events.MessageCreate,
-  async execute(message) {
-    if (!message.author?.bot && message.guild) await handleAntiRaidCommand(message);
-  },
-};
-
-import { Events } from 'discord.js';
-import { inspectMessageDelete } from '../utils/antiRaid.js';
-
-export default {
-  name: Events.MessageDelete,
-  async execute(message) {
-    if (message.guild) await inspectMessageDelete(message);
-  },
-};
-import { Events } from 'discord.js';import { inspectRoleDelete, inspectRoleUpdate } from '../utils/antiRaid.js';export default {  name: Events.GuildRoleDelete,  async execute(role) {    await inspectRoleDelete(role);  },};
-Collapse file‎src/events/antiRaidRoleUpdate.js‎Copy file name to clipboard
-import { Events } from 'discord.js';
-import { inspectRoleUpdate } from '../utils/antiRaid.js';
-
-export default {
-  name: Events.GuildRoleUpdate,
-  async execute(oldRole, newRole) {
-    await inspectRoleUpdate(newRole);
-  },
-};
 import { AuditLogEvent, PermissionFlagsBits } from 'discord.js';
 
 const TRUST_KEY = guildId => `guild:${guildId}:antiRaidTrust`;
 const WINDOW_MS = 60_000;
 const MESSAGE_WINDOW_MS = 20_000;
+const PUNISHED_TTL_MS = 10 * 60_000;
+
 const state = new Map();
 
 function getState(guildId) {
   if (!state.has(guildId)) {
-    state.set(guildId, { kicks: [], bans: [], messageDeletes: [], channels: [], roles: [], roleUpdates: [], punished: new Set() });
+    state.set(guildId, {
+      kicks: [],
+      bans: [],
+      messageDeletes: [],
+      channels: [],
+      roles: [],
+      roleUpdates: [],
+      punished: new Map(),
+    });
   }
+
   return state.get(guildId);
+}
+
+function normalizeTrust(value) {
+  return {
+    trustedUserIds: Array.isArray(value?.trustedUserIds) ? [...new Set(value.trustedUserIds.map(String))] : [],
+    trustedRoleIds: Array.isArray(value?.trustedRoleIds) ? [...new Set(value.trustedRoleIds.map(String))] : [],
+  };
 }
 
 async function readTrust(guild) {
   const value = await guild.client.db?.get?.(TRUST_KEY(guild.id), { trustedUserIds: [], trustedRoleIds: [] });
-  return {
-    trustedUserIds: Array.isArray(value?.trustedUserIds) ? value.trustedUserIds : [],
-    trustedRoleIds: Array.isArray(value?.trustedRoleIds) ? value.trustedRoleIds : [],
-  };
+  return normalizeTrust(value);
+}
+
+async function saveTrust(guild, trust) {
+  const normalized = normalizeTrust(trust);
+  await guild.client.db.set(TRUST_KEY(guild.id), normalized);
+  return normalized;
 }
 
 export async function updateAntiRaidTrust(guild, { userId, roleId, remove = false }) {
+  const id = String(userId || roleId || '');
+  if (!id) return readTrust(guild);
+
   const trust = await readTrust(guild);
-  const collection = userId ? trust.trustedUserIds : trust.trustedRoleIds;
-  const id = userId || roleId;
-  const next = remove ? collection.filter(item => item !== id) : [...new Set([...collection, id])];
-  if (userId) trust.trustedUserIds = next;
-  else trust.trustedRoleIds = next;
-  await guild.client.db.set(TRUST_KEY(guild.id), trust);
-  return trust;
+  const key = userId ? 'trustedUserIds' : 'trustedRoleIds';
+  const current = trust[key] || [];
+  trust[key] = remove
+    ? current.filter(item => item !== id)
+    : [...new Set([...current, id])];
+
+  return saveTrust(guild, trust);
 }
 
 export async function isTrusted(guild, userId) {
+  const targetId = String(userId || '');
+  if (!targetId) return false;
+
   const trust = await readTrust(guild);
-  if (trust.trustedUserIds.includes(userId)) return true;
-  const member = guild.members.cache.get(userId);
-  return Boolean(member?.roles.cache.some(role => trust.trustedRoleIds.includes(role.id)));
+  if (trust.trustedUserIds.includes(targetId)) return true;
+  if (!trust.trustedRoleIds.length) return false;
+
+  let member = guild.members.cache.get(targetId) || null;
+  if (!member) {
+    member = await guild.members.fetch(targetId).catch(() => null);
+  }
+
+  return Boolean(member?.roles?.cache?.some(role => trust.trustedRoleIds.includes(role.id)));
+}
+
+function pruneAndCount(events, windowMs) {
+  const cutoff = Date.now() - windowMs;
+  const filtered = events.filter(event => event.time > cutoff);
+  const total = filtered.reduce((sum, event) => sum + event.amount, 0);
+  return { filtered, total };
 }
 
 function addEvent(guildId, type, amount = 1) {
-  const now = Date.now();
   const current = getState(guildId);
-  const cutoff = now - (type === 'messageDeletes' ? MESSAGE_WINDOW_MS : WINDOW_MS);
-  current[type] = current[type].filter(event => event.time > cutoff);
-  current[type].push({ time: now, amount });
-  return current[type].reduce((total, event) => total + event.amount, 0);
+  const windowMs = type === 'messageDeletes' ? MESSAGE_WINDOW_MS : WINDOW_MS;
+  const { filtered } = pruneAndCount(current[type], windowMs);
+  const next = [...filtered, { time: Date.now(), amount }];
+  current[type] = next;
+  return next.reduce((total, event) => total + event.amount, 0);
 }
 
 async function latestExecutor(guild, type, targetId) {
   const logs = await guild.fetchAuditLogs({ type, limit: 10 }).catch(() => null);
-  const entry = logs?.entries.find(item =>
-    (!targetId || item.target?.id === targetId) && Date.now() - item.createdTimestamp < 15_000
-  );
+  const entry = logs?.entries.find(item => {
+    if (Date.now() - item.createdTimestamp > 15_000) return false;
+    if (!targetId) return true;
+    return item.target?.id === targetId;
+  });
   return entry?.executor || null;
 }
 
 async function punish(guild, executor, reason, mode = 'kick') {
-  if (!executor || executor.bot || executor.id === guild.ownerId || await isTrusted(guild, executor.id)) return false;
+  if (!executor || executor.id === guild.ownerId || await isTrusted(guild, executor.id)) return false;
+
   const member = await guild.members.fetch(executor.id).catch(() => null);
   const botMember = guild.members.me;
   if (!member || !botMember || member.roles.highest.position >= botMember.roles.highest.position) return false;
 
   const current = getState(guild.id);
-  if (current.punished.has(executor.id)) return true;
-  current.punished.add(executor.id);
+  const now = Date.now();
+  const punishedAt = current.punished.get(executor.id);
+  if (punishedAt && now - punishedAt < PUNISHED_TTL_MS) return true;
+  current.punished.set(executor.id, now);
+
+  for (const [userId, ts] of current.punished.entries()) {
+    if (now - ts >= PUNISHED_TTL_MS) current.punished.delete(userId);
+  }
 
   if (mode === 'strip') {
-    const removable = member.roles.cache.filter(role => role.id !== guild.id && !role.managed && role.position < botMember.roles.highest.position);
+    const removable = member.roles.cache.filter(
+      role => role.id !== guild.id && !role.managed && role.position < botMember.roles.highest.position,
+    );
     await member.roles.remove(removable, `Anti-raid: ${reason}`).catch(() => {});
-  } else {
-    await member.kick(`Anti-raid: ${reason}`).catch(() => {});
+    return true;
   }
+
+  await member.kick(`Anti-raid: ${reason}`).catch(() => {});
   return true;
 }
 
-export async function inspectMemberRemoval(member, action = AuditLogEvent.MemberKick) {
-  const executor = await latestExecutor(member.guild, action, member.id);
+function resolveRemovalTargetId(subject) {
+  return subject?.id || subject?.user?.id || null;
+}
+
+export async function inspectMemberRemoval(subject, action = AuditLogEvent.MemberKick) {
+  const guild = subject?.guild;
+  const targetId = resolveRemovalTargetId(subject);
+  if (!guild || !targetId) return;
+
+  const executor = await latestExecutor(guild, action, targetId);
   if (!executor) return;
+
   const type = action === AuditLogEvent.MemberBanAdd ? 'bans' : 'kicks';
-  const total = addEvent(member.guild.id, type);
-  if (total >= 10) await punish(member.guild, executor, `${total} members removed in one minute`);
+  const total = addEvent(guild.id, type);
+  if (total >= 10) await punish(guild, executor, `${total} members removed in one minute`);
 }
 
 export async function inspectMessageDelete(message) {
+  if (!message?.guild) return;
+
   const executor = await latestExecutor(message.guild, AuditLogEvent.MessageBulkDelete, message.channelId);
   if (!executor) return;
+
   const logs = await message.guild.fetchAuditLogs({ type: AuditLogEvent.MessageBulkDelete, limit: 5 }).catch(() => null);
   const entry = logs?.entries.find(item => item.executor?.id === executor.id && Date.now() - item.createdTimestamp < 15_000);
   const total = addEvent(message.guild.id, 'messageDeletes', Number(entry?.extra?.count || 1));
@@ -149,55 +156,128 @@ export async function inspectMessageDelete(message) {
 }
 
 export async function inspectChannelDelete(channel) {
+  if (!channel?.guild) return;
+
   const executor = await latestExecutor(channel.guild, AuditLogEvent.ChannelDelete, channel.id);
-  if (executor && addEvent(channel.guild.id, 'channels') >= 3) await punish(channel.guild, executor, 'three channels deleted in one minute');
+  if (executor && addEvent(channel.guild.id, 'channels') >= 3) {
+    await punish(channel.guild, executor, 'three channels deleted in one minute');
+  }
 }
 
 export async function inspectRoleDelete(role) {
+  if (!role?.guild) return;
+
   const executor = await latestExecutor(role.guild, AuditLogEvent.RoleDelete, role.id);
-  if (executor && addEvent(role.guild.id, 'roles') >= 3) await punish(role.guild, executor, 'three roles deleted in one minute');
+  if (executor && addEvent(role.guild.id, 'roles') >= 3) {
+    await punish(role.guild, executor, 'three roles deleted in one minute');
+  }
 }
 
 export async function inspectRoleUpdate(role) {
+  if (!role?.guild) return;
+
   const executor = await latestExecutor(role.guild, AuditLogEvent.RoleUpdate, role.id);
-  if (executor && addEvent(role.guild.id, 'roleUpdates') >= 3) await punish(role.guild, executor, 'mass role or permission changes', 'strip');
+  if (executor && addEvent(role.guild.id, 'roleUpdates') >= 3) {
+    await punish(role.guild, executor, 'mass role or permission changes', 'strip');
+  }
+}
+
+function mentionFromType(type, id) {
+  return type === 'role' ? `<@&${id}>` : `<@${id}>`;
+}
+
+function parseTrustTarget(raw) {
+  const content = (raw || '').trim();
+  if (!content) return null;
+
+  const roleMatch = content.match(/^<@&(\d{17,20})>$/u);
+  if (roleMatch) return { id: roleMatch[1], mentionType: 'role' };
+
+  const userMatch = content.match(/^<@!?(\d{17,20})>$/u);
+  if (userMatch) return { id: userMatch[1], mentionType: 'user' };
+
+  const idMatch = content.match(/^(\d{17,20})$/u);
+  if (idMatch) return { id: idMatch[1], mentionType: 'id' };
+
+  return null;
+}
+
+function antiRaidStatus(guildId) {
+  const current = getState(guildId);
+  const kicks = pruneAndCount(current.kicks, WINDOW_MS).total;
+  const bans = pruneAndCount(current.bans, WINDOW_MS).total;
+  const messageDeletes = pruneAndCount(current.messageDeletes, MESSAGE_WINDOW_MS).total;
+  const channels = pruneAndCount(current.channels, WINDOW_MS).total;
+  const rolesDeleted = pruneAndCount(current.roles, WINDOW_MS).total;
+  const roleUpdates = pruneAndCount(current.roleUpdates, WINDOW_MS).total;
+
+  return [
+    '🛡️ **حالة Anti-Raid**',
+    '• الحالة: يعمل تلقائيًا',
+    '• الحدود: 10 طرد/بان خلال دقيقة، 20 رسالة خلال 20 ثانية، و3 قنوات/رتب خلال دقيقة.',
+    `• النشاط الحالي: طرد (${kicks}) | بان (${bans}) | حذف رسائل (${messageDeletes}) | حذف قنوات (${channels}) | حذف رتب (${rolesDeleted}) | تعديل رتب (${roleUpdates})`,
+  ].join('\n');
 }
 
 export async function handleAntiRaidCommand(message) {
-  const match = message.content.trim().match(/^(انترايد|تراست|انتراست)\s*(.*)$/u);
+  if (!message.guild || message.author?.bot) return false;
+
+  const match = message.content.trim().match(/^(انترايد|تراست|انتراست)\b\s*(.*)$/u);
   if (!match) return false;
+
   if (message.guild.ownerId !== message.author.id) {
     await message.channel.send('❌ هذا الأمر لمالك السيرفر فقط.');
     return true;
   }
 
   const [, command, rawTarget] = match;
+
   if (command === 'انترايد') {
-    await message.channel.send('🛡️ Anti-Raid يعمل تلقائيًا: 10 طرد/بان خلال دقيقة، 20 رسالة خلال 20 ثانية، و3 قنوات/رتب خلال دقيقة.');
+    await message.channel.send(antiRaidStatus(message.guild.id));
     return true;
   }
 
-  const target = rawTarget.match(/^<@!?(\d+)>$/u) || rawTarget.match(/^<@&(\d+)>$/u) || rawTarget.match(/^(\d{17,20})$/u);
-  if (!target) {
-    await message.channel.send(`❌ استخدم: \`${command} @user\` أو \`${command} @role\` أو اكتب ID.`);
+  const parsed = parseTrustTarget(rawTarget);
+  if (!parsed) {
+    await message.channel.send(`❌ استخدم: \`${command} @user\` أو \`${command} @role\` أو اكتب ID صالح.`);
     return true;
   }
-  const id = target[1];
-  const role = guildRole(message.guild, id);
-  const user = role ? null : await message.client.users.fetch(id).catch(() => null);
+
+  let targetType = parsed.mentionType;
+  let role = null;
+  let user = null;
+
+  if (parsed.mentionType === 'role' || parsed.mentionType === 'id') {
+    role = message.guild.roles.cache.get(parsed.id)
+      || await message.guild.roles.fetch(parsed.id).catch(() => null);
+    if (role) targetType = 'role';
+  }
+
+  if (!role) {
+    user = await message.client.users.fetch(parsed.id).catch(() => null);
+    if (user) targetType = 'user';
+  }
+
   if (!role && !user) {
-    await message.channel.send('❌ لم أجد المستخدم أو الرتبة.');
+    await message.channel.send('❌ لم أستطع العثور على مستخدم أو رتبة بهذا المعرف.');
     return true;
   }
-  await updateAntiRaidTrust(message.guild, { userId: user?.id, roleId: role?.id, remove: command === 'انتراست' });
-  await message.channel.send(command === 'تراست' ? `✅ تمت إضافة ${role || user} إلى قائمة الثقة.` : `✅ تمت إزالة ${role || user} من قائمة الثقة.`);
-  return true;
-}
 
-function guildRole(guild, id) {
-  return guild.roles.cache.get(id) || null;
+  const remove = command === 'انتراست';
+  await updateAntiRaidTrust(message.guild, {
+    userId: targetType === 'user' ? parsed.id : undefined,
+    roleId: targetType === 'role' ? parsed.id : undefined,
+    remove,
+  });
+
+  const targetText = role ? mentionFromType('role', role.id) : mentionFromType('user', parsed.id);
+  const actionText = remove ? 'إزالة' : 'إضافة';
+  await message.channel.send(`✅ تم ${actionText} ${targetText} ${remove ? 'من' : 'إلى'} قائمة الثقة.`);
+  return true;
 }
 
 export function antiRaidPermission() {
   return PermissionFlagsBits.ViewAuditLog;
 }
+
+export { TRUST_KEY };
