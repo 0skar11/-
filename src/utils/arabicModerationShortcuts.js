@@ -1,8 +1,12 @@
 import { PermissionFlagsBits } from 'discord.js';
+import { getCommandPrefix } from '../config/bot.js';
+import { getGuildConfig } from '../services/config/guildConfig.js';
 import { ModerationService } from '../services/moderation/moderationService.js';
 import { WarningService } from '../services/moderation/warningService.js';
 
-const COMMANDS = new Set(['وارن', 'تايم', 'انتايم', 'بان', 'انبان', 'كلير', 'ان', 'شيل', 'ر', 'ب', 'رتبة', 'ازالةرتبة', 'purge']);
+const COMMANDS = new Set(['وارن', 'تايم', 'انتايم', 'بان', 'انبان', 'كلير', 'ان', 'شيل', 'ر', 'رول', 'ب', 'رتبة', 'ازالةرتبة', 'purge']);
+const ADD_ROLE_COMMANDS = new Set(['ر', 'رول', 'ان', 'رتبة']);
+const REMOVE_ROLE_COMMANDS = new Set(['ب', 'شيل', 'ازالةرتبة']);
 const OWNER_ID = '1159601661392715906';
 const MAX_TIMEOUT_MS = 28 * 24 * 60 * 60 * 1000;
 
@@ -14,23 +18,41 @@ function parseDuration(value) {
   return durationMs > 0 && durationMs <= MAX_TIMEOUT_MS ? durationMs : null;
 }
 
-function tokenize(content) {
-  const commandMatch = String(content || '').trim().match(/^([^\s<@]+)\s*/u);
-  if (!commandMatch) return null;
-  const command = commandMatch[1].toLowerCase();
-  if (!COMMANDS.has(command)) return null;
-  const rest = content.slice(commandMatch[0].length).trim();
-  const mentionMatch = rest.match(/^<@!?(\d+)>\s*(.*)$/u);
-  const idMatch = rest.match(/^(\d{17,20})\s*(.*)$/u);
-  const targetId = mentionMatch?.[1] || idMatch?.[1] || null;
-  const tail = mentionMatch?.[2] ?? idMatch?.[2] ?? rest;
-  return { command, targetId, tail: tail.trim() };
+function stripPrefix(content, prefixes) {
+  const value = String(content || '').trim();
+  const prefix = prefixes.filter(Boolean).sort((a, b) => b.length - a.length)
+    .find(candidate => value.toLowerCase().startsWith(candidate.toLowerCase()));
+  return prefix ? value.slice(prefix.length).trim() : value;
+}
+
+function tokenize(content, prefixes = []) {
+  const value = stripPrefix(content, prefixes);
+  const parts = value.split(/\s+/u).filter(Boolean);
+  if (!parts.length) return null;
+
+  let command = parts[0].toLowerCase();
+  let body = parts.slice(1).join(' ');
+  if (!COMMANDS.has(command)) {
+    const last = parts.at(-1)?.toLowerCase();
+    if (!COMMANDS.has(last)) return null;
+    command = last;
+    body = parts.slice(0, -1).join(' ');
+  }
+
+  const mention = body.match(/<@!?(\d+)>/u);
+  const id = body.match(/(?:^|\s)(\d{17,20})(?:\s|$)/u);
+  const targetId = mention?.[1] || id?.[1] || null;
+  const tail = body
+    .replace(/<@!?\d+>/u, '')
+    .replace(/(?:^|\s)\d{17,20}(?=\s|$)/u, '')
+    .trim();
+
+  return { command, targetId, tail };
 }
 
 function roleFor(guild, roleName) {
   const normalized = roleName.trim().toLowerCase();
   if (!normalized) return null;
-
   const roles = guild.roles.cache.filter(role => !role.managed && role.id !== guild.id);
   return roles.find(role => role.name.toLowerCase() === normalized)
     || roles.find(role => role.name.toLowerCase().startsWith(normalized))
@@ -69,7 +91,6 @@ async function purgeEntireChannel(message) {
     deletedCount += deleted.size;
     if (!deleted.size || batch.size < 100) break;
   }
-
   await reply(message, `🧹 تم تنظيف الروم بالكامل. عدد الرسائل المحذوفة: **${deletedCount}**`);
   return true;
 }
@@ -80,14 +101,13 @@ async function changeRole(message, targetMember, roleName, add) {
     return true;
   }
   if (!targetMember || !roleName) {
-    await reply(message, `❌ استخدم: \`${add ? 'ر' : 'ب'} @user اسم الرتبة\` أو اعمل Reply واكتب اسم الرتبة.`);
+    await reply(message, `❌ استخدم: \`${add ? 'ر / رول' : 'ب'} @user اسم الرتبة\` أو اعمل Reply واكتب اسم الرتبة.`);
     return true;
   }
 
   const role = roleFor(message.guild, roleName);
   const botRole = message.guild.members.me?.roles.highest;
   const actor = message.member;
-
   if (!role) {
     await reply(message, `❌ لم أجد رتبة قريبة من **${roleName}**.`);
     return true;
@@ -102,17 +122,19 @@ async function changeRole(message, targetMember, roleName, add) {
   }
 
   if (add) {
-    await targetMember.roles.add(role, `Arabic role shortcut by ${message.author.tag}`);
+    await targetMember.roles.add(role, `Role shortcut by ${message.author.tag}`);
     await reply(message, `✅ تمت إضافة **${role.name}** إلى ${targetMember}.`);
   } else {
-    await targetMember.roles.remove(role, `Arabic role shortcut by ${message.author.tag}`);
+    await targetMember.roles.remove(role, `Role shortcut by ${message.author.tag}`);
     await reply(message, `✅ تم سحب **${role.name}** من ${targetMember}.`);
   }
   return true;
 }
 
 export async function handleArabicModerationShortcut(message) {
-  const parsed = tokenize(message.content);
+  const guildConfig = await getGuildConfig(message.client, message.guild.id).catch(() => null);
+  const prefixes = [guildConfig?.prefix, getCommandPrefix()];
+  const parsed = tokenize(message.content, prefixes);
   if (!parsed) return false;
   if (parsed.command === 'purge') return purgeEntireChannel(message);
 
@@ -129,12 +151,8 @@ export async function handleArabicModerationShortcut(message) {
   const targetUser = targetMember?.user || await message.client.users.fetch(targetId).catch(() => null);
 
   try {
-    if (['ر', 'ان', 'رتبة'].includes(command)) {
-      return changeRole(message, targetMember, tail, true);
-    }
-
-    if (['ب', 'شيل', 'ازالةرتبة'].includes(command)) {
-      return changeRole(message, targetMember, tail, false);
+    if (ADD_ROLE_COMMANDS.has(command) || REMOVE_ROLE_COMMANDS.has(command)) {
+      return changeRole(message, targetMember, tail, ADD_ROLE_COMMANDS.has(command));
     }
 
     if (command === 'وارن') {
@@ -161,34 +179,29 @@ export async function handleArabicModerationShortcut(message) {
     if (command === 'انتايم') {
       if (!hasPermission(message.member, PermissionFlagsBits.ModerateMembers)) return reply(message, '❌ ليس لديك صلاحية إزالة التايم.');
       if (!targetMember) return reply(message, '❌ العضو غير موجود في السيرفر.');
-      const reason = tail || 'لم يتم تحديد سبب';
-      await ModerationService.removeTimeoutUser({ guild, member: targetMember, moderator: message.member, reason });
-      return reply(message, `🔓 تم إلغاء التايم عن ${targetMember}, Reason: ${reason}`);
+      await ModerationService.removeTimeoutUser({ guild, member: targetMember, moderator: message.member, reason: tail || 'لم يتم تحديد سبب' });
+      return reply(message, `🔓 تم إلغاء التايم عن ${targetMember}, Reason: ${tail || 'لم يتم تحديد سبب'}`);
     }
 
     if (command === 'بان') {
       if (!hasPermission(message.member, PermissionFlagsBits.BanMembers)) return reply(message, '❌ ليس لديك صلاحية البان.');
       if (!targetUser) return reply(message, '❌ لم يتم العثور على المستخدم.');
-      const reason = tail || 'لم يتم تحديد سبب';
-      await ModerationService.banUser({ guild, user: targetUser, moderator: message.member, reason });
-      return reply(message, `🚫 ${targetUser} Has Been Banned, Reason: ${reason}`);
+      await ModerationService.banUser({ guild, user: targetUser, moderator: message.member, reason: tail || 'لم يتم تحديد سبب' });
+      return reply(message, `🚫 ${targetUser} Has Been Banned, Reason: ${tail || 'لم يتم تحديد سبب'}`);
     }
 
     if (command === 'انبان') {
       if (!hasPermission(message.member, PermissionFlagsBits.BanMembers)) return reply(message, '❌ ليس لديك صلاحية إلغاء البان.');
       if (!targetUser) return reply(message, '❌ اكتب User ID صحيح أو اعمل Reply على رسالة الشخص.');
-      const reason = tail || 'لم يتم تحديد سبب';
-      await ModerationService.unbanUser({ guild, user: targetUser, moderator: message.member, reason });
-      return reply(message, `✅ تم إلغاء البان عن ${targetUser}, Reason: ${reason}`);
+      await ModerationService.unbanUser({ guild, user: targetUser, moderator: message.member, reason: tail || 'لم يتم تحديد سبب' });
+      return reply(message, `✅ تم إلغاء البان عن ${targetUser}, Reason: ${tail || 'لم يتم تحديد سبب'}`);
     }
 
     if (command === 'كلير') {
       if (!hasPermission(message.member, PermissionFlagsBits.ModerateMembers)) return reply(message, '❌ ليس لديك صلاحية مسح التحذيرات.');
       if (!targetMember) return reply(message, '❌ العضو غير موجود في السيرفر.');
-      ModerationService.assertModerationHierarchy(message.member, targetMember, 'clear warnings for');
-      const reason = tail || 'لم يتم تحديد سبب';
       const result = await WarningService.clearWarnings(guild.id, targetId);
-      return reply(message, `🧹 تم مسح كل تحذيرات ${targetMember}. Reason: ${reason}\nعدد التحذيرات المحذوفة: ${result.count}`);
+      return reply(message, `🧹 تم مسح كل تحذيرات ${targetMember}. Reason: ${tail || 'لم يتم تحديد سبب'}\nعدد التحذيرات المحذوفة: ${result.count}`);
     }
   } catch (error) {
     await reply(message, `❌ ${error.userMessage || error.message || 'حدث خطأ أثناء تنفيذ الأمر.'}`);
