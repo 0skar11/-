@@ -1,5 +1,5 @@
 import { Events } from 'discord.js';
-import { inspectRoleDelete, inspectRoleUpdate } from '../utils/antiRaid.js';
+import { inspectRoleDelete } from '../utils/antiRaid.js';
 
 export default {
   name: Events.GuildRoleDelete,
