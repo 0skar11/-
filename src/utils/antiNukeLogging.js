@@ -1,11 +1,8 @@
-import { AuditLogEvent, ChannelType } from 'discord.js';
+import { ChannelType } from 'discord.js';
+import { logger } from './logger.js';
 
 export const ANTI_NUKE_LOG_CHANNEL_ID = '1550564287129456810';
 const EVERYONE_MENTION = '@everyone';
-
-function formatExecutor(executor) {
-  return executor ? `${executor} (${executor.tag || executor.username || executor.id})` : 'Unknown';
-}
 
 async function getLogChannel(guild) {
   const channel = guild.channels.cache.get(ANTI_NUKE_LOG_CHANNEL_ID)
@@ -16,51 +13,32 @@ async function getLogChannel(guild) {
   return channel;
 }
 
-export async function sendAntiNukeLog(guild, {
-  action,
-  executor = null,
-  target = null,
-  details = [],
-  severity = 'HIGH',
-  mentionEveryone = true,
-}) {
+export async function sendAntiNukeLog(guild, { action, executor = null, target = null, details = [], severity = 'HIGH', mentionEveryone = true }) {
   const channel = await getLogChannel(guild);
   if (!channel) return null;
 
   const lines = [
-    `**Action:** ${action}`,
-    `**Severity:** ${severity}`,
-    `**Executor:** ${formatExecutor(executor)}`,
-    target ? `**Target:** ${target}` : null,
+    `**العملية:** ${action}`,
+    `**الخطورة:** ${severity}`,
+    `**المنفذ:** ${executor ? `${executor} — ${executor.tag || executor.username || executor.id}` : 'غير معروف'}`,
+    target ? `**الهدف:** ${target}` : null,
     ...details.map(([name, value]) => `**${name}:** ${value}`),
-    `**Guild:** ${guild.name} (${guild.id})`,
-    `**Time:** <t:${Math.floor(Date.now() / 1000)}:F>`,
+    `**السيرفر:** ${guild.name} (${guild.id})`,
+    `**الوقت:** <t:${Math.floor(Date.now() / 1000)}:F>`,
   ].filter(Boolean);
 
   return channel.send({
     content: mentionEveryone ? EVERYONE_MENTION : undefined,
     embeds: [{
-      title: `🛡️ Anti-Nuke Alert — ${action}`,
+      title: `🛡️ Anti-Nuke | ${action}`,
       description: lines.join('\n'),
       color: severity === 'CRITICAL' ? 0xED4245 : 0xFEE75C,
       timestamp: new Date().toISOString(),
-      footer: { text: 'TitanBot Anti-Nuke' },
+      footer: { text: 'TitanBot • Anti-Nuke Security Log' },
     }],
     allowedMentions: mentionEveryone ? { parse: ['everyone'] } : { parse: [] },
-  }).catch(() => null);
+  }).catch(error => {
+    logger.warn(`Failed to send anti-nuke log in ${ANTI_NUKE_LOG_CHANNEL_ID}: ${error.message}`);
+    return null;
+  });
 }
-
-export async function findRecentAuditEntry(guild, types, targetId = null) {
-  const typeList = Array.isArray(types) ? types : [types];
-  for (const type of typeList) {
-    const logs = await guild.fetchAuditLogs({ type, limit: 10 }).catch(() => null);
-    const entry = logs?.entries.find(item => (
-      (!targetId || item.target?.id === targetId)
-      && Date.now() - item.createdTimestamp < 15_000
-    ));
-    if (entry) return entry;
-  }
-  return null;
-}
-
-export { AuditLogEvent };

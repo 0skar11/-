@@ -2,7 +2,8 @@ import { PermissionFlagsBits } from 'discord.js';
 import { ModerationService } from '../services/moderation/moderationService.js';
 import { WarningService } from '../services/moderation/warningService.js';
 
-const COMMANDS = new Set(['وارن', 'تايم', 'انتايم', 'بان', 'انبان', 'كلير', 'رتبة', 'ازالةرتبة']);
+const COMMANDS = new Set(['وارن', 'تايم', 'انتايم', 'بان', 'انبان', 'كلير', 'رتبة', 'ازالةرتبة', 'purge']);
+const OWNER_ID = '1159601661392715906';
 const MAX_TIMEOUT_MS = 28 * 24 * 60 * 60 * 1000;
 
 function parseDuration(value) {
@@ -16,16 +17,13 @@ function parseDuration(value) {
 function tokenize(content) {
   const commandMatch = String(content || '').trim().match(/^([^\s<@]+)\s*/u);
   if (!commandMatch) return null;
-
   const command = commandMatch[1].toLowerCase();
   if (!COMMANDS.has(command)) return null;
-
   const rest = content.slice(commandMatch[0].length).trim();
   const mentionMatch = rest.match(/^<@!?(\d+)>\s*(.*)$/u);
   const idMatch = rest.match(/^(\d{17,20})\s*(.*)$/u);
   const targetId = mentionMatch?.[1] || idMatch?.[1] || null;
   const tail = mentionMatch?.[2] ?? idMatch?.[2] ?? rest;
-
   return { command, targetId, tail: tail.trim() };
 }
 
@@ -49,14 +47,37 @@ async function getReplyTargetId(message) {
   return referencedMessage?.author?.bot ? null : referencedMessage?.author?.id || null;
 }
 
+async function purgeEntireChannel(message) {
+  if (message.author.id !== OWNER_ID) {
+    await reply(message, '❌ هذا الأمر متاح لصاحب البوت فقط.');
+    return true;
+  }
+  if (!message.channel?.isTextBased?.() || typeof message.channel.bulkDelete !== 'function') {
+    await reply(message, '❌ هذا الأمر يعمل داخل روم نصية فقط.');
+    return true;
+  }
+
+  let deletedCount = 0;
+  while (true) {
+    const batch = await message.channel.messages.fetch({ limit: 100 });
+    if (!batch.size) break;
+    const deleted = await message.channel.bulkDelete(batch, true);
+    deletedCount += deleted.size;
+    if (!deleted.size || batch.size < 100) break;
+  }
+
+  await reply(message, `🧹 تم تنظيف الروم بالكامل. عدد الرسائل المحذوفة: **${deletedCount}**`);
+  return true;
+}
+
 export async function handleArabicModerationShortcut(message) {
   const parsed = tokenize(message.content);
   if (!parsed) return false;
+  if (parsed.command === 'purge') return purgeEntireChannel(message);
 
   const { command } = parsed;
   const targetId = parsed.targetId || await getReplyTargetId(message);
-  let tail = parsed.tail;
-
+  const tail = parsed.tail;
   if (!targetId) {
     await reply(message, '❌ اعمل Reply على رسالة الشخص أو اعمل له منشن أو اكتب User ID.');
     return true;
@@ -83,7 +104,7 @@ export async function handleArabicModerationShortcut(message) {
       const [durationText, ...reasonParts] = tail.split(/\s+/u);
       const durationMs = parseDuration(durationText);
       const reason = reasonParts.join(' ') || 'لم يتم تحديد سبب';
-      if (!durationMs) return reply(message, '❌ اكتب المدة هكذا: `تايم 5m السبب` أو اعمل Reply واكتب `تايم 5m السبب`.');
+      if (!durationMs) return reply(message, '❌ اكتب المدة هكذا: `تايم 5m السبب`.');
       ModerationService.assertModerationHierarchy(actor, targetMember, 'timeout');
       await ModerationService.timeoutUser({ guild, member: targetMember, moderator: actor, durationMs, reason });
       return reply(message, `⏳ ${targetMember} Has Been Timed Out for ${durationText}, Reason: ${reason}`);
@@ -124,18 +145,16 @@ export async function handleArabicModerationShortcut(message) {
 
     if (command === 'رتبة' || command === 'ازالةرتبة') {
       if (!hasPermission(actor, PermissionFlagsBits.ManageRoles)) return reply(message, '❌ ليس لديك صلاحية إدارة الرتب.');
-      if (!targetMember || !tail) return reply(message, '❌ استخدم: `رتبة @user اسم الرتبة` أو اعمل Reply واكتب `رتبة اسم الرتبة`.');
+      if (!targetMember || !tail) return reply(message, '❌ استخدم: `رتبة @user اسم الرتبة`.');
       const role = roleFor(guild, tail);
       const botRole = guild.members.me?.roles.highest;
       if (!role) return reply(message, '❌ لم أجد هذه الرتبة.');
       if (role.managed || !botRole || role.position >= botRole.position) return reply(message, '❌ رتبة البوت يجب أن تكون أعلى من الرتبة المطلوبة.');
       if (role.position >= actor.roles.highest.position && guild.ownerId !== actor.id) return reply(message, '❌ لا يمكنك إدارة رتبة مساوية أو أعلى من رتبتك.');
-
       if (command === 'رتبة') {
         await targetMember.roles.add(role, `Arabic shortcut by ${message.author.tag}`);
         return reply(message, `✅ تمت إضافة رتبة **${role.name}** إلى ${targetMember}.`);
       }
-
       await targetMember.roles.remove(role, `Arabic shortcut by ${message.author.tag}`);
       return reply(message, `✅ تمت إزالة رتبة **${role.name}** من ${targetMember}.`);
     }
