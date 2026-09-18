@@ -2,7 +2,7 @@ import { PermissionFlagsBits } from 'discord.js';
 import { ModerationService } from '../services/moderation/moderationService.js';
 import { WarningService } from '../services/moderation/warningService.js';
 
-const COMMANDS = new Set(['وارن', 'تايم', 'انتايم', 'بان', 'انبان', 'كلير', 'ان', 'شيل', 'رتبة', 'ازالةرتبة', 'purge']);
+const COMMANDS = new Set(['وارن', 'تايم', 'انتايم', 'بان', 'انبان', 'كلير', 'ان', 'شيل', 'ر', 'ب', 'رتبة', 'ازالةرتبة', 'purge']);
 const OWNER_ID = '1159601661392715906';
 const MAX_TIMEOUT_MS = 28 * 24 * 60 * 60 * 1000;
 
@@ -80,7 +80,7 @@ async function changeRole(message, targetMember, roleName, add) {
     return true;
   }
   if (!targetMember || !roleName) {
-    await reply(message, `❌ استخدم: \`${add ? 'ان' : 'شيل'} @user اسم الرتبة\` أو اعمل Reply واكتب اسم الرتبة.`);
+    await reply(message, `❌ استخدم: \`${add ? 'ر' : 'ب'} @user اسم الرتبة\` أو اعمل Reply واكتب اسم الرتبة.`);
     return true;
   }
 
@@ -129,8 +129,12 @@ export async function handleArabicModerationShortcut(message) {
   const targetUser = targetMember?.user || await message.client.users.fetch(targetId).catch(() => null);
 
   try {
-    if (command === 'ان' || command === 'شيل' || command === 'رتبة' || command === 'ازالةرتبة') {
-      return changeRole(message, targetMember, tail, command === 'ان' || command === 'رتبة');
+    if (['ر', 'ان', 'رتبة'].includes(command)) {
+      return changeRole(message, targetMember, tail, true);
+    }
+
+    if (['ب', 'شيل', 'ازالةرتبة'].includes(command)) {
+      return changeRole(message, targetMember, tail, false);
     }
 
     if (command === 'وارن') {
