@@ -197,20 +197,28 @@ export async function handleAntiRaidCommand(message) {
   const match = message.content.trim().match(/^(انترايد|تراست|انتراست)\s*(.*)$/u);
   if (!match) return false;
 
-  if (message.guild.ownerId !== message.author.id) {
-    await message.channel.send('❌ هذا الأمر لمالك السيرفر فقط.');
-    return true;
-  }
-
   const [, command, rawTarget] = match;
   if (command === 'انترايد') {
+    if (message.guild.ownerId !== message.author.id) {
+      await message.channel.send('❌ هذا الأمر لمالك السيرفر فقط.');
+      return true;
+    }
     await message.channel.send('🛡️ Anti-Raid يعمل تلقائيًا: 10 طرد/بان خلال دقيقة، 20 رسالة خلال 20 ثانية، و3 قنوات/رتب خلال دقيقة.');
     return true;
   }
 
-  const target = rawTarget.match(/^<@!?(\d+)>$/u)
-    || rawTarget.match(/^<@&(\d+)>$/u)
-    || rawTarget.match(/^(\d{17,20})$/u);
+  const canManageTrust = message.guild.ownerId === message.author.id
+    || await isTrusted(message.guild, message.author.id, { member: message.member ?? null });
+  if (!canManageTrust) {
+    await message.channel.send('❌ هذا الأمر لمالك السيرفر أو مستخدم موثوق فقط.');
+    return true;
+  }
+
+  const normalizedTarget = rawTarget.trim();
+
+  const target = normalizedTarget.match(/^<@!?(\d+)>$/u)
+    || normalizedTarget.match(/^<@&(\d+)>$/u)
+    || normalizedTarget.match(/^(\d{17,20})$/u);
 
   if (!target) {
     await message.channel.send(`❌ استخدم: \`${command} @user\` أو \`${command} @role\` أو اكتب ID.`);

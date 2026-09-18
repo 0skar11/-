@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { AuditLogEvent } from 'discord.js';
 
 import antiRaidBanAddEvent from '../src/events/antiRaidBanAdd.js';
-import { inspectMemberRemoval, isTrusted } from '../src/utils/antiRaid.js';
+import { handleAntiRaidCommand, inspectMemberRemoval, isTrusted } from '../src/utils/antiRaid.js';
 import { findRecentAuditEntry } from '../src/utils/antiNukeLogging.js';
 import { handleUntrustedBotJoin } from '../src/utils/antiRaidBots.js';
 
@@ -154,4 +154,81 @@ test('findRecentAuditEntry matches event type and target in freshness window', a
 
   const result = await findRecentAuditEntry(guild, AuditLogEvent.RoleDelete, 'role-1');
   assert.equal(result?.id, 'fresh');
+});
+
+test('trusted non-owner can run تراست and add bot/user trust', async () => {
+  let storedTrust = { trustedUserIds: ['trusted-manager'], trustedRoleIds: [] };
+  let setCalled = false;
+
+  const message = {
+    content: 'تراست   <@123456789012345678>',
+    author: { id: 'trusted-manager' },
+    member: { roles: { cache: [] } },
+    guild: {
+      id: 'guild-trust-command',
+      ownerId: 'server-owner',
+      roles: { cache: { get: () => null } },
+      members: {
+        cache: new Map(),
+        fetch: async () => null,
+      },
+      client: {
+        db: {
+          get: async () => storedTrust,
+          set: async (_key, value) => {
+            setCalled = true;
+            storedTrust = value;
+          },
+        },
+      },
+    },
+    client: {
+      users: {
+        fetch: async id => ({ id, toString: () => `<@${id}>` }),
+      },
+    },
+    channel: { send: async () => {} },
+  };
+
+  const handled = await handleAntiRaidCommand(message);
+  assert.equal(handled, true);
+  assert.equal(setCalled, true);
+  assert.equal(storedTrust.trustedUserIds.includes('123456789012345678'), true);
+});
+
+test('untrusted non-owner cannot run انتراست', async () => {
+  let setCalled = false;
+  let sentText = '';
+
+  const message = {
+    content: 'انتراست <@123456789012345678>',
+    author: { id: 'random-user' },
+    member: { roles: { cache: [] } },
+    guild: {
+      id: 'guild-antitrust-command',
+      ownerId: 'server-owner',
+      roles: { cache: { get: () => null } },
+      members: {
+        cache: new Map(),
+        fetch: async () => null,
+      },
+      client: {
+        db: {
+          get: async () => ({ trustedUserIds: [], trustedRoleIds: [] }),
+          set: async () => { setCalled = true; },
+        },
+      },
+    },
+    client: {
+      users: {
+        fetch: async id => ({ id, toString: () => `<@${id}>` }),
+      },
+    },
+    channel: { send: async text => { sentText = text; } },
+  };
+
+  const handled = await handleAntiRaidCommand(message);
+  assert.equal(handled, true);
+  assert.equal(setCalled, false);
+  assert.match(sentText, /مالك السيرفر أو مستخدم موثوق/);
 });
