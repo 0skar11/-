@@ -2,7 +2,7 @@ import { PermissionFlagsBits } from 'discord.js';
 import { ModerationService } from '../services/moderation/moderationService.js';
 import { WarningService } from '../services/moderation/warningService.js';
 
-const COMMANDS = new Set(['وارن', 'تايم', 'الغاءتايم', 'بان', 'الغاءبان', 'مسح', 'رتبة', 'ازالةرتبة']);
+const COMMANDS = new Set(['وارن', 'تايم', 'انتايم', 'بان', 'انبان', 'كلير', 'رتبة', 'ازالةرتبة']);
 const MAX_TIMEOUT_MS = 28 * 24 * 60 * 60 * 1000;
 
 function parseDuration(value) {
@@ -37,8 +37,7 @@ function hasPermission(member, permission) {
 }
 
 async function reply(message, content) {
-  const sent = await message.channel.send(content).catch(() => null);
-  if (sent) setTimeout(() => sent.delete().catch(() => {}), 8000);
+  await message.channel.send(content).catch(() => {});
 }
 
 export async function handleArabicModerationShortcut(message) {
@@ -46,14 +45,14 @@ export async function handleArabicModerationShortcut(message) {
   if (!parsed) return false;
 
   const { command, targetId, tail } = parsed;
-  if (!targetId && command !== 'الغاءبان') {
+  if (!targetId) {
     await reply(message, '❌ لازم تعمل منشن للشخص أو تكتب User ID.');
     return true;
   }
 
   const actor = message.member;
   const guild = message.guild;
-  const targetMember = targetId ? await guild.members.fetch(targetId).catch(() => null) : null;
+  const targetMember = await guild.members.fetch(targetId).catch(() => null);
   const targetUser = targetMember?.user || await message.client.users.fetch(targetId).catch(() => null);
 
   try {
@@ -77,7 +76,7 @@ export async function handleArabicModerationShortcut(message) {
       return reply(message, `⏳ ${targetMember} Has Been Timed Out for ${durationText}.`);
     }
 
-    if (command === 'الغاءتايم') {
+    if (command === 'انتايم') {
       if (!hasPermission(actor, PermissionFlagsBits.ModerateMembers)) return reply(message, '❌ ليس لديك صلاحية إزالة التايم.');
       if (!targetMember) return reply(message, '❌ العضو غير موجود في السيرفر.');
       await ModerationService.removeTimeoutUser({ guild, member: targetMember, moderator: actor });
@@ -92,19 +91,19 @@ export async function handleArabicModerationShortcut(message) {
       return reply(message, `🚫 ${targetUser} Has Been Banned, Reason: ${reason}`);
     }
 
-    if (command === 'الغاءبان') {
+    if (command === 'انبان') {
       if (!hasPermission(actor, PermissionFlagsBits.BanMembers)) return reply(message, '❌ ليس لديك صلاحية إلغاء البان.');
       if (!targetUser) return reply(message, '❌ اكتب User ID صحيح.');
       await ModerationService.unbanUser({ guild, user: targetUser, moderator: actor, reason: tail || 'لم يتم تحديد سبب' });
       return reply(message, `✅ تم إلغاء البان عن ${targetUser}.`);
     }
 
-    if (command === 'مسح') {
-      if (!hasPermission(actor, PermissionFlagsBits.ManageMessages)) return reply(message, '❌ ليس لديك صلاحية مسح الرسائل.');
-      if (!targetMember || typeof message.channel.bulkDelete !== 'function') return reply(message, '❌ العضو غير موجود أو القناة ليست نصية.');
-      const messages = await message.channel.messages.fetch({ limit: 100 });
-      const deleted = await message.channel.bulkDelete(messages.filter(item => item.author?.id === targetId), true);
-      return reply(message, `🧹 تم مسح ${deleted.size} رسالة من ${targetMember}.`);
+    if (command === 'كلير') {
+      if (!hasPermission(actor, PermissionFlagsBits.ModerateMembers)) return reply(message, '❌ ليس لديك صلاحية مسح التحذيرات.');
+      if (!targetMember) return reply(message, '❌ العضو غير موجود في السيرفر.');
+      ModerationService.assertModerationHierarchy(actor, targetMember, 'clear warnings for');
+      const result = await WarningService.clearWarnings(guild.id, targetId);
+      return reply(message, `🧹 تم مسح كل تحذيرات ${targetMember}.\nعدد التحذيرات المحذوفة: ${result.count}`);
     }
 
     if (command === 'رتبة' || command === 'ازالةرتبة') {
