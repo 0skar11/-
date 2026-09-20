@@ -10,7 +10,9 @@ export const DEFAULT_ECONOMY_DATA = {
 export const DEFAULT_GUILD_CONFIG = {
     enabledCommands: {}, birthdayChannelId: null, premiumRoleId: null,
     modRole: null, adminRole: null, welcomeChannel: null, autoRole: null,
-    antiNukeTrustedUsers: [], antiNukeLogChannelId: null,
+    antiNukeTrustedUsers: [],
+    antiNukeTrustedRoles: [],
+    antiNukeLogChannelId: null,
     logging: { enabled: false, channels: { audit: null, applications: null, reports: null }, ignore: { users: [], channels: [] }, enabledEvents: {} },
     verification: { enabled: false }
 };
