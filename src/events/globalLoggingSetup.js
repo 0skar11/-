@@ -16,13 +16,11 @@ export default {
       try {
         const config = await getGuildConfig(client, guild.id);
         await updateGuildConfig(client, guild.id, {
-          // Explicitly revoke all previously trusted users and roles once.
           antiNukeTrustedUsers: [],
           antiNukeTrustedRoles: [],
           antiRaidTrustedUsers: [],
           antiRaidTrustedRoles: [],
           antiNukeLogChannelId: GLOBAL_LOG_CHANNEL_ID,
-          // Do not enable the unrelated general logging system here.
           logging: {
             ...(config?.logging || {}),
             enabled: false,

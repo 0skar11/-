@@ -1,21 +1,24 @@
-import { Events } from 'discord.js';
+import { Events, PermissionFlagsBits } from 'discord.js';
 import { getGuildConfig, updateGuildConfig } from '../services/config/guildConfig.js';
 
 const OWNER_ID = '1159601661392715906';
-const TRUST_COMMANDS = new Set(['تراست', 'انتراست', 'trust', 'untrust']);
+const TRUST_COMMANDS = new Set(['تراست', 'انتراست', 'trust', 'untrust', 'trusted', 'untrusted']);
 
 function parseTarget(content) {
-  const parts = String(content || '').trim().split(/\s+/u).filter(Boolean);
+  const raw = String(content || '').trim();
+  if (!raw) return null;
+
+  const parts = raw.split(/\s+/u).filter(Boolean);
   if (parts.length < 2) return null;
 
   const command = parts[0].toLowerCase();
   if (!TRUST_COMMANDS.has(command)) return null;
 
-  const targetText = parts.slice(1).join(' ');
-  const role = targetText.match(/<@&(\d+)>/u);
-  const user = targetText.match(/<@!?(\d+)>/u) || targetText.match(/\b(\d{17,20})\b/u);
-  if (role) return { command, type: 'role', id: role[1] };
-  if (user) return { command, type: 'user', id: user[1] };
+  const remainder = parts.slice(1).join(' ');
+  const roleMatch = remainder.match(/<@&(\d+)>/u);
+  const userMatch = remainder.match(/<@!?(\d+)>/u) || remainder.match(/\b(\d{17,20})\b/u);
+  if (roleMatch) return { command, type: 'role', id: roleMatch[1] };
+  if (userMatch) return { command, type: 'user', id: userMatch[1] };
   return null;
 }
 
@@ -33,10 +36,9 @@ export default {
     const target = parseTarget(message.content);
     if (!target) return;
 
-    // This security-sensitive command is never controlled by role permissions.
     if (message.author.id !== OWNER_ID) {
       message.content = '';
-      await message.channel.send('❌ أمر Trust متاح للمالك فقط.').catch(() => {});
+      await message.channel.send('❌ أوامر Anti-Raid و Anti-Nuke، خصوصًا Trust، متاحة للمالك فقط.').catch(() => {});
       return;
     }
 
@@ -53,8 +55,8 @@ export default {
         }
       } else {
         const member = await message.guild.members.fetch(target.id).catch(() => null);
-        if (!member || member.user.bot) {
-          await message.channel.send('❌ العضو غير موجود أو لا يمكن إضافة بوت إلى Trust.').catch(() => {});
+        if (!member) {
+          await message.channel.send('❌ العضو غير موجود في السيرفر.').catch(() => {});
           return;
         }
       }
