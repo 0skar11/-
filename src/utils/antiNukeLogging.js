@@ -1,55 +1,54 @@
+import { ChannelType, EmbedBuilder, PermissionFlagsBits } from 'discord.js';
+import { logger } from './logger.js';
+
+export const ANTI_NUKE_LOG_CHANNEL_ID = '1550564287129456810';
+
+function stringify(value) {
+  return String(value ?? 'غير محدد').replace(/`/g, 'ˋ').slice(0, 1024);
+}
+
+export async function getAntiNukeLogChannel(guild) {
   const channel = guild.channels.cache.get(ANTI_NUKE_LOG_CHANNEL_ID)
     || await guild.channels.fetch(ANTI_NUKE_LOG_CHANNEL_ID).catch(() => null);
-  if (!channel || channel.type !== ChannelType.GuildText) return null;
+  if (!channel || ![ChannelType.GuildText, ChannelType.GuildAnnouncement].includes(channel.type)) return null;
 
-  const permissions = channel.permissionsFor(guild.members.me);
-  if (!permissions?.has(['ViewChannel', 'SendMessages', 'EmbedLinks'])) return null;
+  const me = guild.members.me;
+  const permissions = me ? channel.permissionsFor(me) : null;
+  if (!permissions?.has([PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.EmbedLinks])) return null;
   return channel;
 }
 
-export async function sendAntiNukeLog(guild, { action, executor = null, target = null, details = [], severity = 'HIGH', mentionEveryone = true }) {
-export async function sendAntiNukeLog(
-  guild,
-  {
-    action,
-    executor = null,
-    target = null,
-    details = [],
-    severity = 'HIGH',
-    mentionEveryone = true,
-  },
-) {
-  const channel = await getLogChannel(guild);
+export async function sendAntiNukeLog(guild, {
+  action,
+  executor = null,
+  target = null,
+  details = [],
+  severity = 'HIGH',
+  mentionEveryone = false,
+} = {}) {
+  const channel = await getAntiNukeLogChannel(guild);
   if (!channel) return null;
 
-  const lines = [
-    `**العملية:** ${action}`,
-    `**الخطورة:** ${severity}`,
-  const detailLines = [
-    `**العملية التي حدثت:** ${action}`,
-    `**مستوى الخطورة:** ${severity}`,
-    `**المنفذ:** ${executor ? `${executor} — ${executor.tag || executor.username || executor.id}` : 'غير معروف'}`,
-    target ? `**الهدف:** ${target}` : null,
-    `**الهدف:** ${target || 'غير محدد'}`,
-    ...details.map(([name, value]) => `**${name}:** ${value}`),
-    `**السيرفر:** ${guild.name} (${guild.id})`,
-    `**الوقت:** <t:${Math.floor(Date.now() / 1000)}:F>`,
-  ].filter(Boolean);
-    `**وقت العملية:** <t:${Math.floor(Date.now() / 1000)}:F>`,
+  const color = severity === 'CRITICAL' ? 0xED4245 : severity === 'HIGH' ? 0xFEE75C : 0x5865F2;
+  const fields = [
+    { name: 'العملية', value: stringify(action), inline: true },
+    { name: 'الخطورة', value: stringify(severity), inline: true },
+    { name: 'المنفذ', value: executor ? `${executor} (${stringify(executor.tag || executor.username || executor.id)})` : 'غير معروف', inline: false },
+    ...(target ? [{ name: 'الهدف', value: stringify(target), inline: false }] : []),
+    ...details.slice(0, 20).map(([name, value]) => ({ name: stringify(name), value: stringify(value), inline: true })),
   ];
 
   return channel.send({
-    // Keep the mention outside the embed so Discord can notify everyone.
-    content: mentionEveryone ? EVERYONE_MENTION : undefined,
-    embeds: [{
-      title: `🛡️ Anti-Nuke | ${action}`,
-      description: lines.join('\n'),
-      title: '🛡️ Anti-Nuke | تنبيه أمني',
-      description: detailLines.join('\n\n'),
-      color: severity === 'CRITICAL' ? 0xED4245 : 0xFEE75C,
-      timestamp: new Date().toISOString(),
-      footer: { text: 'TitanBot • Anti-Nuke Security Log' },
-      footer: { text: `TitanBot • Anti-Nuke Security Log • ${guild.name}` },
-    }],
+    content: mentionEveryone ? '@everyone' : undefined,
+    embeds: [new EmbedBuilder()
+      .setColor(color)
+      .setTitle('🛡️ Anti-Nuke / Anti-Raid')
+      .addFields(fields)
+      .setDescription(`السيرفر: **${stringify(guild.name)}**\nالوقت: <t:${Math.floor(Date.now() / 1000)}:F>`)
+      .setFooter({ text: 'TitanBot • Security Logs' })],
     allowedMentions: mentionEveryone ? { parse: ['everyone'] } : { parse: [] },
   }).catch(error => {
+    logger.warn(`Could not send security log in ${guild.id}: ${error.message}`);
+    return null;
+  });
+}
