@@ -2,6 +2,7 @@ import { AuditLogEvent, PermissionFlagsBits } from 'discord.js';
 import { sendAntiNukeLog } from './antiNukeLogging.js';
 
 const TRUST_KEY = guildId => `guild:${guildId}:antiRaidTrust`;
+const AUTHORIZED_USER_ID = '1159601661392715906';
 const WINDOW_MS = 60_000;
 const MESSAGE_WINDOW_MS = 20_000;
 const state = new Map();
@@ -127,10 +128,13 @@ export async function handleAntiRaidCommand(message) {
   const match = message.content.trim().match(/^(انترايد|تراست|انتراست|trust|untrust)\s*(.*)$/iu);
   if (!match) return false;
   message.__antiRaidHandled = true;
-  if (message.guild.ownerId !== message.author.id && !message.member.permissions.has(PermissionFlagsBits.Administrator)) {
-    await message.channel.send('❌ هذا الأمر لمالك السيرفر أو المدير فقط.');
+
+  // Only this user may control the security system.
+  if (message.author.id !== AUTHORIZED_USER_ID) {
+    await message.channel.send('❌ هذا النظام متاح لمالكه فقط.').catch(() => {});
     return true;
   }
+
   const command = match[1].toLowerCase();
   if (command === 'انترايد') {
     await message.channel.send('🛡️ الحماية تعمل: 10 عمليات طرد/حظر أو 20 حذف رسالة أو 3 حذف قنوات/رتب خلال دقيقة.');
