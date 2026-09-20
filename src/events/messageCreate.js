@@ -1,6 +1,7 @@
-import { Events } from 'discord.js';
+﻿import { Events } from 'discord.js';
 import { logger } from '../utils/logger.js';
 import { handleArabicModerationShortcut } from '../utils/arabicModerationShortcuts.js';
+import { handleArabicUtilityShortcuts } from '../utils/arabicUtilityShortcuts.js';
 import { getLevelingConfig, getUserLevelData } from '../services/leveling/leveling.js';
 import { addXp } from '../services/leveling/xpSystem.js';
 import { checkRateLimit } from '../utils/rateLimiter.js';
@@ -25,6 +26,7 @@ export default {
       if (message.author.bot || !message.guild) return;
       logger.debug(`Message received from ${message.author.tag}: ${message.content}`);
 
+      if (await handleArabicUtilityShortcuts(message)) return;
       if (await handleArabicModerationShortcut(message)) return;
       if (await handleCountingGame(message, client)) return;
       await handlePrefixCommand(message, client);
