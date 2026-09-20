@@ -1,6 +1,6 @@
 import { Events } from 'discord.js';
 import { logger, startupLog } from '../utils/logger.js';
-import { synchronizeStaffRoles } from '../services/staffRoleHierarchyService.js';
+import { publishStaffPermissionBoard, synchronizeStaffRoles } from '../services/staffRoleHierarchyService.js';
 
 export default {
   name: Events.ClientReady,
@@ -10,6 +10,7 @@ export default {
     let created = 0;
     let updated = 0;
     let positioned = 0;
+    let boards = 0;
 
     for (const guild of client.guilds.cache.values()) {
       try {
@@ -17,11 +18,12 @@ export default {
         created += summary.created;
         updated += summary.updated;
         positioned += summary.positioned;
+        boards += await publishStaffPermissionBoard(guild);
       } catch (error) {
         logger.error(`Failed to synchronize staff roles in ${guild.name}:`, error);
       }
     }
 
-    startupLog(`Staff role hierarchy: created ${created}, updated ${updated}, positioned ${positioned}`);
+    startupLog(`Staff role hierarchy: created ${created}, updated ${updated}, positioned ${positioned}, permission messages ${boards}`);
   },
 };
