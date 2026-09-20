@@ -1,11 +1,9 @@
 import { Events } from 'discord.js';
-import { handleSecurityShortcut } from '../utils/securityShortcuts.js';
+import { handleAntiRaidCommand } from '../utils/antiRaid.js';
 
 export default {
   name: Events.MessageCreate,
-  async execute() {
-    // Security shortcuts are handled centrally by messageCreate.js.
-    // This file is intentionally kept as a compatibility stub so the
-    // legacy duplicate MessageCreate listener cannot consume the message first.
+  async execute(message) {
+    if (!message.author?.bot && message.guild) await handleAntiRaidCommand(message);
   },
 };
