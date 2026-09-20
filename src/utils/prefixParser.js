@@ -21,7 +21,36 @@ export function parsePrefixCommand(content, prefix) {
 
   return {
     commandName,
-    args: commandArgs
+    args: commandArgs,
+  };
+}
+
+/**
+ * Parse a command sent without the configured prefix.
+ *
+ * Prefix commands remain supported by parsePrefixCommand. This parser only
+ * removes the requirement for the prefix; command resolution still happens in
+ * messageCreate through the normal command alias map and loaded command list.
+ * Unknown regular messages are ignored there because no command is found.
+ */
+export function parseMessageCommand(content, prefix) {
+  if (!content || typeof content !== 'string') {
+    return null;
+  }
+
+  const trimmed = content.trim();
+  if (!trimmed || (prefix && trimmed.startsWith(prefix))) {
+    return null;
+  }
+
+  const args = parseArguments(trimmed);
+  if (args.length === 0) {
+    return null;
+  }
+
+  return {
+    commandName: args[0].toLowerCase(),
+    args: args.slice(1),
   };
 }
 
@@ -82,7 +111,7 @@ export function mapArgumentsToOptions(args, commandData) {
       getBoolean: (name) => args[0] === 'true',
       getSubcommand: () => null,
       getSubcommandGroup: () => null,
-      validateRequired: () => ({ valid: true, missing: [] })
+      validateRequired: () => ({ valid: true, missing: [] }),
     };
   }
 
@@ -196,7 +225,7 @@ export function mapArgumentsToOptions(args, commandData) {
       missing,
       subcommandName,
       subcommandGroupName,
-      optionDefs
-    })
+      optionDefs,
+    }),
   };
 }
