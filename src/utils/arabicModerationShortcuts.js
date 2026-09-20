@@ -1,11 +1,11 @@
 import { PermissionFlagsBits } from 'discord.js';
 import { getCommandPrefix } from '../config/bot.js';
-import { getGuildConfig } from '../services/config/guildConfig.js';
+import { getGuildConfig, updateGuildConfig } from '../services/config/guildConfig.js';
 import { ModerationService } from '../services/moderation/moderationService.js';
 import { WarningService } from '../services/moderation/warningService.js';
 
 const COMMANDS = new Set([
-  'وارن', 'تايم', 'انتايم', 'بان', 'انبان', 'كلير', 'ان', 'شيل', 'ر', 'رول', 'ب', 'رتبة', 'ازالةرتبة', 'purge',
+  'وارن', 'تايم', 'انتايم', 'بان', 'انبان', 'كلير', 'ان', 'شيل', 'ر', 'رول', 'ب', 'رتبة', 'ازالةرتبة', 'purge', 'تراست',
   'warn', 'timeout', 'untimeout', 'ban', 'unban', 'clear', 'remove', 'role', 'roll', 'lock', 'unlock',
 ].map((value) => value.toLowerCase()));
 
@@ -77,6 +77,39 @@ async function getReplyTargetId(message) {
   return referencedMessage?.author?.bot ? null : referencedMessage?.author?.id || null;
 }
 
+async function handleTrust(message, targetId) {
+  if (!message.member?.permissions?.has(PermissionFlagsBits.ManageGuild) && message.guild.ownerId !== message.author.id) {
+    await reply(message, '❌ ليس لديك صلاحية **Manage Server**.');
+    return true;
+  }
+
+  const resolvedTargetId = targetId || await getReplyTargetId(message);
+  if (!resolvedTargetId) {
+    await reply(message, '❌ استخدم الأمر هكذا: `تراست @العضو` أو اعمل Reply على رسالة العضو.');
+    return true;
+  }
+
+  const member = await message.guild.members.fetch(resolvedTargetId).catch(() => null);
+  if (!member) {
+    await reply(message, '❌ العضو غير موجود في السيرفر.');
+    return true;
+  }
+
+  const config = await getGuildConfig(message.client, message.guild.id);
+  const trustedUsers = new Set(Array.isArray(config?.antiRaidTrustedUsers) ? config.antiRaidTrustedUsers : []);
+  const alreadyTrusted = trustedUsers.has(member.id);
+  trustedUsers.add(member.id);
+
+  await updateGuildConfig(message.client, message.guild.id, {
+    antiRaidTrustedUsers: [...trustedUsers],
+  });
+
+  await reply(message, alreadyTrusted
+    ? `ℹ️ ${member} محمي بالفعل من نظام Anti-Raid.`
+    : `🛡️ تم إعطاء ${member} حماية من نظام Anti-Raid.`);
+  return true;
+}
+
 async function purgeEntireChannel(message) {
   if (message.author.id !== OWNER_ID) {
     await reply(message, '❌ هذا الأمر متاح لصاحب البوت فقط.');
@@ -141,6 +174,7 @@ export async function handleArabicModerationShortcut(message) {
   const parsed = tokenize(message.content, prefixes);
   if (!parsed) return false;
   if (parsed.command === 'purge' || parsed.command === 'clear') return purgeEntireChannel(message);
+  if (parsed.command === 'تراست') return handleTrust(message, parsed.targetId);
 
   const { command } = parsed;
   const targetId = parsed.targetId || await getReplyTargetId(message);
