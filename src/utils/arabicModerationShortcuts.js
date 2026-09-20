@@ -5,7 +5,7 @@ import { ModerationService } from '../services/moderation/moderationService.js';
 import { WarningService } from '../services/moderation/warningService.js';
 
 const COMMANDS = new Set([
-  'وارن', 'تايم', 'انتايم', 'بان', 'انبان', 'كلير', 'ان', 'شيل', 'ر', 'رول', 'ب', 'رتبة', 'ازالةرتبة', 'purge', 'تراست',
+  'وارن', 'تايم', 'انتايم', 'بان', 'انبان', 'كلير', 'ان', 'شيل', 'ر', 'رول', 'ب', 'رتبة', 'ازالةرتبة', 'purge', 'تراست', 'trusted',
   'warn', 'timeout', 'untimeout', 'ban', 'unban', 'clear', 'remove', 'role', 'roll', 'lock', 'unlock',
 ].map((value) => value.toLowerCase()));
 
@@ -77,6 +77,62 @@ async function getReplyTargetId(message) {
   return referencedMessage?.author?.bot ? null : referencedMessage?.author?.id || null;
 }
 
+async function handleTrustedList(message) {
+  if (!message.member?.permissions?.has(PermissionFlagsBits.ManageGuild) && message.guild.ownerId !== message.author.id) {
+    await reply(message, '❌ ليس لديك صلاحية **Manage Server**.');
+    return true;
+  }
+
+  const config = await getGuildConfig(message.client, message.guild.id);
+  const trustedUserIds = Array.isArray(config?.antiNukeTrustedUsers) ? config.antiNukeTrustedUsers : [];
+  const trustedRoleIds = Array.isArray(config?.antiNukeTrustedRoles)
+    ? config.antiNukeTrustedRoles
+    : Array.isArray(config?.antiRaidTrustedRoles) ? config.antiRaidTrustedRoles : [];
+
+  const users = [];
+  const bots = [];
+  for (const userId of [...new Set(trustedUserIds)]) {
+    const member = await message.guild.members.fetch(userId).catch(() => null);
+    const user = member?.user || await message.client.users.fetch(userId).catch(() => null);
+    const mention = `<@${userId}>`;
+    if (user?.bot || member?.user?.bot) bots.push(`${mention} (${user.tag || user.username || userId})`);
+    else users.push(`${mention} (${user?.tag || user?.username || userId})`);
+  }
+
+  const roles = [];
+  for (const roleId of [...new Set(trustedRoleIds)]) {
+    const role = await message.guild.roles.fetch(roleId).catch(() => null);
+    roles.push(role ? `${role} (${role.name})` : `<@&${roleId}> (رتبة غير موجودة)`);
+  }
+
+  const lines = [
+    '🛡️ **قائمة Trusted في هذا السيرفر**',
+    '',
+    `**الأعضاء (${users.length}):**`,
+    users.length ? users.join('\n') : 'لا يوجد',
+    '',
+    `**البوتات (${bots.length}):**`,
+    bots.length ? bots.join('\n') : 'لا يوجد',
+    '',
+    `**الرتب (${roles.length}):**`,
+    roles.length ? roles.join('\n') : 'لا يوجد',
+  ];
+
+  const output = lines.join('\n');
+  if (output.length <= 2000) return reply(message, output);
+
+  let chunk = '';
+  for (const line of lines) {
+    if ((chunk + line + '\n').length > 1900) {
+      await reply(message, chunk);
+      chunk = '';
+    }
+    chunk += `${line}\n`;
+  }
+  if (chunk.trim()) await reply(message, chunk);
+  return true;
+}
+
 async function handleTrust(message, targetId) {
   if (!message.member?.permissions?.has(PermissionFlagsBits.ManageGuild) && message.guild.ownerId !== message.author.id) {
     await reply(message, '❌ ليس لديك صلاحية **Manage Server**.');
@@ -96,12 +152,12 @@ async function handleTrust(message, targetId) {
   }
 
   const config = await getGuildConfig(message.client, message.guild.id);
-  const trustedUsers = new Set(Array.isArray(config?.antiRaidTrustedUsers) ? config.antiRaidTrustedUsers : []);
+  const trustedUsers = new Set(Array.isArray(config?.antiNukeTrustedUsers) ? config.antiNukeTrustedUsers : []);
   const alreadyTrusted = trustedUsers.has(member.id);
   trustedUsers.add(member.id);
 
   await updateGuildConfig(message.client, message.guild.id, {
-    antiRaidTrustedUsers: [...trustedUsers],
+    antiNukeTrustedUsers: [...trustedUsers],
   });
 
   await reply(message, alreadyTrusted
@@ -173,6 +229,7 @@ export async function handleArabicModerationShortcut(message) {
   const prefixes = [guildConfig?.prefix, getCommandPrefix()];
   const parsed = tokenize(message.content, prefixes);
   if (!parsed) return false;
+  if (parsed.command === 'trusted') return handleTrustedList(message);
   if (parsed.command === 'purge' || parsed.command === 'clear') return purgeEntireChannel(message);
   if (parsed.command === 'تراست') return handleTrust(message, parsed.targetId);
 
