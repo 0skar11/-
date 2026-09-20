@@ -4,7 +4,7 @@ import { getGuildConfig } from '../services/config/guildConfig.js';
 import { ModerationService } from '../services/moderation/moderationService.js';
 import { WarningService } from '../services/moderation/warningService.js';
 
-const COMMANDS = new Set(['وارن', 'تايم', 'انتايم', 'بان', 'انبان', 'كلير', 'ان', 'شيل', 'ر', 'رول', 'ب', 'رتبة', 'ازالةرتبة', 'purge']);
+const COMMANDS = new Set(['وارن', 'تايم', 'انتايم', 'بان', 'انبان', 'كلير', 'ان', 'شيل', 'ر', 'رول', 'ب', 'رتبة', 'ازالةرتبة', 'purge', 'ق']);
 const ADD_ROLE_COMMANDS = new Set(['ر', 'رول', 'ان', 'رتبة']);
 const REMOVE_ROLE_COMMANDS = new Set(['ب', 'شيل', 'ازالةرتبة']);
 const OWNER_ID = '1159601661392715906';
@@ -95,6 +95,32 @@ async function purgeEntireChannel(message) {
   return true;
 }
 
+async function lockChannel(message) {
+  if (!hasPermission(message.member, PermissionFlagsBits.ManageChannels)) {
+    await reply(message, '❌ ليس لديك صلاحية إدارة الرومات.');
+    return true;
+  }
+  if (!message.channel?.permissionOverwrites?.edit) {
+    await reply(message, '❌ هذا الأمر يعمل داخل روم قابلة للقفل فقط.');
+    return true;
+  }
+
+  const everyoneRole = message.guild.roles.everyone;
+  const currentPermissions = message.channel.permissionsFor(everyoneRole);
+  if (currentPermissions?.has(PermissionFlagsBits.SendMessages) === false) {
+    await reply(message, '⚠️ الروم مقفولة بالفعل.');
+    return true;
+  }
+
+  await message.channel.permissionOverwrites.edit(
+    everyoneRole,
+    { SendMessages: false },
+    { reason: `Channel locked by ${message.author.tag}` },
+  );
+  await reply(message, `🔒 تم قفل ${message.channel} بنجاح.`);
+  return true;
+}
+
 async function changeRole(message, targetMember, roleName, add) {
   if (!hasPermission(message.member, PermissionFlagsBits.ManageRoles)) {
     await reply(message, '❌ ليس لديك صلاحية إدارة الرتب.');
@@ -137,6 +163,7 @@ export async function handleArabicModerationShortcut(message) {
   const parsed = tokenize(message.content, prefixes);
   if (!parsed) return false;
   if (parsed.command === 'purge') return purgeEntireChannel(message);
+  if (parsed.command === 'ق') return lockChannel(message);
 
   const { command } = parsed;
   const targetId = parsed.targetId || await getReplyTargetId(message);
