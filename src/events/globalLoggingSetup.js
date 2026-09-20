@@ -9,18 +9,15 @@ export default {
   once: true,
 
   async execute(client) {
-    let cleared = 0;
     let configured = 0;
 
     for (const guild of client.guilds.cache.values()) {
       try {
         const config = await getGuildConfig(client, guild.id);
         await updateGuildConfig(client, guild.id, {
-          antiNukeTrustedUsers: [],
-          antiNukeTrustedRoles: [],
-          antiRaidTrustedUsers: [],
-          antiRaidTrustedRoles: [],
           antiNukeLogChannelId: GLOBAL_LOG_CHANNEL_ID,
+          // Keep general application/moderation logging disabled. Anti-Nuke
+          // writes directly to antiNukeLogChannelId and is unaffected by this.
           logging: {
             ...(config?.logging || {}),
             enabled: false,
@@ -32,13 +29,12 @@ export default {
             },
           },
         });
-        cleared += 1;
         configured += 1;
       } catch (error) {
-        logger.error(`Failed to reset Anti-Raid/Anti-Nuke config in ${guild.name}:`, error);
+        logger.error(`Failed to configure Anti-Raid/Anti-Nuke logging in ${guild.name}:`, error);
       }
     }
 
-    startupLog(`Anti-Raid/Anti-Nuke reset: cleared trust in ${cleared} guild(s); configured ${configured} log channel(s)`);
+    startupLog(`Anti-Raid/Anti-Nuke logging configured for ${configured} guild(s)`);
   },
 };
