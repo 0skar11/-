@@ -1,19 +1,24 @@
 import { Events } from 'discord.js';
-import { sendAntiNukeLog } from '../utils/antiNukeLogging.js';
+import { getGuildConfig } from '../services/config/guildConfig.js';
+import { sendAntiNukeLog } from './antiNukeLogging.js';
 
-export default {
-  name: Events.MessageCreate,
-  async execute(message) {
-    if (!message.guild || message.author?.bot) return;
-    const match = message.content.trim().match(/^(تراست|انتراست)\s+(.+)$/u);
-    if (!match) return;
-    await sendAntiNukeLog(message.guild, {
-      action: match[1] === 'تراست' ? 'Trust Added' : 'Trust Removed',
-      executor: message.author,
-      target: match[2],
-      details: [['Command', message.content], ['Permission', 'Server owner only']],
+export async function handleUntrustedBotJoin(member) {
+  if (!member?.guild || !member.user?.bot) return false;
+  const config = await getGuildConfig(member.client, member.guild.id).catch(() => null);
+  const trusted = new Set(config?.antiNukeTrustedUsers || []);
+  if (trusted.has(member.id) || member.id === member.guild.client.user?.id) return false;
+
+  if (member.kickable) {
+    await member.kick('Anti-Nuke: untrusted bot join').catch(() => {});
+    await sendAntiNukeLog(member.guild, {
+      action: 'Untrusted bot blocked',
+      target: `${member.user.tag} (${member.id})`,
+      executor: member.guild.client.user,
       severity: 'HIGH',
-      mentionEveryone: true,
     });
-  },
-};
+    return true;
+  }
+  return false;
+}
+
+export default { name: Events.GuildMemberAdd, async execute(member) { await handleUntrustedBotJoin(member); } };
