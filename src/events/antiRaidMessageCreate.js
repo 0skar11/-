@@ -1,9 +1,9 @@
 import { Events } from 'discord.js';
-import { handleAntiRaidCommand } from '../utils/antiRaid.js';
+import { handleSecurityShortcut } from '../utils/securityShortcuts.js';
 
 export default {
   name: Events.MessageCreate,
   async execute(message) {
-    if (message.guild && !message.author?.bot) await handleAntiRaidCommand(message);
+    await handleSecurityShortcut(message);
   },
 };
