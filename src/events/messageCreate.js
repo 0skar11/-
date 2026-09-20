@@ -4,7 +4,7 @@ import { handleArabicModerationShortcut } from '../utils/arabicModerationShortcu
 import { getLevelingConfig, getUserLevelData } from '../services/leveling/leveling.js';
 import { addXp } from '../services/leveling/xpSystem.js';
 import { checkRateLimit } from '../utils/rateLimiter.js';
-import { parsePrefixCommand } from '../utils/prefixParser.js';
+import { parsePrefixCommand, parseMessageCommand } from '../utils/prefixParser.js';
 import { supportsPrefixExecution, executePrefixCommand, resolvePrefixAccessKey } from '../utils/messageAdapter.js';
 import { resolveCommandAlias, resolveSubcommandAlias } from '../config/commands/commandAliases.js';
 import { getPrefixRestriction } from '../config/commands/prefixRestrictions.js';
@@ -39,7 +39,7 @@ async function handlePrefixCommand(message, client) {
   try {
     const guildConfig = await getGuildConfig(client, message.guild.id);
     const prefix = guildConfig?.prefix || getCommandPrefix();
-    const parsed = parsePrefixCommand(message.content, prefix);
+    const parsed = parsePrefixCommand(message.content, prefix) ?? parseMessageCommand(message.content, prefix);
     if (!parsed) return;
 
     let { commandName, args } = parsed;

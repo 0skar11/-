@@ -4,9 +4,13 @@ import { getGuildConfig } from '../services/config/guildConfig.js';
 import { ModerationService } from '../services/moderation/moderationService.js';
 import { WarningService } from '../services/moderation/warningService.js';
 
-const COMMANDS = new Set(['وارن', 'تايم', 'انتايم', 'بان', 'انبان', 'كلير', 'ان', 'شيل', 'ر', 'رول', 'ب', 'رتبة', 'ازالةرتبة', 'purge']);
-const ADD_ROLE_COMMANDS = new Set(['ر', 'رول', 'ان', 'رتبة']);
-const REMOVE_ROLE_COMMANDS = new Set(['ب', 'شيل', 'ازالةرتبة']);
+const COMMANDS = new Set([
+  'وارن', 'تايم', 'انتايم', 'بان', 'انبان', 'كلير', 'ان', 'شيل', 'ر', 'رول', 'ب', 'رتبة', 'ازالةرتبة', 'purge',
+  'warn', 'timeout', 'untimeout', 'ban', 'unban', 'clear', 'remove', 'role', 'roll', 'lock', 'unlock',
+].map((value) => value.toLowerCase()));
+
+const ADD_ROLE_COMMANDS = new Set(['ر', 'رول', 'ان', 'رتبة', 'role', 'roll', 'addrole']);
+const REMOVE_ROLE_COMMANDS = new Set(['ب', 'شيل', 'ازالةرتبة', 'remove', 'unrole', 'removerole']);
 const OWNER_ID = '1159601661392715906';
 const MAX_TIMEOUT_MS = 28 * 24 * 60 * 60 * 1000;
 
@@ -101,7 +105,7 @@ async function changeRole(message, targetMember, roleName, add) {
     return true;
   }
   if (!targetMember || !roleName) {
-    await reply(message, `❌ استخدم: \`${add ? 'ر / رول' : 'ب'} @user اسم الرتبة\` أو اعمل Reply واكتب اسم الرتبة.`);
+    await reply(message, `❌ استخدم: \`${add ? 'ر / رول' : 'ب / شيل'} @user اسم الرتبة\` أو اعمل Reply واكتب اسم الرتبة.`);
     return true;
   }
 
@@ -136,7 +140,7 @@ export async function handleArabicModerationShortcut(message) {
   const prefixes = [guildConfig?.prefix, getCommandPrefix()];
   const parsed = tokenize(message.content, prefixes);
   if (!parsed) return false;
-  if (parsed.command === 'purge') return purgeEntireChannel(message);
+  if (parsed.command === 'purge' || parsed.command === 'clear') return purgeEntireChannel(message);
 
   const { command } = parsed;
   const targetId = parsed.targetId || await getReplyTargetId(message);
@@ -155,7 +159,7 @@ export async function handleArabicModerationShortcut(message) {
       return changeRole(message, targetMember, tail, ADD_ROLE_COMMANDS.has(command));
     }
 
-    if (command === 'وارن') {
+    if (command === 'وارن' || command === 'warn') {
       if (!hasPermission(message.member, PermissionFlagsBits.ModerateMembers)) return reply(message, '❌ ليس لديك صلاحية التحذير.');
       if (!targetMember) return reply(message, '❌ العضو غير موجود في السيرفر.');
       ModerationService.assertModerationHierarchy(message.member, targetMember, 'warn');
@@ -164,7 +168,14 @@ export async function handleArabicModerationShortcut(message) {
       return reply(message, `⚠️ ${targetMember} Has Been Warned, Reason: ${reason}\nTotal Warns: ${result.totalCount}`);
     }
 
-    if (command === 'تايم') {
+    if (command === 'كلير' || command === 'clear') {
+      if (!hasPermission(message.member, PermissionFlagsBits.ModerateMembers)) return reply(message, '❌ ليس لديك صلاحية مسح التحذيرات.');
+      if (!targetMember) return reply(message, '❌ العضو غير موجود في السيرفر.');
+      const result = await WarningService.clearWarnings(guild.id, targetId);
+      return reply(message, `🧹 تم مسح كل تحذيرات ${targetMember}. Reason: ${tail || 'لم يتم تحديد سبب'}\nعدد التحذيرات المحذوفة: ${result.count}`);
+    }
+
+    if (command === 'تايم' || command === 'timeout') {
       if (!hasPermission(message.member, PermissionFlagsBits.ModerateMembers)) return reply(message, '❌ ليس لديك صلاحية التايم.');
       if (!targetMember) return reply(message, '❌ العضو غير موجود في السيرفر.');
       const [durationText, ...reasonParts] = tail.split(/\s+/u);
@@ -176,32 +187,25 @@ export async function handleArabicModerationShortcut(message) {
       return reply(message, `⏳ ${targetMember} Has Been Timed Out for ${durationText}, Reason: ${reason}`);
     }
 
-    if (command === 'انتايم') {
+    if (command === 'انتايم' || command === 'untimeout') {
       if (!hasPermission(message.member, PermissionFlagsBits.ModerateMembers)) return reply(message, '❌ ليس لديك صلاحية إزالة التايم.');
       if (!targetMember) return reply(message, '❌ العضو غير موجود في السيرفر.');
       await ModerationService.removeTimeoutUser({ guild, member: targetMember, moderator: message.member, reason: tail || 'لم يتم تحديد سبب' });
       return reply(message, `🔓 تم إلغاء التايم عن ${targetMember}, Reason: ${tail || 'لم يتم تحديد سبب'}`);
     }
 
-    if (command === 'بان') {
+    if (command === 'بان' || command === 'ban') {
       if (!hasPermission(message.member, PermissionFlagsBits.BanMembers)) return reply(message, '❌ ليس لديك صلاحية البان.');
       if (!targetUser) return reply(message, '❌ لم يتم العثور على المستخدم.');
       await ModerationService.banUser({ guild, user: targetUser, moderator: message.member, reason: tail || 'لم يتم تحديد سبب' });
       return reply(message, `🚫 ${targetUser} Has Been Banned, Reason: ${tail || 'لم يتم تحديد سبب'}`);
     }
 
-    if (command === 'انبان') {
+    if (command === 'انبان' || command === 'unban') {
       if (!hasPermission(message.member, PermissionFlagsBits.BanMembers)) return reply(message, '❌ ليس لديك صلاحية إلغاء البان.');
       if (!targetUser) return reply(message, '❌ اكتب User ID صحيح أو اعمل Reply على رسالة الشخص.');
       await ModerationService.unbanUser({ guild, user: targetUser, moderator: message.member, reason: tail || 'لم يتم تحديد سبب' });
       return reply(message, `✅ تم إلغاء البان عن ${targetUser}, Reason: ${tail || 'لم يتم تحديد سبب'}`);
-    }
-
-    if (command === 'كلير') {
-      if (!hasPermission(message.member, PermissionFlagsBits.ModerateMembers)) return reply(message, '❌ ليس لديك صلاحية مسح التحذيرات.');
-      if (!targetMember) return reply(message, '❌ العضو غير موجود في السيرفر.');
-      const result = await WarningService.clearWarnings(guild.id, targetId);
-      return reply(message, `🧹 تم مسح كل تحذيرات ${targetMember}. Reason: ${tail || 'لم يتم تحديد سبب'}\nعدد التحذيرات المحذوفة: ${result.count}`);
     }
   } catch (error) {
     await reply(message, `❌ ${error.userMessage || error.message || 'حدث خطأ أثناء تنفيذ الأمر.'}`);
