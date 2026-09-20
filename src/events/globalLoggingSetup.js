@@ -9,32 +9,38 @@ export default {
   once: true,
 
   async execute(client) {
-    let updated = 0;
+    let cleared = 0;
+    let configured = 0;
 
     for (const guild of client.guilds.cache.values()) {
       try {
         const config = await getGuildConfig(client, guild.id);
-        const logging = {
-          ...(config?.logging || {}),
-          enabled: true,
-          channels: {
-            ...(config?.logging?.channels || {}),
-            audit: GLOBAL_LOG_CHANNEL_ID,
-          },
-          // Empty means every known event type is enabled unless explicitly disabled later.
-          enabledEvents: {},
-        };
-
         await updateGuildConfig(client, guild.id, {
+          // Explicitly revoke all previously trusted users and roles once.
+          antiNukeTrustedUsers: [],
+          antiNukeTrustedRoles: [],
+          antiRaidTrustedUsers: [],
+          antiRaidTrustedRoles: [],
           antiNukeLogChannelId: GLOBAL_LOG_CHANNEL_ID,
-          logging,
+          // Do not enable the unrelated general logging system here.
+          logging: {
+            ...(config?.logging || {}),
+            enabled: false,
+            channels: {
+              ...(config?.logging?.channels || {}),
+              audit: null,
+              applications: null,
+              reports: null,
+            },
+          },
         });
-        updated += 1;
+        cleared += 1;
+        configured += 1;
       } catch (error) {
-        logger.error(`Failed to configure global log channel in ${guild.name}:`, error);
+        logger.error(`Failed to reset Anti-Raid/Anti-Nuke config in ${guild.name}:`, error);
       }
     }
 
-    startupLog(`Global logging configured for ${updated} guild(s) in #${GLOBAL_LOG_CHANNEL_ID}`);
+    startupLog(`Anti-Raid/Anti-Nuke reset: cleared trust in ${cleared} guild(s); configured ${configured} log channel(s)`);
   },
 };
