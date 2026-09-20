@@ -1,5 +1,3 @@
-// prefixParser.js
-
 import { resolveSubcommandAlias } from '../config/commands/commandAliases.js';
 import { logger } from './logger.js';
 
@@ -9,13 +7,11 @@ export function parsePrefixCommand(content, prefix) {
   }
 
   const withoutPrefix = content.slice(prefix.length).trim();
-  
   if (!withoutPrefix) {
     return null;
   }
 
   const args = parseArguments(withoutPrefix);
-  
   if (args.length === 0) {
     return null;
   }
@@ -40,31 +36,26 @@ function parseArguments(input) {
 
     if (inQuote) {
       if (char === quoteChar) {
-        
         inQuote = false;
         args.push(current);
         current = '';
       } else {
         current += char;
       }
-    } else {
-      if (char === '"' || char === "'") {
-        
-        if (current.trim()) {
-          args.push(current.trim());
-          current = '';
-        }
-        inQuote = true;
-        quoteChar = char;
-      } else if (char === ' ') {
-        
-        if (current.trim()) {
-          args.push(current.trim());
-          current = '';
-        }
-      } else {
-        current += char;
+    } else if (char === '"' || char === "'") {
+      if (current.trim()) {
+        args.push(current.trim());
+        current = '';
       }
+      inQuote = true;
+      quoteChar = char;
+    } else if (char === ' ') {
+      if (current.trim()) {
+        args.push(current.trim());
+        current = '';
+      }
+    } else {
+      current += char;
     }
   }
 
@@ -81,9 +72,7 @@ export function mapArgumentsToOptions(args, commandData) {
   let subcommandGroupName = null;
 
   const cmdData = commandData.toJSON ? commandData.toJSON() : commandData;
-  
   if (!cmdData || !cmdData.options) {
-    
     return {
       _positional: args,
       get: (name) => args[0] || null,
@@ -148,7 +137,6 @@ export function mapArgumentsToOptions(args, commandData) {
   for (let i = 0; i < Math.min(currentArgs.length, optionDefs.length); i++) {
     const optionDef = optionDefs[i];
     const value = currentArgs[i];
-    
     options[optionDef.name] = value;
   }
 
