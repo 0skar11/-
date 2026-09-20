@@ -2,25 +2,20 @@ import { AuditLogEvent, Events } from 'discord.js';
 import { getGuildConfig } from '../services/config/guildConfig.js';
 import { sendAntiNukeLog } from './antiNukeLogging.js';
 
+const BOT_OWNER_ID = '1159601661392715906';
 const GLOBAL_LOG_CHANNEL_ID = '1550564287129456810';
 
 async function getBotAddExecutor(guild, botId) {
   const logs = await guild.fetchAuditLogs({ type: AuditLogEvent.BotAdd, limit: 10 }).catch(() => null);
   return logs?.entries.find((entry) => (
-    entry.target?.id === botId && Date.now() - entry.createdTimestamp < 15_000
+    entry.target?.id === botId && Date.now() - entry.createdTimestamp < 30_000
   )) || null;
 }
 
-async function isTrustedMember(guild, config, member) {
+function isExplicitlyTrusted(config, member) {
   if (!member) return false;
-  if (member.id === guild.ownerId || member.id === guild.client.user?.id) return true;
-  if (config?.antiNukeTrustedUsers?.includes(member.id)) return true;
-
-  const trustedRoles = new Set([
-    ...(config?.antiNukeTrustedRoles || []),
-    ...(config?.antiRaidTrustedRoles || []),
-  ]);
-  return member.roles.cache.some((role) => trustedRoles.has(role.id));
+  return member.id === BOT_OWNER_ID
+    || config?.antiNukeTrustedUsers?.includes(member.id) === true;
 }
 
 export async function handleUntrustedBotJoin(member) {
@@ -29,34 +24,34 @@ export async function handleUntrustedBotJoin(member) {
 
   const config = await getGuildConfig(member.client, member.guild.id).catch(() => null);
   const entry = await getBotAddExecutor(member.guild, member.id);
-  const executor = entry?.executor
+  const inviter = entry?.executor
     ? await member.guild.members.fetch(entry.executor.id).catch(() => null)
     : null;
 
-  // If Discord has not exposed the audit entry yet, the bot is still removed;
-  // the inviter is only acted on when Discord identifies them safely.
-  const trusted = await isTrustedMember(member.guild, config, executor);
+  // A role named Owner is not trusted automatically. Only the bot owner or an
+  // explicitly trusted user may invite bots without enforcement.
+  const trusted = isExplicitlyTrusted(config, inviter);
   if (trusted) return false;
 
   const botRemoved = member.kickable
-    ? await member.kick('Anti-Nuke: untrusted bot join').then(() => true).catch(() => false)
+    ? await member.kick('Anti-Raid: untrusted bot added').then(() => true).catch(() => false)
     : false;
-  const inviterRemoved = executor && executor.id !== member.guild.ownerId && executor.kickable
-    ? await executor.kick('Anti-Nuke: invited an untrusted bot').then(() => true).catch(() => false)
+  const inviterRemoved = inviter?.kickable
+    ? await inviter.kick('Anti-Raid: invited an untrusted bot').then(() => true).catch(() => false)
     : false;
 
   await sendAntiNukeLog(member.guild, {
     action: 'Untrusted bot blocked',
     target: `${member.user.tag} (${member.id})`,
-    executor: executor?.user || member.guild.client.user,
+    executor: inviter?.user || member.guild.client.user,
     auditLogId: entry?.id,
     severity: 'HIGH',
     channelId: GLOBAL_LOG_CHANNEL_ID,
     details: [
       ['Bot removed', botRemoved ? 'Yes' : 'No'],
-      ['Inviter', executor ? `${executor.user.tag} (${executor.id})` : 'Unknown'],
+      ['Inviter', inviter ? `${inviter.user.tag} (${inviter.id})` : 'Unknown'],
       ['Inviter removed', inviterRemoved ? 'Yes' : 'No'],
-      ['Reason', 'Inviter and bot were not trusted'],
+      ['Reason', 'No explicit trust; role names do not bypass Anti-Raid'],
     ],
   });
 
