@@ -26,42 +26,26 @@ function parseCommand(content) {
 function toBoldFont(value) {
   return [...String(value)].map((character) => {
     const codePoint = character.codePointAt(0);
-    if (codePoint >= 0x41 && codePoint <= 0x5a) {
-      return String.fromCodePoint(BOLD_UPPER_START + codePoint - 0x41);
-    }
-    if (codePoint >= 0x61 && codePoint <= 0x7a) {
-      return String.fromCodePoint(BOLD_LOWER_START + codePoint - 0x61);
-    }
-    if (codePoint >= 0x30 && codePoint <= 0x39) {
-      return String.fromCodePoint(BOLD_DIGIT_START + codePoint - 0x30);
-    }
+    if (codePoint >= 0x41 && codePoint <= 0x5a) return String.fromCodePoint(BOLD_UPPER_START + codePoint - 0x41);
+    if (codePoint >= 0x61 && codePoint <= 0x7a) return String.fromCodePoint(BOLD_LOWER_START + codePoint - 0x61);
+    if (codePoint >= 0x30 && codePoint <= 0x39) return String.fromCodePoint(BOLD_DIGIT_START + codePoint - 0x30);
     return character;
   }).join('');
 }
 
 async function lockChannel(message, locked) {
-  if (!hasPermission(message.member, PermissionFlagsBits.ManageChannels)) {
-    return reply(message, '❌ ليس لديك صلاحية إدارة الشانيل.');
-  }
+  if (!hasPermission(message.member, PermissionFlagsBits.ManageChannels)) return reply(message, '❌ ليس لديك صلاحية إدارة الشانيل.');
 
   const channel = message.channel;
-  if (!channel?.isTextBased?.() || !channel.permissionOverwrites?.edit) {
-    return reply(message, '❌ هذا الأمر يعمل داخل روم نصية فقط.');
-  }
+  if (!channel?.isTextBased?.() || !channel.permissionOverwrites?.edit) return reply(message, '❌ هذا الأمر يعمل داخل روم نصية فقط.');
 
   try {
     const everyoneRole = message.guild.roles.everyone;
     const currentPermissions = channel.permissionsFor(everyoneRole);
     const alreadyLocked = currentPermissions?.has(PermissionFlagsBits.SendMessages) === false;
+    if (locked === alreadyLocked) return reply(message, locked ? 'ℹ️ الشانيل مقفولة بالفعل.' : 'ℹ️ الشانيل مفتوحة بالفعل.');
 
-    if (locked === alreadyLocked) {
-      return reply(message, locked ? 'ℹ️ الشانيل مقفولة بالفعل.' : 'ℹ️ الشانيل مفتوحة بالفعل.');
-    }
-
-    await channel.permissionOverwrites.edit(everyoneRole, {
-      SendMessages: !locked,
-    }, { reason: `${locked ? 'Channel locked' : 'Channel unlocked'} by ${message.author.tag}` });
-
+    await channel.permissionOverwrites.edit(everyoneRole, { SendMessages: !locked }, { reason: `${locked ? 'Channel locked' : 'Channel unlocked'} by ${message.author.tag}` });
     return reply(message, locked ? '🔒 تم قفل الشانيل.' : '🔓 تم فتح الشانيل.');
   } catch (error) {
     return reply(message, `❌ تعذر ${locked ? 'قفل' : 'فتح'} الشانيل: ${error.message}`);
@@ -76,9 +60,7 @@ async function getReplyMember(message) {
 }
 
 async function changeNickname(message, tail) {
-  if (!hasPermission(message.member, PermissionFlagsBits.ManageNicknames)) {
-    return reply(message, '❌ ليس لديك صلاحية تغيير الأسماء.');
-  }
+  if (!hasPermission(message.member, PermissionFlagsBits.ManageNicknames)) return reply(message, '❌ ليس لديك صلاحية تغيير الأسماء.');
 
   const mention = tail.match(/^<@!?(\d+)>\s*/u);
   const targetId = mention?.[1] || null;
@@ -88,7 +70,10 @@ async function changeNickname(message, tail) {
     : await getReplyMember(message) || message.member;
 
   if (!targetMember) return reply(message, '❌ العضو غير موجود في السيرفر.');
-  if (!nickname) return reply(message, '❌ استخدم الأمر هكذا: `نك الاسم` أو `نك @العضو الاسم`.');
+
+  // `نك @العضو` أو Reply ثم `نك` يعيد الاسم الأصلي بإزالة الـ nickname.
+  const restoreOriginalName = Boolean(targetId || message.reference?.messageId) && !nickname;
+  if (!nickname && !restoreOriginalName) return reply(message, '❌ استخدم الأمر هكذا: `نك الاسم` أو `نك @العضو الاسم`، ولإرجاع الاسم الأصلي استخدم `نك @العضو`.');
   if (nickname.length > 32) return reply(message, '❌ الاسم يجب ألا يتجاوز 32 حرفاً.');
 
   const botMember = message.guild.members.me;
@@ -102,8 +87,10 @@ async function changeNickname(message, tail) {
   }
 
   try {
-    await targetMember.setNickname(nickname, `Nickname changed by ${message.author.tag}`);
-    return reply(message, `✅ تم تغيير اسم ${targetMember} إلى **${nickname}**.`);
+    await targetMember.setNickname(restoreOriginalName ? null : nickname, `Nickname ${restoreOriginalName ? 'restored' : 'changed'} by ${message.author.tag}`);
+    return reply(message, restoreOriginalName
+      ? `✅ تم إرجاع الاسم الأصلي لـ ${targetMember}.`
+      : `✅ تم تغيير اسم ${targetMember} إلى **${nickname}**.`);
   } catch (error) {
     return reply(message, `❌ تعذر تغيير الاسم: ${error.message}`);
   }
