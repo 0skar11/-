@@ -71,9 +71,8 @@ async function changeNickname(message, tail) {
 
   if (!targetMember) return reply(message, '❌ العضو غير موجود في السيرفر.');
 
-  // `نك @العضو` أو Reply ثم `نك` يعيد الاسم الأصلي بإزالة الـ nickname.
-  const restoreOriginalName = Boolean(targetId || message.reference?.messageId) && !nickname;
-  if (!nickname && !restoreOriginalName) return reply(message, '❌ استخدم الأمر هكذا: `نك الاسم` أو `نك @العضو الاسم`، ولإرجاع الاسم الأصلي استخدم `نك @العضو`.');
+  // `نك @العضو` أو Reply ثم `نك` يعيد الاسم الأصلي بدون رسالة استخدام.
+  const restoreOriginalName = !nickname;
   if (nickname.length > 32) return reply(message, '❌ الاسم يجب ألا يتجاوز 32 حرفاً.');
 
   const botMember = message.guild.members.me;
