@@ -5,8 +5,7 @@ import { ModerationService } from '../services/moderation/moderationService.js';
 import { WarningService } from '../services/moderation/warningService.js';
 
 const COMMANDS = new Set([
-  'وارن', 'تايم', 'انتايم', 'بان', 'انبان', 'كلير', 'ان', 'شيل', 'ر', 'رول', 'ب', 'رتبة', 'ازالةرتبة', 'purge', 'تراست', 'انتراست', 'trusted', 'trust', 'untrust',
-  'warn', 'timeout', 'untimeout', 'ban', 'unban', 'clear', 'remove', 'role', 'roll', 'lock', 'unlock',
+  'وارن', 'تايم', 'انتايم', 'بان', 'انبان', 'كلير', 'ان', 'شيل', 'ر', 'رول', 'ب', 'رتبة', 'ازالةرتبة', 'purge', 'تراست', 'انتراست', 'trusted', 'trustedlist', 'warn', 'timeout', 'untimeout', 'ban', 'unban', 'clear', 'remove', 'role', 'roll', 'lock', 'unlock',
 ].map((value) => value.toLowerCase()));
 
 const ADD_ROLE_COMMANDS = new Set(['ر', 'رول', 'ان', 'رتبة', 'role', 'roll', 'addrole']);
@@ -190,8 +189,7 @@ async function purgeEntireChannel(message) {
 
 async function changeRole(message, targetMember, roleName, add) {
   if (!hasPermission(message.member, PermissionFlagsBits.ManageRoles)) {
-    await reply(message, '❌ ليس لديك صلاحية إدارة الرتب.');
-    return true;
+    return reply(message, '> You cannot moderate this person');
   }
   if (!targetMember || !roleName) {
     await reply(message, `❌ استخدم: \`${add ? 'ر / رول' : 'ب / شيل'} @user اسم الرتبة\` أو اعمل Reply واكتب اسم الرتبة.`);
@@ -252,7 +250,7 @@ export async function handleArabicModerationShortcut(message) {
     }
 
     if (command === 'وارن' || command === 'warn') {
-      if (!hasPermission(message.member, PermissionFlagsBits.ModerateMembers)) return reply(message, '❌ ليس لديك صلاحية التحذير.');
+      if (!hasPermission(message.member, PermissionFlagsBits.ModerateMembers)) return reply(message, '> You cannot moderate this person');
       if (!targetMember) return reply(message, '❌ العضو غير موجود في السيرفر.');
       ModerationService.assertModerationHierarchy(message.member, targetMember, 'warn');
       const reason = tail || 'لم يتم تحديد سبب';
@@ -261,14 +259,14 @@ export async function handleArabicModerationShortcut(message) {
     }
 
     if (command === 'كلير' || command === 'clear') {
-      if (!hasPermission(message.member, PermissionFlagsBits.ModerateMembers)) return reply(message, '❌ ليس لديك صلاحية مسح التحذيرات.');
+      if (!hasPermission(message.member, PermissionFlagsBits.ModerateMembers)) return reply(message, '> You cannot moderate this person');
       if (!targetMember) return reply(message, '❌ العضو غير موجود في السيرفر.');
       const result = await WarningService.clearWarnings(guild.id, targetId);
       return reply(message, `🧹 تم مسح كل تحذيرات ${targetMember}. Reason: ${tail || 'لم يتم تحديد سبب'}\nعدد التحذيرات المحذوفة: ${result.count}`);
     }
 
     if (command === 'تايم' || command === 'timeout') {
-      if (!hasPermission(message.member, PermissionFlagsBits.ModerateMembers)) return reply(message, '❌ ليس لديك صلاحية التايم.');
+      if (!hasPermission(message.member, PermissionFlagsBits.ModerateMembers)) return reply(message, '> You cannot moderate this person');
       if (!targetMember) return reply(message, '❌ العضو غير موجود في السيرفر.');
       const [durationText, ...reasonParts] = tail.split(/\s+/u);
       const durationMs = parseDuration(durationText);
@@ -280,21 +278,21 @@ export async function handleArabicModerationShortcut(message) {
     }
 
     if (command === 'انتايم' || command === 'untimeout') {
-      if (!hasPermission(message.member, PermissionFlagsBits.ModerateMembers)) return reply(message, '❌ ليس لديك صلاحية إزالة التايم.');
+      if (!hasPermission(message.member, PermissionFlagsBits.ModerateMembers)) return reply(message, '> You cannot moderate this person');
       if (!targetMember) return reply(message, '❌ العضو غير موجود في السيرفر.');
       await ModerationService.removeTimeoutUser({ guild, member: targetMember, moderator: message.member, reason: tail || 'لم يتم تحديد سبب' });
       return reply(message, `🔓 تم إلغاء التايم عن ${targetMember}, Reason: ${tail || 'لم يتم تحديد سبب'}`);
     }
 
     if (command === 'بان' || command === 'ban') {
-      if (!hasPermission(message.member, PermissionFlagsBits.BanMembers)) return reply(message, '❌ ليس لديك صلاحية البان.');
+      if (!hasPermission(message.member, PermissionFlagsBits.BanMembers)) return reply(message, '> You cannot moderate this person');
       if (!targetUser) return reply(message, '❌ لم يتم العثور على المستخدم.');
       await ModerationService.banUser({ guild, user: targetUser, moderator: message.member, reason: tail || 'لم يتم تحديد سبب' });
       return reply(message, `🚫 ${targetUser} Has Been Banned, Reason: ${tail || 'لم يتم تحديد سبب'}`);
     }
 
     if (command === 'انبان' || command === 'unban') {
-      if (!hasPermission(message.member, PermissionFlagsBits.BanMembers)) return reply(message, '❌ ليس لديك صلاحية إلغاء البان.');
+      if (!hasPermission(message.member, PermissionFlagsBits.BanMembers)) return reply(message, '> You cannot moderate this person');
       if (!targetUser) return reply(message, '❌ اكتب User ID صحيح أو اعمل Reply على رسالة الشخص.');
       await ModerationService.unbanUser({ guild, user: targetUser, moderator: message.member, reason: tail || 'لم يتم تحديد سبب' });
       return reply(message, `✅ تم إلغاء البان عن ${targetUser}, Reason: ${tail || 'لم يتم تحديد سبب'}`);
