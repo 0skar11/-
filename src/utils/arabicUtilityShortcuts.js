@@ -60,7 +60,10 @@ async function getReplyMember(message) {
 }
 
 async function changeNickname(message, tail) {
-  if (!hasPermission(message.member, PermissionFlagsBits.ManageNicknames)) return reply(message, '❌ ليس لديك صلاحية تغيير الأسماء.');
+  // The nickname shortcut requires Manage Nicknames explicitly.
+  if (!message.member?.permissions?.has(PermissionFlagsBits.ManageNicknames)) {
+    return reply(message, '❌ ليس لديك صلاحية Manage Nicknames لت使用 أمر نك.');
+  }
 
   const mention = tail.match(/^<@!?(\d+)>\s*/u);
   const targetId = mention?.[1] || null;
@@ -71,7 +74,6 @@ async function changeNickname(message, tail) {
 
   if (!targetMember) return reply(message, '❌ العضو غير موجود في السيرفر.');
 
-  // `نك @العضو` أو Reply ثم `نك` يعيد الاسم الأصلي بدون رسالة استخدام.
   const restoreOriginalName = !nickname;
   if (nickname.length > 32) return reply(message, '❌ الاسم يجب ألا يتجاوز 32 حرفاً.');
 
