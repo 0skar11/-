@@ -17,7 +17,6 @@ async function reply(message, content) {
 function parseCommand(content) {
   const parts = String(content || '').trim().split(/\s+/u).filter(Boolean);
   if (!parts.length) return null;
-
   const command = parts[0].toLowerCase();
   if (!COMMANDS.has(command)) return null;
   return { command, tail: parts.slice(1).join(' ') };
@@ -34,17 +33,14 @@ function toBoldFont(value) {
 }
 
 async function lockChannel(message, locked) {
-  if (!hasPermission(message.member, PermissionFlagsBits.ManageChannels)) return reply(message, '❌ ليس لديك صلاحية إدارة الشانيل.');
-
+  if (!hasPermission(message.member, PermissionFlagsBits.ManageChannels)) return true;
   const channel = message.channel;
   if (!channel?.isTextBased?.() || !channel.permissionOverwrites?.edit) return reply(message, '❌ هذا الأمر يعمل داخل روم نصية فقط.');
-
   try {
     const everyoneRole = message.guild.roles.everyone;
     const currentPermissions = channel.permissionsFor(everyoneRole);
     const alreadyLocked = currentPermissions?.has(PermissionFlagsBits.SendMessages) === false;
     if (locked === alreadyLocked) return reply(message, locked ? 'ℹ️ الشانيل مقفولة بالفعل.' : 'ℹ️ الشانيل مفتوحة بالفعل.');
-
     await channel.permissionOverwrites.edit(everyoneRole, { SendMessages: !locked }, { reason: `${locked ? 'Channel locked' : 'Channel unlocked'} by ${message.author.tag}` });
     return reply(message, locked ? '🔒 تم قفل الشانيل.' : '🔓 تم فتح الشانيل.');
   } catch (error) {
@@ -60,9 +56,7 @@ async function getReplyMember(message) {
 }
 
 async function changeNickname(message, tail) {
-  if (!message.member?.permissions?.has(PermissionFlagsBits.ManageNicknames)) {
-    return reply(message, '❌ ليس لديك صلاحية Manage Nicknames لتستخدم أمر نك.');
-  }
+  if (!message.member?.permissions?.has(PermissionFlagsBits.ManageNicknames)) return true;
 
   const mention = tail.match(/^<@!?(\d+)>\s*/u);
   const targetId = mention?.[1] || null;
@@ -70,17 +64,15 @@ async function changeNickname(message, tail) {
   const targetMember = targetId
     ? await message.guild.members.fetch(targetId).catch(() => null)
     : await getReplyMember(message) || message.member;
-
   if (!targetMember) return reply(message, '❌ العضو غير موجود في السيرفر.');
 
   const restoreOriginalName = !nickname;
   if (nickname.length > 32) return reply(message, '❌ الاسم يجب ألا يتجاوز 32 حرفاً.');
 
+  // Manage Nicknames allows targeting members regardless of the requester's
+  // role position. Discord still requires the bot's highest role to be above
+  // the target member because this is enforced by Discord itself.
   const botMember = message.guild.members.me;
-  if (targetMember.id !== message.member.id && message.guild.ownerId !== message.member.id
-    && targetMember.roles.highest.position >= message.member.roles.highest.position) {
-    return reply(message, '❌ لا يمكنك تغيير اسم عضو أعلى منك أو مساوي لك.');
-  }
   if (targetMember.id !== message.member.id && botMember
     && targetMember.roles.highest.position >= botMember.roles.highest.position) {
     return reply(message, '❌ لا أستطيع تغيير اسم هذا العضو بسبب ترتيب الرتب.');
@@ -99,11 +91,9 @@ async function changeNickname(message, tail) {
 export async function handleArabicUtilityShortcuts(message) {
   const parsed = parseCommand(message.content);
   if (!parsed) return false;
-
   if (parsed.command === 'ق') return lockChannel(message, true);
   if (parsed.command === 'ف') return lockChannel(message, false);
   if (parsed.command === 'نك') return changeNickname(message, parsed.tail);
-
   if (!parsed.tail) return reply(message, '❌ اكتب النص بعد الأمر، مثال: `font CHAOS`');
   return reply(message, toBoldFont(parsed.tail));
 }
