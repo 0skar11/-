@@ -60,7 +60,6 @@ async function getReplyMember(message) {
 }
 
 async function changeNickname(message, tail) {
-  // The nickname shortcut requires Manage Nicknames explicitly.
   if (!message.member?.permissions?.has(PermissionFlagsBits.ManageNicknames)) {
     return reply(message, '❌ ليس لديك صلاحية Manage Nicknames لتستخدم أمر نك.');
   }
@@ -90,8 +89,8 @@ async function changeNickname(message, tail) {
   try {
     await targetMember.setNickname(restoreOriginalName ? null : nickname, `Nickname ${restoreOriginalName ? 'restored' : 'changed'} by ${message.author.tag}`);
     return reply(message, restoreOriginalName
-      ? `✅ تم إرجاع الاسم الأصلي لـ ${targetMember}.`
-      : `✅ تم تغيير اسم ${targetMember} إلى:\n> ${nickname}`);
+      ? `تم إرجاع الاسم الأصلي لـ ${targetMember}.`
+      : `تم تغيير اسم ${targetMember}.`);
   } catch (error) {
     return reply(message, `❌ تعذر تغيير الاسم: ${error.message}`);
   }
