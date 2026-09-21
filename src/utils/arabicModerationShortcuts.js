@@ -1,12 +1,14 @@
 import { PermissionFlagsBits } from 'discord.js';
 import { getCommandPrefix } from '../config/bot.js';
-import { getGuildConfig } from '../services/config/guildConfig.js';
+import { getGuildConfig, updateGuildConfig } from '../services/config/guildConfig.js';
 import { ModerationService } from '../services/moderation/moderationService.js';
 import { WarningService } from '../services/moderation/warningService.js';
 
-const COMMANDS = new Set(['وارن', 'تايم', 'انتايم', 'بان', 'انبان', 'كلير', 'ان', 'شيل', 'ر', 'رول', 'ب', 'رتبة', 'ازالةرتبة', 'purge', 'ق']);
-const ADD_ROLE_COMMANDS = new Set(['ر', 'رول', 'ان', 'رتبة']);
-const REMOVE_ROLE_COMMANDS = new Set(['ب', 'شيل', 'ازالةرتبة']);
+const COMMANDS = new Set([
+  'وارن', 'وارنات', 'تايم', 'انتايم', 'بان', 'انبان', 'كلير', 'ان', 'شيل', 'ر', 'رول', 'ب', 'رتبة', 'ازالةرتبة', 'purge', 'تراست', 'انتراست', 'trusted', 'trustedlist', 'warn', 'warnings', 'timeout', 'untimeout', 'ban', 'unban', 'clear', 'remove', 'role', 'roll', 'lock', 'unlock',
+].map((value) => value.toLowerCase()));
+const ADD_ROLE_COMMANDS = new Set(['ر', 'رول', 'ان', 'رتبة', 'role', 'roll', 'addrole']);
+const REMOVE_ROLE_COMMANDS = new Set(['ب', 'شيل', 'ازالةرتبة', 'remove', 'unrole', 'removerole']);
 const OWNER_ID = '1159601661392715906';
 const MAX_TIMEOUT_MS = 28 * 24 * 60 * 60 * 1000;
 
@@ -29,7 +31,6 @@ function tokenize(content, prefixes = []) {
   const value = stripPrefix(content, prefixes);
   const parts = value.split(/\s+/u).filter(Boolean);
   if (!parts.length) return null;
-
   let command = parts[0].toLowerCase();
   let body = parts.slice(1).join(' ');
   if (!COMMANDS.has(command)) {
@@ -38,15 +39,10 @@ function tokenize(content, prefixes = []) {
     command = last;
     body = parts.slice(0, -1).join(' ');
   }
-
   const mention = body.match(/<@!?(\d+)>/u);
   const id = body.match(/(?:^|\s)(\d{17,20})(?:\s|$)/u);
   const targetId = mention?.[1] || id?.[1] || null;
-  const tail = body
-    .replace(/<@!?\d+>/u, '')
-    .replace(/(?:^|\s)\d{17,20}(?=\s|$)/u, '')
-    .trim();
-
+  const tail = body.replace(/<@!?\d+>/u, '').replace(/(?:^|\s)\d{17,20}(?=\s|$)/u, '').trim();
   return { command, targetId, tail };
 }
 
@@ -73,16 +69,45 @@ async function getReplyTargetId(message) {
   return referencedMessage?.author?.bot ? null : referencedMessage?.author?.id || null;
 }
 
-async function purgeEntireChannel(message) {
-  if (message.author.id !== OWNER_ID) {
-    await reply(message, '❌ هذا الأمر متاح لصاحب البوت فقط.');
-    return true;
+async function handleTrustedList(message) {
+  if (message.author.id !== OWNER_ID) return reply(message, '❌ أمر Trust متاح للمالك فقط.');
+  const config = await getGuildConfig(message.client, message.guild.id);
+  const trustedUserIds = Array.isArray(config?.antiNukeTrustedUsers) ? config.antiNukeTrustedUsers : [];
+  const trustedRoleIds = Array.isArray(config?.antiNukeTrustedRoles) ? config.antiNukeTrustedRoles : [];
+  const users = [];
+  const bots = [];
+  for (const userId of [...new Set(trustedUserIds)]) {
+    const member = await message.guild.members.fetch(userId).catch(() => null);
+    const user = member?.user || await message.client.users.fetch(userId).catch(() => null);
+    const mention = `<@${userId}>`;
+    if (user?.bot || member?.user?.bot) bots.push(`${mention} (${user?.tag || user?.username || userId})`);
+    else users.push(`${mention} (${user?.tag || user?.username || userId})`);
   }
-  if (!message.channel?.isTextBased?.() || typeof message.channel.bulkDelete !== 'function') {
-    await reply(message, '❌ هذا الأمر يعمل داخل روم نصية فقط.');
-    return true;
+  const roles = [];
+  for (const roleId of [...new Set(trustedRoleIds)]) {
+    const role = await message.guild.roles.fetch(roleId).catch(() => null);
+    roles.push(role ? `${role} (${role.name})` : `<@&${roleId}> (رتبة غير موجودة)`);
   }
+  return reply(message, ['🛡️ **قائمة Trusted في هذا السيرفر**', '', `**الأعضاء (${users.length}):**`, users.length ? users.join('\n') : 'لا يوجد', '', `**البوتات (${bots.length}):**`, bots.length ? bots.join('\n') : 'لا يوجد', '', `**الرتب (${roles.length}):**`, roles.length ? roles.join('\n') : 'لا يوجد'].join('\n'));
+}
 
+async function handleTrust(message, targetId) {
+  if (message.author.id !== OWNER_ID) return reply(message, '❌ أمر Trust متاح للمالك فقط.');
+  const resolvedTargetId = targetId || await getReplyTargetId(message);
+  if (!resolvedTargetId) return true;
+  const member = await message.guild.members.fetch(resolvedTargetId).catch(() => null);
+  if (!member) return reply(message, '❌ العضو غير موجود في السيرفر.');
+  const config = await getGuildConfig(message.client, message.guild.id);
+  const trustedUsers = new Set(Array.isArray(config?.antiNukeTrustedUsers) ? config.antiNukeTrustedUsers : []);
+  const alreadyTrusted = trustedUsers.has(member.id);
+  trustedUsers.add(member.id);
+  await updateGuildConfig(message.client, message.guild.id, { antiNukeTrustedUsers: [...trustedUsers] });
+  return reply(message, alreadyTrusted ? `ℹ️ ${member} محمي بالفعل من نظام Anti-Raid.` : `🛡️ تم إعطاء ${member} حماية من نظام Anti-Raid.`);
+}
+
+async function purgeEntireChannel(message) {
+  if (message.author.id !== OWNER_ID) return reply(message, '❌ هذا الأمر متاح لصاحب البوت فقط.');
+  if (!message.channel?.isTextBased?.() || typeof message.channel.bulkDelete !== 'function') return reply(message, '❌ هذا الأمر يعمل داخل روم نصية فقط.');
   let deletedCount = 0;
   while (true) {
     const batch = await message.channel.messages.fetch({ limit: 100 });
@@ -91,126 +116,97 @@ async function purgeEntireChannel(message) {
     deletedCount += deleted.size;
     if (!deleted.size || batch.size < 100) break;
   }
-  await reply(message, `🧹 تم تنظيف الروم بالكامل. عدد الرسائل المحذوفة: **${deletedCount}**`);
-  return true;
+  return reply(message, `🧹 تم تنظيف الروم بالكامل. عدد الرسائل المحذوفة: **${deletedCount}**`);
 }
 
 async function lockChannel(message) {
-  if (!hasPermission(message.member, PermissionFlagsBits.ManageChannels)) {
-    await reply(message, '❌ ليس لديك صلاحية إدارة الرومات.');
-    return true;
-  }
-  if (!message.channel?.permissionOverwrites?.edit) {
-    await reply(message, '❌ هذا الأمر يعمل داخل روم قابلة للقفل فقط.');
-    return true;
-  }
-
+  if (!hasPermission(message.member, PermissionFlagsBits.ManageChannels)) return reply(message, '❌ ليس لديك صلاحية إدارة الرومات.');
+  if (!message.channel?.permissionOverwrites?.edit) return reply(message, '❌ هذا الأمر يعمل داخل روم قابلة للقفل فقط.');
   const everyoneRole = message.guild.roles.everyone;
-  const currentPermissions = message.channel.permissionsFor(everyoneRole);
-  if (currentPermissions?.has(PermissionFlagsBits.SendMessages) === false) {
-    await reply(message, '⚠️ الروم مقفولة بالفعل.');
-    return true;
-  }
-
-  await message.channel.permissionOverwrites.edit(
-    everyoneRole,
-    { SendMessages: false },
-    { reason: `Channel locked by ${message.author.tag}` },
-  );
-  await reply(message, `🔒 تم قفل ${message.channel} بنجاح.`);
-  return true;
+  if (message.channel.permissionsFor(everyoneRole)?.has(PermissionFlagsBits.SendMessages) === false) return reply(message, '⚠️ الروم مقفولة بالفعل.');
+  await message.channel.permissionOverwrites.edit(everyoneRole, { SendMessages: false }, { reason: `Channel locked by ${message.author.tag}` });
+  return reply(message, `🔒 تم قفل ${message.channel} بنجاح.`);
 }
 
 async function changeRole(message, targetMember, roleName, add) {
-  if (!hasPermission(message.member, PermissionFlagsBits.ManageRoles)) {
-    await reply(message, '❌ ليس لديك صلاحية إدارة الرتب.');
-    return true;
-  }
-  if (!targetMember || !roleName) {
-    await reply(message, `❌ استخدم: \`${add ? 'ر / رول' : 'ب'} @user اسم الرتبة\` أو اعمل Reply واكتب اسم الرتبة.`);
-    return true;
-  }
-
+  if (!hasPermission(message.member, PermissionFlagsBits.ManageRoles)) return reply(message, '> You cannot moderate this person');
+  if (!targetMember || !roleName) return true;
   const role = roleFor(message.guild, roleName);
   const botRole = message.guild.members.me?.roles.highest;
   const actor = message.member;
-  if (!role) {
-    await reply(message, `❌ لم أجد رتبة قريبة من **${roleName}**.`);
-    return true;
-  }
-  if (role.managed || !botRole || role.position >= botRole.position) {
-    await reply(message, '❌ لا أستطيع إدارة هذه الرتبة لأنها أعلى من رتبة البوت أو Managed.');
-    return true;
-  }
-  if (role.position >= actor.roles.highest.position && message.guild.ownerId !== actor.id) {
-    await reply(message, '❌ لا يمكنك إدارة رتبة مساوية أو أعلى من رتبتك.');
-    return true;
-  }
-
+  if (!role) return reply(message, `❌ لم أجد رتبة قريبة من **${roleName}**.`);
+  if (role.managed || !botRole || role.position >= botRole.position) return reply(message, '❌ لا أستطيع إدارة هذه الرتبة لأنها أعلى من رتبة البوت أو Managed.');
+  if (role.position >= actor.roles.highest.position && message.guild.ownerId !== actor.id) return reply(message, '❌ لا يمكنك إدارة رتبة مساوية أو أعلى من رتبتك.');
   if (add) {
     await targetMember.roles.add(role, `Role shortcut by ${message.author.tag}`);
-    await reply(message, `✅ تمت إضافة **${role.name}** إلى ${targetMember}.`);
-  } else {
-    await targetMember.roles.remove(role, `Role shortcut by ${message.author.tag}`);
-    await reply(message, `✅ تم سحب **${role.name}** من ${targetMember}.`);
+    return reply(message, `✅ تمت إضافة **${role.name}** إلى ${targetMember}.`);
   }
-  return true;
+  await targetMember.roles.remove(role, `Role shortcut by ${message.author.tag}`);
+  return reply(message, `✅ تم سحب **${role.name}** من ${targetMember}.`);
 }
 
 function warningMessage(targetMember, reason, totalWarnings, moderator) {
   const timestamp = Math.floor(Date.now() / 1000);
-  const targetMention = `<@${targetMember.id}>`;
-  const moderatorMention = `<@${moderator.id}>`;
+  return ['⚠️ **WARNING ISSUED**', '', `> **User:** <@${targetMember.id}>`, `> **Reason:** \`${reason}\``, `> **Warnings:** \`${totalWarnings}\``, '━━━━━━━━━━━━━━━━━━', `👮 **Moderator:** <@${moderator.id}>`, `🕒 **Time:** <t:${timestamp}:R>`].join('\n');
+}
 
-  return [
-    '⚠️ **WARNING ISSUED**',
-    '',
-    `> **User:** ${targetMention}`,
-    `> **Reason:** \`${reason}\``,
-    `> **Warnings:** \`${totalWarnings}\``,
-    '━━━━━━━━━━━━━━━━━━',
-    `👮 **Moderator:** ${moderatorMention}`,
-    `🕒 **Time:** <t:${timestamp}:R>`,
-  ].join('\n');
+async function listWarnings(message, targetMember, guildId) {
+  if (!hasPermission(message.member, PermissionFlagsBits.ModerateMembers)) return reply(message, '> You cannot moderate this person');
+  if (!targetMember) return true;
+  const warnings = (await WarningService.getWarnings(guildId, targetMember.id))
+    .sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0));
+  if (!warnings.length) return reply(message, `📋 لا توجد تحذيرات على <@${targetMember.id}>.`);
+
+  const lines = [`📋 **Warnings for <@${targetMember.id}>**`, ''];
+  for (const [index, warning] of warnings.entries()) {
+    const moderator = await message.guild.members.fetch(warning.moderatorId).catch(() => null);
+    const timestamp = Math.floor((warning.timestamp || Date.now()) / 1000);
+    lines.push(`**${index + 1}.** <t:${timestamp}:f> — ${warning.reason || 'لم يتم تحديد سبب'} — بواسطة ${moderator ? `<@${moderator.id}>` : `<@${warning.moderatorId}>`}`);
+  }
+
+  let chunk = '';
+  for (const line of lines) {
+    if ((chunk + line + '\n').length > 1900) {
+      await reply(message, chunk);
+      chunk = '';
+    }
+    chunk += `${line}\n`;
+  }
+  if (chunk.trim()) await reply(message, chunk);
+  return true;
 }
 
 export async function handleArabicModerationShortcut(message) {
   const guildConfig = await getGuildConfig(message.client, message.guild.id).catch(() => null);
-  const prefixes = [guildConfig?.prefix, getCommandPrefix()];
-  const parsed = tokenize(message.content, prefixes);
+  const parsed = tokenize(message.content, [guildConfig?.prefix, getCommandPrefix()]);
   if (!parsed) return false;
   if (parsed.command === 'purge') return purgeEntireChannel(message);
   if (parsed.command === 'ق') return lockChannel(message);
 
   const { command } = parsed;
   const targetId = parsed.targetId || await getReplyTargetId(message);
+  if (!targetId) return true;
   const tail = parsed.tail;
-  if (!targetId) {
-    await reply(message, '❌ اعمل Reply على رسالة الشخص أو اعمل له منشن أو اكتب User ID.');
-    return true;
-  }
-
   const guild = message.guild;
   const targetMember = await guild.members.fetch(targetId).catch(() => null);
   const targetUser = targetMember?.user || await message.client.users.fetch(targetId).catch(() => null);
 
   try {
-    if (ADD_ROLE_COMMANDS.has(command) || REMOVE_ROLE_COMMANDS.has(command)) {
-      return changeRole(message, targetMember, tail, ADD_ROLE_COMMANDS.has(command));
-    }
+    if (command === 'وارنات' || command === 'warnings') return listWarnings(message, targetMember, guild.id);
+    if (ADD_ROLE_COMMANDS.has(command) || REMOVE_ROLE_COMMANDS.has(command)) return changeRole(message, targetMember, tail, ADD_ROLE_COMMANDS.has(command));
 
-    if (command === 'وارن') {
+    if (command === 'وارن' || command === 'warn') {
       if (!hasPermission(message.member, PermissionFlagsBits.ModerateMembers)) return reply(message, '> You cannot moderate this person');
-      if (!targetMember) return reply(message, '❌ العضو غير موجود في السيرفر.');
+      if (!targetMember) return true;
       ModerationService.assertModerationHierarchy(message.member, targetMember, 'warn');
       const reason = tail || 'لم يتم تحديد سبب';
       const result = await WarningService.addWarning({ guildId: guild.id, userId: targetId, moderatorId: message.member.id, reason });
       return reply(message, warningMessage(targetMember, reason, result.totalCount, message.member));
     }
 
-    if (command === 'تايم') {
+    if (command === 'تايم' || command === 'timeout') {
       if (!hasPermission(message.member, PermissionFlagsBits.ModerateMembers)) return reply(message, '> You cannot moderate this person');
-      if (!targetMember) return reply(message, '❌ العضو غير موجود في السيرفر.');
+      if (!targetMember) return true;
       const [durationText, ...reasonParts] = tail.split(/\s+/u);
       const durationMs = parseDuration(durationText);
       const reason = reasonParts.join(' ') || 'لم يتم تحديد سبب';
@@ -220,36 +216,35 @@ export async function handleArabicModerationShortcut(message) {
       return reply(message, `⏳ ${targetMember} Has Been Timed Out for ${durationText}, Reason: ${reason}`);
     }
 
-    if (command === 'انتايم') {
+    if (command === 'انتايم' || command === 'untimeout') {
       if (!hasPermission(message.member, PermissionFlagsBits.ModerateMembers)) return reply(message, '> You cannot moderate this person');
-      if (!targetMember) return reply(message, '❌ العضو غير موجود في السيرفر.');
+      if (!targetMember) return true;
       await ModerationService.removeTimeoutUser({ guild, member: targetMember, moderator: message.member, reason: tail || 'لم يتم تحديد سبب' });
       return reply(message, `🔓 تم إلغاء التايم عن ${targetMember}, Reason: ${tail || 'لم يتم تحديد سبب'}`);
     }
 
-    if (command === 'بان') {
+    if (command === 'بان' || command === 'ban') {
       if (!hasPermission(message.member, PermissionFlagsBits.BanMembers)) return reply(message, '> You cannot moderate this person');
-      if (!targetUser) return reply(message, '❌ لم يتم العثور على المستخدم.');
+      if (!targetUser) return true;
       await ModerationService.banUser({ guild, user: targetUser, moderator: message.member, reason: tail || 'لم يتم تحديد سبب' });
       return reply(message, `🚫 ${targetUser} Has Been Banned, Reason: ${tail || 'لم يتم تحديد سبب'}`);
     }
 
-    if (command === 'انبان') {
+    if (command === 'انبان' || command === 'unban') {
       if (!hasPermission(message.member, PermissionFlagsBits.BanMembers)) return reply(message, '> You cannot moderate this person');
-      if (!targetUser) return reply(message, '❌ اكتب User ID صحيح أو اعمل Reply على رسالة الشخص.');
+      if (!targetUser) return true;
       await ModerationService.unbanUser({ guild, user: targetUser, moderator: message.member, reason: tail || 'لم يتم تحديد سبب' });
       return reply(message, `✅ تم إلغاء البان عن ${targetUser}, Reason: ${tail || 'لم يتم تحديد سبب'}`);
     }
 
-    if (command === 'كلير') {
+    if (command === 'كلير' || command === 'clear') {
       if (!hasPermission(message.member, PermissionFlagsBits.ModerateMembers)) return reply(message, '> You cannot moderate this person');
-      if (!targetMember) return reply(message, '❌ العضو غير موجود في السيرفر.');
+      if (!targetMember) return true;
       const result = await WarningService.clearWarnings(guild.id, targetId);
       return reply(message, `🧹 تم مسح كل تحذيرات ${targetMember}. Reason: ${tail || 'لم يتم تحديد سبب'}\nعدد التحذيرات المحذوفة: ${result.count}`);
     }
   } catch (error) {
     await reply(message, `❌ ${error.userMessage || error.message || 'حدث خطأ أثناء تنفيذ الأمر.'}`);
   }
-
   return true;
 }
