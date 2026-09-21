@@ -12,11 +12,6 @@ async function reply(message, content) {
   await message.channel.send(content).catch(() => {});
 }
 
-/**
- * Handle the Arabic message deletion shortcut: `م 10`.
- *
- * @returns {Promise<boolean>} whether the message matched the shortcut
- */
 export async function handleMessageDeleteShortcut(message) {
   const match = String(message?.content || '').trim().match(SHORTCUT_PATTERN);
   if (!match) return false;
