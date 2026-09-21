@@ -16,8 +16,6 @@ async function reply(message, content) {
 export async function handleMessageDeleteShortcut(message) {
   const match = String(message?.content || '').trim().match(SHORTCUT_PATTERN);
   if (!match) return false;
-
-  // This shortcut is intentionally silent when Manage Messages is missing.
   if (!message.member?.permissions?.has(PermissionFlagsBits.ManageMessages)) return true;
 
   const amount = Number(toWesternDigits(match[1]));
