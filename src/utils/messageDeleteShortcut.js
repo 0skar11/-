@@ -3,13 +3,14 @@ import { PermissionFlagsBits } from 'discord.js';
 const SHORTCUT_PATTERN = /^م\s+([0-9٠-٩]+)$/u;
 const MIN_AMOUNT = 1;
 const MAX_AMOUNT = 100;
+const CONFIRMATION_DELETE_DELAY_MS = 4_000;
 
 function toWesternDigits(value) {
   return value.replace(/[٠-٩]/gu, (digit) => String('٠١٢٣٤٥٦٧٨٩'.indexOf(digit)));
 }
 
 async function reply(message, content) {
-  await message.channel.send(content).catch(() => {});
+  return message.channel.send(content).catch(() => null);
 }
 
 export async function handleMessageDeleteShortcut(message) {
@@ -35,7 +36,13 @@ export async function handleMessageDeleteShortcut(message) {
   try {
     const fetched = await message.channel.messages.fetch({ limit: amount });
     const deleted = await message.channel.bulkDelete(fetched, true);
-    await reply(message, `🧹 تم حذف **${deleted.size}** رسالة.`);
+    const confirmation = await reply(message, `🧹 تم حذف **${deleted.size}** رسالة.`);
+
+    if (confirmation) {
+      setTimeout(() => {
+        confirmation.delete().catch(() => {});
+      }, CONFIRMATION_DELETE_DELAY_MS);
+    }
   } catch (error) {
     await reply(message, '❌ تعذر حذف الرسائل. تأكد من صلاحيات البوت وأن الرسائل ليست أقدم من 14 يومًا.');
   }
