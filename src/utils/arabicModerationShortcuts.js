@@ -189,7 +189,8 @@ async function purgeEntireChannel(message) {
 
 async function changeRole(message, targetMember, roleName, add) {
   if (!hasPermission(message.member, PermissionFlagsBits.ManageRoles)) {
-    return reply(message, '> You cannot moderate this person');
+    await reply(message, '> You cannot moderate this person');
+    return true;
   }
   if (!targetMember || !roleName) {
     await reply(message, `❌ استخدم: \`${add ? 'ر / رول' : 'ب / شيل'} @user اسم الرتبة\` أو اعمل Reply واكتب اسم الرتبة.`);
@@ -220,6 +221,23 @@ async function changeRole(message, targetMember, roleName, add) {
     await reply(message, `✅ تم سحب **${role.name}** من ${targetMember}.`);
   }
   return true;
+}
+
+function warningMessage(targetMember, reason, totalWarnings, moderator) {
+  const timestamp = Math.floor(Date.now() / 1000);
+  const targetName = targetMember.displayName || targetMember.user?.username || targetMember.user?.tag || targetMember.id;
+  const moderatorName = moderator.displayName || moderator.user?.username || moderator.user?.tag || moderator.id;
+
+  return [
+    '⚠️ **WARNING ISSUED**',
+    '',
+    `> **User:** \`${targetName}\``,
+    `> **Reason:** \`${reason}\``,
+    `> **Warnings:** \`${totalWarnings}\``,
+    '━━━━━━━━━━━━━━━━━━',
+    `👮 **Moderator:** \`${moderatorName}\``,
+    `🕒 **Time:** <t:${timestamp}:R>`,
+  ].join('\n');
 }
 
 export async function handleArabicModerationShortcut(message) {
@@ -255,7 +273,7 @@ export async function handleArabicModerationShortcut(message) {
       ModerationService.assertModerationHierarchy(message.member, targetMember, 'warn');
       const reason = tail || 'لم يتم تحديد سبب';
       const result = await WarningService.addWarning({ guildId: guild.id, userId: targetId, moderatorId: message.member.id, reason });
-      return reply(message, `⚠️ ${targetMember} Has Been Warned, Reason: ${reason}\nTotal Warns: ${result.totalCount}`);
+      return reply(message, warningMessage(targetMember, reason, result.totalCount, message.member));
     }
 
     if (command === 'كلير' || command === 'clear') {
