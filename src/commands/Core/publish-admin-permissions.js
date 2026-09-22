@@ -4,23 +4,12 @@ import { publishStaffPermissionBoard } from '../../services/staffRoleHierarchySe
 export default {
   data: new SlashCommandBuilder()
     .setName('publish-admin-permissions')
-    .setDescription('ينشر صلاحيات رتب الإدارة في روم الصلاحيات'),
+    .setDescription('Permission-board publishing is disabled'),
 
   async execute(interaction) {
-    if (!interaction.inGuild()) {
-      return interaction.reply({ content: '❌ هذا الأمر يعمل داخل السيرفر فقط.', ephemeral: true });
-    }
-
-    if (!interaction.memberPermissions?.has(PermissionFlagsBits.ManageGuild)) {
-      return interaction.reply({ content: '❌ تحتاج إلى صلاحية Manage Server.', ephemeral: true });
-    }
-
-    await interaction.deferReply({ ephemeral: true });
-    try {
-      const result = await publishStaffPermissionBoard(interaction.guild);
-      await interaction.editReply(`✅ تم إرسال **${result.sent}** رسائل صلاحيات منفصلة في الروم <#${result.channelId}>.`);
-    } catch (error) {
-      await interaction.editReply(`❌ فشل إرسال لوحة الصلاحيات: ${error.message}`);
-    }
+    if (!interaction.inGuild()) return interaction.reply({ content: '❌ هذا الأمر يعمل داخل السيرفر فقط.', ephemeral: true });
+    if (!interaction.memberPermissions?.has(PermissionFlagsBits.ManageGuild)) return interaction.reply({ content: '❌ تحتاج إلى صلاحية Manage Server.', ephemeral: true });
+    const result = await publishStaffPermissionBoard(interaction.guild);
+    await interaction.reply({ content: `🛑 تم تعطيل إرسال رسائل الصلاحيات نهائيًا في الروم <#${result.channelId}>.`, ephemeral: true });
   },
 };
