@@ -24,7 +24,8 @@ export default {
       }
 
       try {
-        boards += await publishStaffPermissionBoard(guild);
+        const boardResult = await publishStaffPermissionBoard(guild);
+        boards += boardResult.sent;
       } catch (error) {
         logger.error(`Failed to publish staff permission board in ${guild.name}:`, error);
       }
@@ -33,3 +34,4 @@ export default {
     startupLog(`Staff role hierarchy: created ${created}, updated ${updated}, positioned ${positioned}, permission messages ${boards}`);
   },
 };
+
