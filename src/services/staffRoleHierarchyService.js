@@ -39,6 +39,11 @@ function permissionNames(permissions) {
   return permissions.map((permission) => `✅ ${PERMISSION_LABELS.get(permission) || permission}`);
 }
 
+// Helper to convert hex color to Discord color value
+function hexToDecimal(hexColor) {
+  return parseInt(hexColor.replace('#', ''), 16);
+}
+
 export async function synchronizeStaffRoles(guild) {
   const botMember = guild.members.me || await guild.members.fetchMe().catch(() => null);
   if (!botMember?.permissions.has(PermissionFlagsBits.ManageRoles)) {
@@ -54,10 +59,10 @@ export async function synchronizeStaffRoles(guild) {
   for (const definition of ROLE_DEFINITIONS) {
     let role = roles.find((candidate) => candidate.name === definition.name && !candidate.managed);
     if (!role) {
-      role = await guild.roles.create({ name: definition.name, color: definition.color, hoist: true, mentionable: false, permissions: definition.permissions, reason: 'Create/update ordered staff role hierarchy' });
+      role = await guild.roles.create({ name: definition.name, color: hexToDecimal(definition.color), hoist: true, mentionable: false, permissions: definition.permissions, reason: 'Create/update ordered staff role hierarchy' });
       created += 1;
     } else if (role.position < botMember.roles.highest.position) {
-      await role.edit({ color: definition.color, hoist: true, permissions: definition.permissions, reason: 'Synchronize ordered staff role permissions' });
+      await role.edit({ color: hexToDecimal(definition.color), hoist: true, permissions: definition.permissions, reason: 'Synchronize ordered staff role permissions' });
       updated += 1;
     }
     if (!role.managed && role.position < botMember.roles.highest.position) managedRoles.push(role);
@@ -96,7 +101,7 @@ export async function publishStaffPermissionBoard(guild) {
     if (!role) continue;
     const permissionLines = permissionNames(role.permissions.toArray());
     const embed = new EmbedBuilder()
-      .setColor(role.color || definition.color)
+      .setColor(hexToDecimal(definition.color))
       .setTitle(`${role.name} — الصلاحيات`)
       .setDescription(`الرتبة: ${role}\n\n${permissionLines.join('\n') || 'لا توجد صلاحيات إضافية'}`)
       .setFooter({ text: PERMISSION_BOARD_FOOTER });
@@ -108,3 +113,4 @@ export async function publishStaffPermissionBoard(guild) {
 }
 
 export { ROLE_DEFINITIONS, ROLE_PERMISSIONS_CHANNEL_ID };
+
