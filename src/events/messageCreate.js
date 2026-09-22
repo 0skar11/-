@@ -2,7 +2,7 @@ import { Events } from 'discord.js';
 import { logger } from '../utils/logger.js';
 import { handleArabicUtilityShortcuts } from '../utils/arabicUtilityShortcuts.js';
 import { handleMessageDeleteShortcut } from '../utils/messageDeleteShortcut.js';
-import { parsePrefixCommand, parseMessageCommand } from '../utils/prefixParser.js';
+import { parsePrefixCommand } from '../utils/prefixParser.js';
 import { supportsPrefixExecution, executePrefixCommand, resolvePrefixAccessKey } from '../utils/messageAdapter.js';
 import { resolveCommandAlias, resolveSubcommandAlias } from '../config/commands/commandAliases.js';
 import { getPrefixRestriction } from '../config/commands/prefixRestrictions.js';
@@ -20,8 +20,6 @@ export default {
       if (message.author.bot || !message.guild) return;
       logger.debug(`Message received from ${message.author.tag}: ${message.content}`);
 
-      // Trust/untrust is handled exclusively by events/02_commandFeedback.js.
-      // Keeping one owner for this command prevents duplicate replies and conflicts.
       if (await handleArabicUtilityShortcuts(message)) return;
       if (await handleMessageDeleteShortcut(message)) return;
       if (await handleCountingGame(message, client)) return;
@@ -36,7 +34,9 @@ async function handlePrefixCommand(message, client) {
   try {
     const guildConfig = await getGuildConfig(client, message.guild.id);
     const prefix = guildConfig?.prefix || getCommandPrefix();
-    const parsed = parsePrefixCommand(message.content, prefix) ?? parseMessageCommand(message.content, prefix);
+
+    // Only explicitly prefixed messages are commands. Normal conversation is ignored.
+    const parsed = parsePrefixCommand(message.content, prefix);
     if (!parsed) return;
 
     let { commandName, args } = parsed;
@@ -48,10 +48,10 @@ async function handlePrefixCommand(message, client) {
 
     const resolvedCommandName = resolveCommandAlias(commandName);
     const command = client.commands.get(resolvedCommandName);
-    if (!command) {
-      await message.channel.send(`❌ الأمر غير موجود: \`${commandName}\`. استخدم /help لمعرفة الأوامر المتاحة.`).catch(() => {});
-      return;
-    }
+
+    // Unknown prefixed commands are ignored; only real loaded commands are handled.
+    if (!command) return;
+
     if (isMaintenanceMode() && !isBotOwner(message.author.id)) {
       await message.channel.send({ embeds: [createEmbed({ title: 'Maintenance Mode', description: getBotMessage('maintenanceMode'), color: 'warning' })] }).catch(() => {});
       return;
