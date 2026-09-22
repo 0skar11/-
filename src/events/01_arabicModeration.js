@@ -1,11 +1,9 @@
 import { Events } from 'discord.js';
-import { handleArabicModerationShortcut } from '../utils/arabicModerationShortcuts.js';
 
+// Arabic commands are normal aliases handled by the regular prefix pipeline.
+// Keeping this listener inert prevents commands from executing twice.
 export default {
   name: Events.MessageCreate,
   once: false,
-  async execute(message) {
-    if (!message?.guild || message.author?.bot) return;
-    await handleArabicModerationShortcut(message);
-  },
+  async execute() {},
 };
