@@ -12,6 +12,7 @@ import { enforceAbuseProtection, formatCooldownDuration } from '../utils/abusePr
 import { createEmbed } from '../utils/embeds.js';
 import { isCommandEnabled } from '../services/commandAccessService.js';
 import { getCountingGameConfig, saveCountingGameConfig, isValidCountingMessage, recordCorrectCount } from '../services/countingGameService.js';
+import { handleTrustedListCommand } from '../utils/trustedCommand.js';
 
 export default {
   name: Events.MessageCreate,
@@ -34,12 +35,19 @@ async function handlePrefixCommand(message, client) {
   try {
     const guildConfig = await getGuildConfig(client, message.guild.id);
     const prefix = guildConfig?.prefix || getCommandPrefix();
-
-    // Only explicitly prefixed messages are commands. Normal conversation is ignored.
     const parsed = parsePrefixCommand(message.content, prefix);
     if (!parsed) return;
 
     let { commandName, args } = parsed;
+    if (commandName.toLowerCase() === 'trusted') {
+      if (args.length) {
+        await message.channel.send(`❌ صيغة الأمر الصحيحة: \`${prefix}trusted\``).catch(() => {});
+      } else {
+        await handleTrustedListCommand(message, client);
+      }
+      return;
+    }
+
     const musicPrefixShortcut = commandName.toLowerCase();
     if (new Set(['leave', 'pause', 'resume', 'skip', 'stop', 'volume']).has(musicPrefixShortcut)) {
       commandName = 'music';
@@ -48,32 +56,16 @@ async function handlePrefixCommand(message, client) {
 
     const resolvedCommandName = resolveCommandAlias(commandName);
     const command = client.commands.get(resolvedCommandName);
-
-    // Unknown prefixed commands are ignored; only real loaded commands are handled.
     if (!command) return;
-
     if (isMaintenanceMode() && !isBotOwner(message.author.id)) {
       await message.channel.send({ embeds: [createEmbed({ title: 'Maintenance Mode', description: getBotMessage('maintenanceMode'), color: 'warning' })] }).catch(() => {});
       return;
     }
-    if (!isCommandCategoryEnabled(command.category)) {
-      await message.channel.send('❌ هذا القسم من الأوامر متوقف حاليًا.').catch(() => {});
-      return;
-    }
+    if (!isCommandCategoryEnabled(command.category)) return;
 
     const restriction = getPrefixRestriction(command, args, resolveSubcommandAlias);
-    if (restriction.blocked) {
-      await message.channel.send(`❌ ${restriction.reason || 'هذا الأمر غير متاح بهذه الطريقة.'}`).catch(() => {});
-      return;
-    }
-    if (!supportsPrefixExecution(command)) {
-      await message.channel.send('❌ هذا الأمر متاح باستخدام Slash Command فقط.').catch(() => {});
-      return;
-    }
-    if (!(await isCommandEnabled(client, message.guild.id, resolvePrefixAccessKey(command.data, args), command.category))) {
-      await message.channel.send('❌ هذا الأمر متوقف في هذا السيرفر.').catch(() => {});
-      return;
-    }
+    if (restriction.blocked || !supportsPrefixExecution(command)) return;
+    if (!(await isCommandEnabled(client, message.guild.id, resolvePrefixAccessKey(command.data, args), command.category))) return;
 
     const abuseProtection = await enforceAbuseProtection({ guildId: message.guild.id, user: message.author }, command, resolvedCommandName);
     if (!abuseProtection.allowed) {
