@@ -2,9 +2,9 @@ import { isServerOwner } from '../config/serverOwners.js';
 import { canLiftHardBan } from './moderation/hardBanService.js';
 
 // Only owners and trusted members may mention @everyone / @here.
-// Anyone else has the message deleted and gets a short notice (gone after 3 seconds).
+// Anyone else has the message deleted and gets a short notice (gone after 1 second).
 const EVERYONE_MENTION = /@(?:everyone|here)\b/u;
-const BLOCKED_NOTICE_DELETE_MS = 3_000;
+const BLOCKED_NOTICE_DELETE_MS = 1_000;
 
 async function canMentionEveryone(message) {
   if (isServerOwner(message.author.id)) return true;
