@@ -13,6 +13,7 @@ const EMOJI_RULES = [
   { emoji: '📜', words: ['rules', 'قوانين', 'القوانين'] },
   { emoji: '👋', words: ['welcome', 'ترحيب', 'الترحيب'] },
   { emoji: '📸', words: ['media', 'pics', 'pic', 'photos', 'photo', 'images', 'image', 'صور', 'الصور', 'ميديا'] },
+  { emoji: '👀', words: ['reveal', 'reveals', 'face-reveal', 'ريفيل'] },
   { emoji: '🤳', words: ['selfie', 'selfies', 'سيلفي'] },
   { emoji: '🎬', words: ['clips', 'clip', 'videos', 'video', 'فيديو', 'فيديوهات', 'مقاطع'] },
   { emoji: '😂', words: ['memes', 'meme', 'ميمز', 'ميم', 'نكت', 'ضحك'] },
@@ -61,10 +62,15 @@ export function pickChannelEmoji(cleanName) {
   return DEFAULT_EMOJI;
 }
 
+// An emoji someone already put at the start of the name (e.g. 💭・general)
+// is kept instead of being swapped for the default one.
+const LEADING_EMOJI = /^\p{Extended_Pictographic}(?:\uFE0F|\p{Emoji_Modifier}|\u200D\p{Extended_Pictographic}\uFE0F?)*/u;
+
 export function formatChatChannelName(name) {
   const clean = cleanChannelName(name);
   if (!clean) return null;
-  return `${pickChannelEmoji(clean)}${SEPARATOR}${clean}`.slice(0, 100);
+  const emoji = String(name).trim().match(LEADING_EMOJI)?.[0] || pickChannelEmoji(clean);
+  return `${emoji}${SEPARATOR}${clean}`.slice(0, 100);
 }
 
 export async function tidyChatChannelNames(client) {

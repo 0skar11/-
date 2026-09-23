@@ -24,6 +24,19 @@ describe('formatChatChannelName', () => {
     }
   });
 
+  test('keeps an emoji the channel already starts with', () => {
+    assert.equal(formatChatChannelName('💭・general'), '💭・general');
+    assert.equal(formatChatChannelName('📷・media'), '📷・media');
+    assert.equal(formatChatChannelName('📷 media'), '📷・media');
+  });
+
+  test('names the communication channels', () => {
+    assert.equal(formatChatChannelName('games'), '🎮・games');
+    assert.equal(formatChatChannelName('memes'), '😂・memes');
+    assert.equal(formatChatChannelName('reveal'), '👀・reveal');
+    assert.equal(formatChatChannelName('cmd'), '🤖・cmd');
+  });
+
   test('falls back to the chat emoji and skips empty names', () => {
     assert.equal(formatChatChannelName('random'), '💬・random');
     assert.equal(formatChatChannelName('・・'), null);
