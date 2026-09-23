@@ -8,7 +8,7 @@ export default {
     .setName('publish-board')
     .setDescription('Post a bot info board once (skipped if it already exists)')
     .addSubcommand((sub) => sub.setName('moderation-commands').setDescription('Post the Arabic moderation commands list'))
-    .addSubcommand((sub) => sub.setName('admin-permissions').setDescription('Post the staff permission board')),
+    .addSubcommand((sub) => sub.setName('admin-permissions').setDescription('Post or refresh the staff permission board')),
 
   async execute(interaction) {
     if (!interaction.inGuild()) return interaction.reply({ content: '❌ هذا الأمر يعمل داخل السيرفر فقط.', ephemeral: true });
@@ -19,8 +19,11 @@ export default {
       let channelId;
       if (interaction.options.getSubcommand() === 'admin-permissions') {
         const result = await publishStaffPermissionBoard(interaction.guild);
-        sent = result.sent > 0;
-        channelId = result.channelId;
+        const parts = [];
+        if (result.sent) parts.push(`إرسال ${result.sent}`);
+        if (result.edited) parts.push(`تحديث ${result.edited}`);
+        const summary = parts.length ? `✅ تم ${parts.join(' و ')} رسالة في الروم <#${result.channelId}>.` : `ℹ️ لم يتم العثور على رتب الستاف في الروم <#${result.channelId}>.`;
+        return interaction.reply({ content: summary, ephemeral: true });
       } else {
         const result = await publishArabicModerationCommands(interaction.client);
         sent = result.status !== 'exists';
