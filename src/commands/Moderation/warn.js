@@ -5,7 +5,8 @@ import { logger } from '../../utils/logger.js';
 import { ModerationService } from '../../services/moderation/moderationService.js';
 import { TitanBotError, ErrorTypes } from '../../utils/errorHandler.js';
 import { InteractionHelper } from '../../utils/interactionHelper.js';
-import { issueWarning, warningCard } from '../../services/moderation/warnEscalation.js';
+import { issueWarning, warningCard, warningPunishment } from '../../services/moderation/warnEscalation.js';
+import { fetchRepliedMessage, sendModerationActionLog } from '../../services/moderation/moderationActionLogService.js';
 export default {
     data: new SlashCommandBuilder()
         .setName("warn")
@@ -70,6 +71,7 @@ export default {
 
         ModerationService.assertModerationHierarchy(interaction.member, member, 'warn');
 
+        const repliedMessage = await fetchRepliedMessage(interaction);
         const result = await issueWarning({
             guild: interaction.guild,
             member,
@@ -95,6 +97,17 @@ export default {
                     autoTimeoutMs: result.timeoutApplied ? result.timeoutMs : 0
                 }
             }
+        });
+
+        await sendModerationActionLog(interaction.guild, {
+            action: 'warn',
+            targetUser: target,
+            moderatorUser: moderator,
+            reason: result.reason,
+            warnings: totalCount,
+            punishment: warningPunishment(result),
+            channel: interaction.channel,
+            repliedMessage,
         });
 
         await InteractionHelper.safeEditReply(interaction, warningCard({ userId: target.id, moderatorId: moderator.id, result }));
