@@ -2,6 +2,7 @@ import { Events } from 'discord.js';
 import { logEvent, EVENT_TYPES } from '../services/loggingService.js';
 import { logger } from '../utils/logger.js';
 import { formatLogLine } from '../utils/logging/logEmbeds.js';
+import { handleForeignInviteLink } from '../services/inviteLinkGuardService.js';
 
 const MAX_LOGGED_EDIT_CONTENT_LENGTH = 512;
 
@@ -14,6 +15,9 @@ export default {
       if (!newMessage.guild || newMessage.author?.bot) return;
 
       if (oldMessage.content === newMessage.content) return;
+
+      // An edit must not sneak in an invite to another server.
+      if (!newMessage.partial) await handleForeignInviteLink(newMessage);
 
       const metaLines = [
         formatLogLine('Channel', newMessage.channel ? `${newMessage.channel.name} ${newMessage.channel.toString()}` : 'Unknown'),
