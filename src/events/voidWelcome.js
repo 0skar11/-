@@ -31,12 +31,12 @@ export default {
 
     try {
       await channel.send({
-        content: `welcome to VOID ${member}`,
+        content: `welcome to chaos ${member}`,
         allowedMentions: { users: [member.id] },
       });
-      logger.info(`Sent VOID welcome for ${member.user.tag} in channel ${WELCOME_CHANNEL_ID}.`);
+      logger.info(`Sent chaos welcome for ${member.user.tag} in channel ${WELCOME_CHANNEL_ID}.`);
     } catch (error) {
-      logger.error(`Failed to send VOID welcome in channel ${WELCOME_CHANNEL_ID}:`, error);
+      logger.error(`Failed to send chaos welcome in channel ${WELCOME_CHANNEL_ID}:`, error);
     }
   },
 };
