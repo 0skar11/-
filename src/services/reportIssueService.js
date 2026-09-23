@@ -1,12 +1,12 @@
 import axios from 'axios';
 import { logger } from '../utils/logger.js';
 
-// Every report is also opened as an issue in a private GitHub repo, so reports can be
+// Every report is also opened as an issue (label 'بلاغ') in the bot's GitHub repo, so reports can be
 // searched and followed up there. Closing the issue marks the report as solved: the
 // watcher below then updates the report in Discord and tells the reporter.
 //   GITHUB_TOKEN   fine-grained token with Issues read/write on REPORTS_REPO
-//   REPORTS_REPO   owner/name of the private reports repo
-const REPORTS_REPO = process.env.REPORTS_REPO || '0skar11/void-reports';
+//   REPORTS_REPO   owner/name of the repo the report issues go to
+const REPORTS_REPO = process.env.REPORTS_REPO || '0skar11/-';
 const REPORT_LABEL = 'بلاغ';
 const SOLVED_LABEL = 'اتحلت';
 const CLOSED_LABEL = 'اتقفلت';
