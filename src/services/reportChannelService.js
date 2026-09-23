@@ -1,5 +1,6 @@
 import { PermissionFlagsBits } from 'discord.js';
 import { logger } from '../utils/logger.js';
+import { openReportIssue } from './reportIssueService.js';
 
 // Any message posted in this channel is turned into a report; no command needed.
 // `/report file` sends its reports here as well.
@@ -25,6 +26,15 @@ function buildReportEmbed({ reporter, content, reportedUser, sourceChannel }) {
   };
 }
 
+// Saves the posted report as a GitHub issue and shows its number on the report.
+async function recordReport(reportMessage, details) {
+  const attachmentUrls = [...reportMessage.attachments.values()].map((attachment) => attachment.url);
+  const number = await openReportIssue({ reportMessage, attachmentUrls, ...details });
+  if (!number) return;
+  const [embed] = reportMessage.embeds;
+  await reportMessage.edit({ embeds: [{ ...embed?.toJSON?.(), title: `📩 بلاغ #${number}` }] }).catch(() => null);
+}
+
 async function fetchReportChannel(guild) {
   const channel = guild.channels.cache.get(REPORT_CHANNEL_ID)
     || await guild.channels.fetch(REPORT_CHANNEL_ID).catch(() => null);
@@ -44,10 +54,11 @@ export async function sendReport(guild, { reporter, reportedUser, reason, source
     logger.warn(`Report channel ${REPORT_CHANNEL_ID} was not found in guild ${guild.id}.`);
     return false;
   }
-  await channel.send({
+  const posted = await channel.send({
     ...ownerPing(guild),
     embeds: [buildReportEmbed({ reporter, content: reason, reportedUser, sourceChannel })],
   });
+  await recordReport(posted, { reporter, reportedUser, content: reason, sourceChannel });
   return true;
 }
 
@@ -67,21 +78,24 @@ export async function handleReportChannelMessage(message) {
   const embed = buildReportEmbed({ reporter: message.author, content: message.content });
   const files = [...message.attachments.values()].map((attachment) => ({ attachment: attachment.url, name: attachment.name }));
 
-  let posted = null;
+  let posted;
   try {
     posted = await message.channel.send({ ...ownerPing(message.guild), embeds: [embed], files });
   } catch (error) {
     // Attachments can exceed the bot's upload limit: post the report without them and keep the original.
     logger.error(`Failed to post report from ${message.author.tag} with attachments:`, error);
-    await message.channel.send({ ...ownerPing(message.guild), embeds: [embed] }).catch((fallbackError) => {
+    const fallback = await message.channel.send({ ...ownerPing(message.guild), embeds: [embed] }).catch((fallbackError) => {
       logger.error(`Failed to post report from ${message.author.tag}:`, fallbackError);
+      return null;
     });
+    if (fallback) await recordReport(fallback, { reporter: message.author, content: `${message.content}\n\n(المرفقات في الرسالة الأصلية: ${message.url})` });
     return true;
   }
 
-  if (posted && permissions.has(PermissionFlagsBits.ManageMessages)) {
+  if (permissions.has(PermissionFlagsBits.ManageMessages)) {
     await message.delete().catch(() => null);
   }
+  await recordReport(posted, { reporter: message.author, content: message.content });
   logger.info(`Report registered from ${message.author.tag} (${message.author.id}) in guild ${message.guild.id}.`);
   return true;
 }
