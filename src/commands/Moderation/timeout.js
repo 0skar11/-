@@ -15,6 +15,17 @@ const durationChoices = [
     { name: "1 week", value: 10080 },
 ];
 
+const MAX_TIMEOUT_MINUTES = 28 * 24 * 60;
+const UNIT_MINUTES = { s: 1 / 60, m: 1, h: 60, d: 1440, w: 10080, 'ث': 1 / 60, 'د': 1, 'س': 60, 'ي': 1440 };
+
+// Prefix usage accepts units (`10m`, `2h`, `1d`, `1w`, `10د`, `2س`, `1ي`); a bare number means minutes.
+function resolveDurationMinutes(interaction) {
+    if (!interaction._isPrefixCommand) return interaction.options.getInteger("duration");
+    const raw = String(interaction.options.getString("duration") || "").trim().toLowerCase();
+    const match = raw.match(/^(\d+)\s*([smhdwثدسي])?$/u);
+    return match ? Math.ceil(Number(match[1]) * UNIT_MINUTES[match[2] || "m"]) : null;
+}
+
 export default {
     data: new SlashCommandBuilder()
         .setName("timeout")
@@ -52,7 +63,7 @@ export default {
 
         const targetUser = interaction.options.getUser("target");
         const member = interaction.options.getMember("target");
-        const durationMinutes = interaction.options.getInteger("duration");
+        const durationMinutes = resolveDurationMinutes(interaction);
         const reason = interaction.options.getString("reason") || "No reason provided";
 
         if (!targetUser) {
@@ -83,6 +94,14 @@ export default {
                 "Target not found",
                 ErrorTypes.USER_INPUT,
                 "The target user is not currently in this server.",
+            );
+        }
+
+        if (!durationMinutes || durationMinutes < 1 || durationMinutes > MAX_TIMEOUT_MINUTES) {
+            throw new TitanBotError(
+                "Invalid duration",
+                ErrorTypes.USER_INPUT,
+                "❌ اكتب المدة صح، مثال: `10m` أو `2h` أو `1d` (أقصى مدة 28 يوم).",
             );
         }
 
