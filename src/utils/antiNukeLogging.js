@@ -67,12 +67,43 @@ async function stripDangerousPermissions(member) {
   return changed;
 }
 
-async function notify(guild, action, entry, count, response) {
+const ACTION_LABELS = Object.freeze({
+  channelDelete: 'مسح روم',
+  roleDelete: 'مسح رتبة',
+  memberBan: 'باند أعضاء',
+  memberKick: 'طرد أعضاء',
+  bulkDelete: 'مسح رسائل جماعي',
+  permissionUpdate: 'تعديل صلاحيات',
+  roleCreate: 'إنشاء رتب',
+});
+
+async function send(guild, payload) {
   const config = await getGuildConfig(guild.client, guild.id).catch(() => null);
   const channel = config?.antiNukeLogChannelId ? guild.channels.cache.get(config.antiNukeLogChannelId) : null;
   if (!channel?.isTextBased?.()) return;
-  const embed = new EmbedBuilder().setColor(response === 'ban' ? 0xed4245 : 0xfee75c).setTitle('Anti-Nuke Detection').setDescription(`**Action:** ${action}\n**Executor:** <@${entry.executor?.id}>\n**Count:** ${count}\n**Response:** ${response}`).addFields({ name: 'Audit Log ID', value: `\`${entry.id}\`` }).setTimestamp();
-  await channel.send({ embeds: [embed] }).catch(() => {});
+  await channel.send(payload).catch(() => {});
+}
+
+const time = () => `<t:${Math.floor(Date.now() / 1000)}:F>`;
+
+// Suspicious activity below the limit: yellow warning, no ping.
+function warn(guild, executorId, action, count, threshold) {
+  const embed = new EmbedBuilder().setColor(0xfee75c).setTitle('⚠️ نشاط مشبوه')
+    .setDescription(`**العضو:** <@${executorId}>\n**الفعل:** ${ACTION_LABELS[action] || action} (${count}/${threshold})\n**الوقت:** ${time()}`);
+  return send(guild, { embeds: [embed], allowedMentions: { parse: [] } });
+}
+
+// Sent only after the member has already been dealt with: red, pings everyone.
+function alert(guild, executorId, punishment, reason) {
+  const embed = new EmbedBuilder().setColor(0xed4245).setTitle(`🚨 ${punishment}`)
+    .setDescription(`**العضو:** <@${executorId}>\n**السبب:** ${reason}\n**الوقت:** ${time()}`);
+  return send(guild, { content: '@everyone', embeds: [embed], allowedMentions: { parse: ['everyone'] } });
+}
+
+async function punish(member, reason) {
+  if (member?.kickable && await member.kick(reason).then(() => true).catch(() => false)) return 'تم طرده';
+  if (await stripDangerousPermissions(member)) return 'تم سحب صلاحياته (لم يمكن طرده)';
+  return 'فشل التعامل معه — يحتاج تدخل يدوي';
 }
 
 export async function inspectAuditAction(guild, action, targetId = null, filter) {
@@ -83,15 +114,20 @@ export async function inspectAuditAction(guild, action, targetId = null, filter)
   const config = await getGuildConfig(guild.client, guild.id).catch(() => null);
   if (await isTrusted(guild, config, entry.executor.id)) return false;
   const count = record(guild.id, entry.executor.id, action, rule.windowMs);
-  if (count < rule.threshold) return notify(guild, action, entry, count, 'log');
+  if (count < rule.threshold) {
+    await warn(guild, entry.executor.id, action, count, rule.threshold);
+    return false;
+  }
+  const reason = `${ACTION_LABELS[action] || action}: ${count} مرات خلال ${rule.windowMs / 1000} ثانية`;
   const executor = await guild.members.fetch(entry.executor.id).catch(() => null);
-  const response = count >= rule.threshold + 2 ? 'ban' : 'strip_permissions';
-  if (response === 'ban' && executor?.bannable) await executor.ban({ reason: `Anti-Nuke: ${count} ${action} actions in ${rule.windowMs / 1000}s` }).catch(() => {});
-  else await stripDangerousPermissions(executor);
-  await notify(guild, action, entry, count, response);
+  const punishment = await punish(executor, `Anti-Nuke: ${reason}`);
+  await alert(guild, entry.executor.id, punishment, reason);
   return true;
 }
 
 export async function findRecentAuditEntry(guild, auditType, targetId, filter) { return getEntry(guild, auditType, targetId, filter); }
-export async function sendAntiNukeLog(guild, data) { logger.warn(`[Anti-Nuke] ${data.action}: ${data.target || 'unknown'}`, data); await notify(guild, data.action, { id: data.auditLogId || 'manual', executor: data.executor }, 1, 'log'); }
+export async function sendAntiNukeLog(guild, data) {
+  logger.warn(`[Anti-Nuke] ${data.action}: ${data.target || 'unknown'}`);
+  await alert(guild, data.executor?.id, data.punishment || 'تم طرده', data.reason || data.action);
+}
 export { AuditLogEvent };
