@@ -5,7 +5,7 @@ export const commandAliases = {
   بان: 'ban', انبان: 'unban', تايم: 'timeout', انتايم: 'untimeout', mute: 'timeout', unmute: 'untimeout',
   وارن: 'warn', وارنات: 'warnings', كلير: 'purge', clear: 'purge',
   طرد: 'kick', تحذير: 'warn', تحذيرات: 'warnings', مسح: 'purge', قفل: 'lock', فتح: 'unlock',
-  حالات: 'cases', ملاحظات: 'usernotes', قل: 'say', خاص: 'dm',
+  حالات: 'cases', ملاحظات: 'usernotes', قل: 'say', قول: 'say', خاص: 'dm',
   kick: 'kick', ban: 'ban', warn: 'warn', purge: 'purge', untimeout: 'untimeout',
   rank: 'rank', lvl: 'rank', xp: 'rank', leaderboard: 'leaderboard', lb: 'leaderboard', top: 'leaderboard',
   shop: 'shop', buy: 'buy', inventory: 'inventory', inv: 'inventory', items: 'inventory',
