@@ -2,6 +2,7 @@ import { PermissionFlagsBits } from 'discord.js';
 import { logger } from '../../utils/logger.js';
 import { TitanBotError, ErrorTypes } from '../../utils/errorHandler.js';
 import { logModerationAction } from '../../utils/moderation.js';
+import { canLiftHardBan, isHardBanned, removeHardBan } from './hardBanService.js';
 
 function getTargetLabel(target) {
   return target?.id ? `<@${target.id}>` : 'this user';
@@ -133,8 +134,17 @@ export class ModerationService {
   static async unbanUser({ guild, user, moderator, reason = 'No reason provided' }) {
     if (!guild || !user || !moderator) throw new TitanBotError('Missing required parameters', ErrorTypes.VALIDATION, '❌ Member Not Found');
     const banInfo = await guild.bans.fetch(user.id).catch(() => null);
-    if (!banInfo) throw new TitanBotError('User not banned', ErrorTypes.VALIDATION, `❌ ${user} Is Not Banned`);
+    const hardBanned = await isHardBanned(guild.client, guild.id, user.id);
+    if (hardBanned && !(await canLiftHardBan(guild, moderator.id))) {
+      throw new TitanBotError('Hard ban requires trust', ErrorTypes.PERMISSION, '🚫 No Permission — هارد بان، فكّه للـ trusted فقط');
+    }
+    if (!banInfo) {
+      if (hardBanned) await removeHardBan(guild.client, guild.id, user.id);
+      throw new TitanBotError('User not banned', ErrorTypes.VALIDATION, `❌ ${user} Is Not Banned`);
+    }
 
+    // Drop the hard ban first so the unban isn't reverted by the GuildBanRemove guard.
+    if (hardBanned) await removeHardBan(guild.client, guild.id, user.id);
     await guild.members.unban(user.id, reason);
     const caseId = await logModerationAction({ client: guild.client, guild, event: {
       action: 'Member Unbanned', target: `${user.tag} (${user.id})`, executor: `${moderator.user?.tag || moderator.id} (${moderator.id})`, reason,

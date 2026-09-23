@@ -6,10 +6,12 @@ import { ModerationService } from '../../services/moderation/moderationService.j
 import { TitanBotError, replyUserError, ErrorTypes } from '../../utils/errorHandler.js';
 
 import { InteractionHelper } from '../../utils/interactionHelper.js';
+import { groupLeadingUsers } from '../../utils/prefixArgs.js';
+import { addHardBans } from '../../services/moderation/hardBanService.js';
 export default {
     data: new SlashCommandBuilder()
         .setName("massban")
-        .setDescription("Ban multiple users from the server at once")
+        .setDescription("Hard-ban users: only trusted members can lift these bans")
         .addStringOption(option =>
             option
                 .setName("users")
@@ -31,6 +33,11 @@ export default {
         )
         .setDefaultMemberPermissions(PermissionFlagsBits.BanMembers),
     category: "moderation",
+
+    // Prefix usage: `هارد بان ID1 ID2 السبب` — all leading IDs go into `users`, the rest is the reason.
+    normalizePrefixArgs(args) {
+        return groupLeadingUsers(args);
+    },
     abuseProtection: { maxAttempts: 3, windowMs: 60_000 },
 
     async execute(interaction, config, client) {
@@ -145,7 +152,9 @@ export default {
                 }
             }
 
-            let description = `**Mass Ban Results:**\n\n`;
+            await addHardBans(client, interaction.guild.id, results.successful.map((result) => result.userId));
+
+            let description = `**Hard Ban Results** — فك البان متاح للـ trusted فقط\n\n`;
             
             if (results.successful.length > 0) {
                 description += `✅ **Successfully Banned (${results.successful.length}):**\n`;
@@ -175,7 +184,7 @@ export default {
             return await InteractionHelper.safeEditReply(interaction, {
                 embeds: [
                     embed(
-                        `🔨 Mass Ban Completed`,
+                        `🔨 Hard Ban Completed`,
                         description
                     )
                 ]

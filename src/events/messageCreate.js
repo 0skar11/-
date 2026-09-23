@@ -4,7 +4,7 @@ import { handleArabicUtilityShortcuts } from '../utils/arabicUtilityShortcuts.js
 import { handleMessageDeleteShortcut } from '../utils/messageDeleteShortcut.js';
 import { parsePrefixCommand, parseMessageCommand, mapArgumentsToOptions } from '../utils/prefixParser.js';
 import { supportsPrefixExecution, executePrefixCommand, resolvePrefixAccessKey } from '../utils/messageAdapter.js';
-import { resolveCommandAlias, resolveSubcommandAlias } from '../config/commands/commandAliases.js';
+import { resolveCommandAlias, resolveSubcommandAlias, twoWordCommandAliases } from '../config/commands/commandAliases.js';
 import { getPrefixRestriction } from '../config/commands/prefixRestrictions.js';
 import { getGuildConfig } from '../services/config/guildConfig.js';
 import { getCommandPrefix, isBotOwner, isCommandCategoryEnabled, isMaintenanceMode } from '../config/bot.js';
@@ -12,7 +12,7 @@ import { enforceAbuseProtection, formatCooldownDuration } from '../utils/abusePr
 import { isCommandEnabled } from '../services/commandAccessService.js';
 import { getCountingGameConfig, saveCountingGameConfig, isValidCountingMessage, recordCorrectCount } from '../services/countingGameService.js';
 import { handleTrustedListCommand } from '../utils/trustedCommand.js';
-import { handleArabicRoleShortcut } from '../utils/arabicModerationShortcuts.js';
+import { handleArabicRoleShortcut, handleClearWarningsShortcut } from '../utils/arabicModerationShortcuts.js';
 
 export default {
   name: Events.MessageCreate,
@@ -70,6 +70,17 @@ async function handlePrefixCommand(message, client) {
         await handleTrustedListCommand(message, client);
       }
       return;
+    }
+
+    const typedCommand = commandName.toLowerCase();
+    if (typedCommand === 'مسح' && args[0] === 'تحذيرات') {
+      await handleClearWarningsShortcut(message, args.slice(1));
+      return;
+    }
+    const twoWordCommand = twoWordCommandAliases[`${typedCommand} ${args[0] || ''}`];
+    if (twoWordCommand) {
+      commandName = twoWordCommand;
+      args = args.slice(1);
     }
 
     const musicPrefixShortcut = commandName.toLowerCase();

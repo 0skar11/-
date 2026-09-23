@@ -3,6 +3,7 @@ import { getCommandPrefix } from '../config/bot.js';
 import { getGuildConfig, updateGuildConfig } from '../services/config/guildConfig.js';
 import { ModerationService } from '../services/moderation/moderationService.js';
 import { WarningService } from '../services/moderation/warningService.js';
+import { scheduleNoPermissionDelete } from './noPermissionReply.js';
 
 const COMMANDS = new Set([
   'وارن', 'وارنات', 'تايم', 'انتايم', 'بان', 'انبان', 'كلير', 'ان', 'شيل', 'ر', 'رول', 'ب', 'رتبة', 'ازالةرتبة', 'purge', 'تراست', 'انتراست', 'trusted', 'trustedlist', 'warn', 'warnings', 'timeout', 'untimeout', 'ban', 'unban', 'clear', 'remove', 'role', 'roll', 'lock', 'unlock',
@@ -60,7 +61,7 @@ function hasPermission(member, permission) {
 }
 
 async function reply(message, content) {
-  await message.channel.send({ content, allowedMentions: { parse: [] } }).catch(() => {});
+  await message.channel.send({ content, allowedMentions: { parse: [] } }).then(scheduleNoPermissionDelete).catch(() => {});
 }
 
 async function getReplyTargetId(message) {
@@ -213,6 +214,25 @@ export async function handleArabicRoleShortcut(message, prefixes = []) {
     await reply(message, `❌ ${error.userMessage || error.message || 'حدث خطأ أثناء تنفيذ الأمر.'}`);
   }
   return true;
+}
+
+/** `مسح تحذيرات @member` (or as a reply) — clears all of a member's warnings. */
+export async function handleClearWarningsShortcut(message, args) {
+  if (!hasPermission(message.member, PermissionFlagsBits.ModerateMembers)) return reply(message, '🚫 No Permission');
+  const body = args.join(' ');
+  const mention = body.match(/<@!?(\d+)>/u);
+  const id = body.match(/(?:^|\s)(\d{17,20})(?:\s|$)/u);
+  const targetId = mention?.[1] || id?.[1] || await getReplyTargetId(message);
+  if (!targetId) return reply(message, '❌ Usage: `مسح تحذيرات @user`');
+  const targetMember = await message.guild.members.fetch(targetId).catch(() => null);
+  if (!targetMember) return reply(message, '❌ Member Not Found');
+  try {
+    ModerationService.assertModerationHierarchy(message.member, targetMember, 'warn');
+    const result = await WarningService.clearWarnings(message.guild.id, targetId);
+    return reply(message, `🧹 تم مسح كل تحذيرات ${targetMember}.\nعدد التحذيرات المحذوفة: ${result.count}`);
+  } catch (error) {
+    return reply(message, `❌ ${error.userMessage || error.message || 'حدث خطأ أثناء تنفيذ الأمر.'}`);
+  }
 }
 
 export async function handleArabicModerationShortcut(message) {
