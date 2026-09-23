@@ -11,6 +11,7 @@ const PERMISSION_NAMES = [
   [PermissionFlagsBits.SendMessages, 'SendMessages'],
   [PermissionFlagsBits.EmbedLinks, 'EmbedLinks'],
   [PermissionFlagsBits.ReadMessageHistory, 'ReadMessageHistory'],
+  [PermissionFlagsBits.ManageMessages, 'ManageMessages'],
 ];
 
 function buildEmbed() {
@@ -64,21 +65,35 @@ function embedSignature(embed) {
   });
 }
 
-const isBoardMessage = (message, botId) => message.author?.id === botId && (
+export const isBoardMessage = (message, botId) => message.author?.id === botId && (
   message.embeds[0]?.title === MODERATION_COMMANDS_TITLE || message.content?.includes(LEGACY_MARKER)
 );
 
-/** Scans the whole channel history (not only the last 100 messages), oldest board first. */
-async function findBoardMessages(channel, botId) {
+/** Reads the whole channel history (not only the last 100 messages), oldest first. */
+async function fetchAllMessages(channel) {
   const found = [];
   let before;
   for (let page = 0; page < 50; page++) {
     const batch = await channel.messages.fetch({ limit: 100, ...(before ? { before } : {}) });
-    found.push(...batch.filter((message) => isBoardMessage(message, botId)).values());
+    found.push(...batch.values());
     if (batch.size < 100) break;
     before = batch.lastKey();
   }
   return found.sort((a, b) => a.createdTimestamp - b.createdTimestamp);
+}
+
+/** The channel holds only the commands list: every other message is deleted. */
+async function deleteMessages(channel, messages) {
+  const TWO_WEEKS = 14 * 24 * 60 * 60 * 1000 - 60_000;
+  const recent = messages.filter((message) => Date.now() - message.createdTimestamp < TWO_WEEKS);
+  const old = messages.filter((message) => !recent.includes(message));
+  for (let i = 0; i < recent.length; i += 100) {
+    const chunk = recent.slice(i, i + 100);
+    if (chunk.length === 1) await chunk[0].delete().catch(() => {});
+    else await channel.bulkDelete(chunk.map((message) => message.id), true).catch(() => {});
+  }
+  // Discord only bulk-deletes messages younger than 14 days; older ones go one by one.
+  for (const message of old) await message.delete().catch(() => {});
 }
 
 let inFlight = null;
@@ -108,10 +123,9 @@ async function publish(client) {
     throw new Error(`Missing permissions in channel ${MODERATION_COMMANDS_CHANNEL_ID}: ${missing.join(', ')}`);
   }
 
-  const boards = await findBoardMessages(channel, client.user.id);
-  const [existing, ...duplicates] = boards;
-  // Earlier restarts may have posted extra copies; keep only the oldest one.
-  for (const duplicate of duplicates) await duplicate.delete().catch(() => {});
+  const messages = await fetchAllMessages(channel);
+  const existing = messages.find((message) => isBoardMessage(message, client.user.id));
+  await deleteMessages(channel, messages.filter((message) => message !== existing));
   if (existing) {
     // Keep the posted list in sync with the code (new commands, removed legacy marker).
     const embed = buildEmbed();
