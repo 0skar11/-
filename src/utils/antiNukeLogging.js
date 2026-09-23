@@ -14,7 +14,7 @@ const ACTIONS = Object.freeze({
   memberKick: { audit: AuditLogEvent.MemberKick, threshold: 5, windowMs: TEN_SECONDS },
   bulkDelete: { audit: AuditLogEvent.MessageBulkDelete, threshold: 10, windowMs: ONE_MINUTE },
   permissionUpdate: { audit: [AuditLogEvent.RoleUpdate, AuditLogEvent.ChannelOverwriteUpdate], threshold: 2, windowMs: ONE_MINUTE },
-  memberRoleAdd: { audit: AuditLogEvent.MemberRoleUpdate, threshold: 3, windowMs: TEN_SECONDS },
+  roleCreate: { audit: AuditLogEvent.RoleCreate, threshold: 3, windowMs: TEN_SECONDS },
 });
 
 async function getEntry(guild, auditType, targetId, filter = () => true) {
@@ -92,6 +92,6 @@ export async function inspectAuditAction(guild, action, targetId = null, filter)
   return true;
 }
 
-export async function findRecentAuditEntry(guild, auditType, targetId) { return getEntry(guild, auditType, targetId); }
+export async function findRecentAuditEntry(guild, auditType, targetId, filter) { return getEntry(guild, auditType, targetId, filter); }
 export async function sendAntiNukeLog(guild, data) { logger.warn(`[Anti-Nuke] ${data.action}: ${data.target || 'unknown'}`, data); await notify(guild, data.action, { id: data.auditLogId || 'manual', executor: data.executor }, 1, 'log'); }
 export { AuditLogEvent };
