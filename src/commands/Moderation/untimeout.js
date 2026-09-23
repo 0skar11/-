@@ -3,7 +3,7 @@ import { logger } from '../../utils/logger.js';
 import { ModerationService } from '../../services/moderation/moderationService.js';
 import { TitanBotError, ErrorTypes } from '../../utils/errorHandler.js';
 import { InteractionHelper } from '../../utils/interactionHelper.js';
-import { oneLine, withReason } from '../../utils/oneLine.js';
+import { moderationCard } from '../../utils/moderationCard.js';
 
 export default {
     data: new SlashCommandBuilder()
@@ -55,6 +55,11 @@ export default {
             moderator: interaction.member,
         });
 
-        await InteractionHelper.safeEditReply(interaction, oneLine('🔓', `<@${targetUser.id}> Timeout Removed`));
+        await InteractionHelper.safeEditReply(interaction, moderationCard({
+            emoji: '🔓',
+            title: 'TIMEOUT REMOVED',
+            fields: [['User', `<@${targetUser.id}>`]],
+            moderatorId: interaction.user.id,
+        }));
     },
 };

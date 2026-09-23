@@ -6,6 +6,8 @@ import { WarningService } from '../services/moderation/warningService.js';
 import { scheduleNoPermissionDelete } from './noPermissionReply.js';
 import { handlePurgeMessage } from '../services/moderation/channelPurgeService.js';
 import { refreshTrustedBoard } from '../services/trustedBoardService.js';
+import { issueWarning, warningCard } from '../services/moderation/warnEscalation.js';
+import { moderationCard, cardReason, formatDurationMs } from './moderationCard.js';
 
 const COMMANDS = new Set([
   'وارن', 'وارنات', 'تايم', 'انتايم', 'بان', 'انبان', 'كلير', 'ان', 'شيل', 'ر', 'رول', 'ب', 'رتبة', 'ازالةرتبة', 'purge', 'تراست', 'انتراست', 'trusted', 'trustedlist', 'warn', 'warnings', 'timeout', 'untimeout', 'ban', 'unban', 'clear', 'remove', 'role', 'roll', 'lock', 'unlock',
@@ -66,6 +68,11 @@ async function reply(message, content) {
   await message.channel.send({ content, allowedMentions: { parse: [] } }).then(scheduleNoPermissionDelete).catch(() => {});
 }
 
+async function sendCard(message, card) {
+  await message.channel.send(moderationCard(card)).catch(() => {});
+  return true;
+}
+
 async function getReplyTargetId(message) {
   if (!message.reference?.messageId) return null;
   const referencedMessage = await message.fetchReference().catch(() => null);
@@ -115,7 +122,7 @@ async function lockChannel(message) {
   const everyoneRole = message.guild.roles.everyone;
   if (message.channel.permissionsFor(everyoneRole)?.has(PermissionFlagsBits.SendMessages) === false) return reply(message, '⚠️ الروم مقفولة بالفعل.');
   await message.channel.permissionOverwrites.edit(everyoneRole, { SendMessages: false }, { reason: `Channel locked by ${message.author.tag}` });
-  return reply(message, `🔒 تم قفل ${message.channel} بنجاح.`);
+  return sendCard(message, { emoji: '🔒', title: 'CHANNEL LOCKED', fields: [['Channel', `${message.channel}`]], moderatorId: message.author.id });
 }
 
 async function changeRole(message, targetMember, roleName, add) {
@@ -129,15 +136,10 @@ async function changeRole(message, targetMember, roleName, add) {
   if (role.position >= actor.roles.highest.position && message.guild.ownerId !== actor.id) return reply(message, '❌ Role Is Higher Than Yours');
   if (add) {
     await targetMember.roles.add(role, `Role shortcut by ${message.author.tag}`);
-    return reply(message, `✅ ${targetMember} Got ${role}`);
+    return sendCard(message, { emoji: '✅', title: 'ROLE ADDED', fields: [['User', `<@${targetMember.id}>`], ['Role', `${role}`]], moderatorId: message.author.id });
   }
   await targetMember.roles.remove(role, `Role shortcut by ${message.author.tag}`);
-  return reply(message, `➖ ${role} Removed From ${targetMember}`);
-}
-
-function warningMessage(targetMember, reason, totalWarnings, moderator) {
-  const timestamp = Math.floor(Date.now() / 1000);
-  return ['⚠️ **WARNING ISSUED**', '', `> **User:** <@${targetMember.id}>`, `> **Reason:** \`${reason}\``, `> **Warnings:** \`${totalWarnings}\``, '━━━━━━━━━━━━━━━━━━', `👮 **Moderator:** <@${moderator.id}>`, `🕒 **Time:** <t:${timestamp}:R>`].join('\n');
+  return sendCard(message, { emoji: '➖', title: 'ROLE REMOVED', fields: [['User', `<@${targetMember.id}>`], ['Role', `${role}`]], moderatorId: message.author.id });
 }
 
 async function listWarnings(message, targetMember, guildId) {
@@ -218,7 +220,7 @@ export async function handleClearWarningsShortcut(message, args) {
   try {
     ModerationService.assertModerationHierarchy(message.member, targetMember, 'warn');
     const result = await WarningService.clearWarnings(message.guild.id, targetId);
-    return reply(message, `🧹 تم مسح كل تحذيرات ${targetMember}.\nعدد التحذيرات المحذوفة: ${result.count}`);
+    return sendCard(message, { emoji: '🧹', title: 'WARNINGS CLEARED', fields: [['User', `<@${targetId}>`], ['Removed', `${result.count}`]], moderatorId: message.author.id });
   } catch (error) {
     return reply(message, `❌ ${error.userMessage || error.message || 'حدث خطأ أثناء تنفيذ الأمر.'}`);
   }
@@ -247,9 +249,9 @@ export async function handleArabicModerationShortcut(message) {
       if (!hasPermission(message.member, PermissionFlagsBits.ModerateMembers)) return reply(message, '🚫 No Permission');
       if (!targetMember) return true;
       ModerationService.assertModerationHierarchy(message.member, targetMember, 'warn');
-      const reason = tail || 'لم يتم تحديد سبب';
-      const result = await WarningService.addWarning({ guildId: guild.id, userId: targetId, moderatorId: message.member.id, reason });
-      return reply(message, warningMessage(targetMember, reason, result.totalCount, message.member));
+      const result = await issueWarning({ guild, member: targetMember, moderator: message.member, reason: tail });
+      await message.channel.send(warningCard({ userId: targetId, moderatorId: message.member.id, result })).catch(() => {});
+      return true;
     }
 
     if (command === 'تايم' || command === 'timeout') {
@@ -261,35 +263,40 @@ export async function handleArabicModerationShortcut(message) {
       if (!durationMs) return reply(message, '❌ اكتب المدة هكذا: `تايم 5m السبب`.');
       ModerationService.assertModerationHierarchy(message.member, targetMember, 'timeout');
       await ModerationService.timeoutUser({ guild, member: targetMember, moderator: message.member, durationMs, reason });
-      return reply(message, `⏳ ${targetMember} Has Been Timed Out for ${durationText}, Reason: ${reason}`);
+      return sendCard(message, {
+        emoji: '⏳',
+        title: 'TIMEOUT ISSUED',
+        fields: [['User', `<@${targetId}>`], ['Reason', cardReason(reason)], ['Duration', `${formatDurationMs(durationMs)} (ends <t:${Math.floor((Date.now() + durationMs) / 1000)}:R>)`]],
+        moderatorId: message.member.id,
+      });
     }
 
     if (command === 'انتايم' || command === 'untimeout') {
       if (!hasPermission(message.member, PermissionFlagsBits.ModerateMembers)) return reply(message, '🚫 No Permission');
       if (!targetMember) return true;
       await ModerationService.removeTimeoutUser({ guild, member: targetMember, moderator: message.member, reason: tail || 'لم يتم تحديد سبب' });
-      return reply(message, `🔓 تم إلغاء التايم عن ${targetMember}, Reason: ${tail || 'لم يتم تحديد سبب'}`);
+      return sendCard(message, { emoji: '🔓', title: 'TIMEOUT REMOVED', fields: [['User', `<@${targetId}>`], ['Reason', cardReason(tail)]], moderatorId: message.member.id });
     }
 
     if (command === 'بان' || command === 'ban') {
       if (!hasPermission(message.member, PermissionFlagsBits.BanMembers)) return reply(message, '🚫 No Permission');
       if (!targetUser) return true;
       await ModerationService.banUser({ guild, user: targetUser, moderator: message.member, reason: tail || 'لم يتم تحديد سبب' });
-      return reply(message, `🚫 ${targetUser} Has Been Banned, Reason: ${tail || 'لم يتم تحديد سبب'}`);
+      return sendCard(message, { emoji: '🔨', title: 'BAN ISSUED', fields: [['User', `<@${targetId}>`], ['Reason', cardReason(tail)]], moderatorId: message.member.id });
     }
 
     if (command === 'انبان' || command === 'unban') {
       if (!hasPermission(message.member, PermissionFlagsBits.BanMembers)) return reply(message, '🚫 No Permission');
       if (!targetUser) return true;
       await ModerationService.unbanUser({ guild, user: targetUser, moderator: message.member, reason: tail || 'لم يتم تحديد سبب' });
-      return reply(message, `✅ تم إلغاء البان عن ${targetUser}, Reason: ${tail || 'لم يتم تحديد سبب'}`);
+      return sendCard(message, { emoji: '✅', title: 'BAN REMOVED', fields: [['User', `<@${targetId}>`], ['Reason', cardReason(tail)]], moderatorId: message.member.id });
     }
 
     if (command === 'كلير' || command === 'clear') {
       if (!hasPermission(message.member, PermissionFlagsBits.ModerateMembers)) return reply(message, '🚫 No Permission');
       if (!targetMember) return true;
       const result = await WarningService.clearWarnings(guild.id, targetId);
-      return reply(message, `🧹 تم مسح كل تحذيرات ${targetMember}. Reason: ${tail || 'لم يتم تحديد سبب'}\nعدد التحذيرات المحذوفة: ${result.count}`);
+      return sendCard(message, { emoji: '🧹', title: 'WARNINGS CLEARED', fields: [['User', `<@${targetId}>`], ['Reason', cardReason(tail)], ['Removed', `${result.count}`]], moderatorId: message.member.id });
     }
   } catch (error) {
     await reply(message, `❌ ${error.userMessage || error.message || 'حدث خطأ أثناء تنفيذ الأمر.'}`);

@@ -12,6 +12,7 @@ import { logger, startupLog, shutdownLog } from './utils/logger.js';
 import { checkBirthdays } from './services/birthdayService.js';
 import { checkGiveaways } from './services/giveawayService.js';
 import { checkClosedReports } from './services/reportIssueService.js';
+import { WarningService } from './services/moderation/warningService.js';
 import { loadCommands, registerCommands as registerSlashCommands } from './handlers/loaders/commandLoader.js';
 import { runSafeTask, handleTaskError, ErrorCodes } from './utils/errorHandler.js';
 import { initializeMusic } from './services/music/riffySetup.js';
@@ -253,6 +254,14 @@ class TitanBot extends Client {
     cron.schedule('* * * * *', runSafeTask('giveaway_check', () => checkGiveaways(this)));
     cron.schedule('*/15 * * * *', runSafeTask('counter_update', () => this.updateAllCounters()));
     cron.schedule('*/5 * * * *', runSafeTask('closed_report_check', () => checkClosedReports(this)));
+    cron.schedule('*/30 * * * *', runSafeTask('warning_expiry', () => this.pruneExpiredWarnings()));
+  }
+
+  // Warnings are removed automatically 5 days after they were issued.
+  async pruneExpiredWarnings() {
+    for (const guildId of this.guilds.cache.keys()) {
+      await WarningService.pruneExpiredWarnings(guildId);
+    }
   }
 
   async updateAllCounters() {
