@@ -25,6 +25,7 @@ export const subcommandAliases = {
 
 /** Two-word Arabic commands (`ماس بان ID1 ID2`), keyed by their first two words. */
 export const twoWordCommandAliases = {
+  'هارد بان': 'massban',
   'ماس بان': 'massban',
   'ماس طرد': 'masskick',
 };

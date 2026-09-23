@@ -25,7 +25,7 @@ function buildEmbed() {
           '`بان @العضو السبب` — Ban',
           '`انبان ID_العضو` — Unban',
           '`طرد @العضو السبب` — Kick',
-          '`ماس بان ID1 ID2 السبب` — Mass ban',
+          '`هارد بان @العضو ID2 السبب` — Hard ban (فكّه للـ trusted فقط)',
           '`ماس طرد ID1 ID2 السبب` — Mass kick',
         ].join('\n'),
       },
@@ -56,7 +56,7 @@ function buildEmbed() {
 
 /**
  * Posts the Arabic moderation commands list once in its channel.
- * Returns { status, channelId } where status is 'sent', 'exists', or throws on failure.
+ * Returns { status, channelId } where status is 'sent', 'updated' or 'exists'; throws on failure.
  */
 export async function publishArabicModerationCommands(client) {
   const channel = await client.channels.fetch(MODERATION_COMMANDS_CHANNEL_ID).catch((error) => {
@@ -81,8 +81,16 @@ export async function publishArabicModerationCommands(client) {
     )
   );
   if (existing) {
-    const hasLegacyMarker = existing.content?.includes(LEGACY_MARKER) || existing.embeds[0]?.footer?.text === LEGACY_MARKER;
-    if (hasLegacyMarker) await existing.edit({ content: '', embeds: [buildEmbed()] });
+    // Keep the posted list in sync with the code (new commands, removed legacy marker).
+    const embed = buildEmbed();
+    const outdated = existing.content?.includes(LEGACY_MARKER)
+      || existing.embeds[0]?.footer?.text
+      || JSON.stringify(existing.embeds[0]?.fields?.map(({ name, value }) => ({ name, value })))
+        !== JSON.stringify(embed.data.fields.map(({ name, value }) => ({ name, value })));
+    if (outdated) {
+      await existing.edit({ content: '', embeds: [embed] });
+      return { status: 'updated', channelId: channel.id };
+    }
     return { status: 'exists', channelId: channel.id };
   }
 

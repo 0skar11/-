@@ -31,7 +31,7 @@ function record(guildId, executorId, action) {
   return history.length;
 }
 
-async function isTrusted(guild, config, executorId) {
+export async function isTrusted(guild, config, executorId) {
   if (executorId === guild.ownerId || executorId === guild.client.user?.id) return true;
   if (config?.antiNukeTrustedUsers?.includes(executorId)) return true;
   const trustedRoles = new Set(config?.antiNukeTrustedRoles || []);

@@ -23,7 +23,7 @@ export default {
         channelId = result.channelId;
       } else {
         const result = await publishArabicModerationCommands(interaction.client);
-        sent = result.status === 'sent';
+        sent = result.status !== 'exists';
         channelId = result.channelId;
       }
       const content = sent
