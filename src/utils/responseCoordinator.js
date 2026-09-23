@@ -189,7 +189,7 @@ export class ResponseCoordinator {
   }
 
   async respondUsage(usageLine) {
-    const result = await this.respond({ content: `⚠️ **الاستخدام:** \`${usageLine}\``, embeds: [], allowedMentions: { parse: [] } });
+    const result = await this.respond({ content: `⚠️ ${usageLine}`, embeds: [], allowedMentions: { parse: [] } });
     this.markFinalized('usage');
     return result;
   }

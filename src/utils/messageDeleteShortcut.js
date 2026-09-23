@@ -24,7 +24,7 @@ export async function handleMessageDeleteShortcut(message) {
 
   const amount = /^[0-9٠-٩]+$/u.test(match[1] || '') ? Number(toWesternDigits(match[1])) : NaN;
   if (!Number.isInteger(amount) || amount < MIN_AMOUNT || amount > MAX_AMOUNT) {
-    await reply(message, '⚠️ **الاستخدام:** `م 1-100`');
+    await reply(message, '⚠️ م 1-100');
     return true;
   }
   if (!message.channel?.isTextBased?.() || typeof message.channel.bulkDelete !== 'function') {
