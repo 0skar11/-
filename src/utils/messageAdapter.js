@@ -91,6 +91,11 @@ export function createMockInteraction(message, commandData, args) {
           return cachedMember.user;
         }
 
+        const cachedUser = message.client?.users?.cache?.get(id);
+        if (cachedUser) {
+          return cachedUser;
+        }
+
         return {
           id,
           username: 'Unknown',
@@ -199,7 +204,28 @@ export function supportsPrefixExecution(command) {
   return !!command.execute;
 }
 
+/**
+ * Slash commands receive resolved members; prefix commands only get mentions/IDs.
+ * Fetch mentioned members first so getUser/getMember work for members that are not cached yet.
+ */
+async function cacheMentionedMembers(message, args) {
+  if (!message.guild?.members?.fetch) return;
+  const ids = new Set();
+  for (const arg of args) {
+    const match = String(arg).match(/^(?:<@!?(\d{17,20})>|(\d{17,20}))$/u);
+    if (match) ids.add(match[1] || match[2]);
+  }
+  await Promise.all([...ids]
+    .filter((id) => !message.guild.members.cache.has(id))
+    .map(async (id) => {
+      const member = await message.guild.members.fetch(id).catch(() => null);
+      // Users outside the server (e.g. for unban) are still resolved so replies show their tag.
+      if (!member) await message.client?.users?.fetch?.(id).catch(() => null);
+    }));
+}
+
 export async function executePrefixCommand(command, message, args, client, prefixOverride = null, guildConfig = null) {
+  await cacheMentionedMembers(message, args);
   const mockInteraction = createMockInteraction(message, command.data, args);
   const coordinator = mockInteraction._responseCoordinator;
   const prefix = prefixOverride || getCommandPrefix();

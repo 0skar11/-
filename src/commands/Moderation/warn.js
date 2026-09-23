@@ -6,6 +6,7 @@ import { WarningService } from '../../services/moderation/warningService.js';
 import { ModerationService } from '../../services/moderation/moderationService.js';
 import { TitanBotError, ErrorTypes } from '../../utils/errorHandler.js';
 import { InteractionHelper } from '../../utils/interactionHelper.js';
+import { oneLine, withReason } from '../../utils/oneLine.js';
 export default {
     data: new SlashCommandBuilder()
         .setName("warn")
@@ -96,13 +97,6 @@ export default {
             }
         });
 
-        await InteractionHelper.safeEditReply(interaction, {
-            embeds: [
-                successEmbed(
-                    `⚠️ **Warned** ${target.tag}`,
-                    `**Reason:** ${reason}\n**Total Warns:** ${totalCount}`,
-                ),
-            ],
-        });
+        await InteractionHelper.safeEditReply(interaction, oneLine('⚠️', withReason(`<@${target.id}> Has Been Warned (${totalCount})`, reason)));
     }
 };

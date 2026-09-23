@@ -1,9 +1,9 @@
 import { SlashCommandBuilder, PermissionFlagsBits } from 'discord.js';
-import { successEmbed } from '../../utils/embeds.js';
 import { logger } from '../../utils/logger.js';
 import { TitanBotError, ErrorTypes } from '../../utils/errorHandler.js';
 import { InteractionHelper } from '../../utils/interactionHelper.js';
 import { ModerationService } from '../../services/moderation/moderationService.js';
+import { oneLine, withReason } from '../../utils/oneLine.js';
 
 const durationChoices = [
     { name: "5 minutes", value: 5 },
@@ -14,6 +14,24 @@ const durationChoices = [
     { name: "1 day", value: 1440 },
     { name: "1 week", value: 10080 },
 ];
+
+const MAX_TIMEOUT_MINUTES = 28 * 24 * 60;
+const UNIT_MINUTES = { s: 1 / 60, m: 1, h: 60, d: 1440, w: 10080, 'ث': 1 / 60, 'د': 1, 'س': 60, 'ي': 1440 };
+
+// Prefix usage accepts units (`10m`, `2h`, `1d`, `1w`, `10د`, `2س`, `1ي`); a bare number means minutes.
+function resolveDurationMinutes(interaction) {
+    if (!interaction._isPrefixCommand) return interaction.options.getInteger("duration");
+    const raw = String(interaction.options.getString("duration") || "").trim().toLowerCase();
+    const match = raw.match(/^(\d+)\s*([smhdwثدسي])?$/u);
+    return match ? Math.ceil(Number(match[1]) * UNIT_MINUTES[match[2] || "m"]) : null;
+}
+
+function formatDuration(minutes) {
+    if (minutes % 10080 === 0) return `${minutes / 10080}w`;
+    if (minutes % 1440 === 0) return `${minutes / 1440}d`;
+    if (minutes % 60 === 0) return `${minutes / 60}h`;
+    return `${minutes}m`;
+}
 
 export default {
     data: new SlashCommandBuilder()
@@ -52,7 +70,7 @@ export default {
 
         const targetUser = interaction.options.getUser("target");
         const member = interaction.options.getMember("target");
-        const durationMinutes = interaction.options.getInteger("duration");
+        const durationMinutes = resolveDurationMinutes(interaction);
         const reason = interaction.options.getString("reason") || "No reason provided";
 
         if (!targetUser) {
@@ -86,6 +104,14 @@ export default {
             );
         }
 
+        if (!durationMinutes || durationMinutes < 1 || durationMinutes > MAX_TIMEOUT_MINUTES) {
+            throw new TitanBotError(
+                "Invalid duration",
+                ErrorTypes.USER_INPUT,
+                "❌ Duration: `10m` `2h` `1d` (Max 28d)",
+            );
+        }
+
         const durationMs = durationMinutes * 60 * 1000;
         const result = await ModerationService.timeoutUser({
             guild: interaction.guild,
@@ -95,17 +121,6 @@ export default {
             reason,
         });
 
-        const durationDisplay =
-            durationChoices.find((c) => c.value === durationMinutes)
-                ?.name || `${durationMinutes} minutes`;
-
-        await InteractionHelper.safeEditReply(interaction, {
-            embeds: [
-                successEmbed(
-                    `⏳ **Timed out** ${targetUser.tag} for ${durationDisplay}.`,
-                    `**Reason:** ${reason}\n**Case ID:** #${result.caseId}`,
-                ),
-            ],
-        });
+        await InteractionHelper.safeEditReply(interaction, oneLine('⏳', withReason(`<@${targetUser.id}> Has Been Timed Out ${formatDuration(durationMinutes)}`, reason)));
     },
 };

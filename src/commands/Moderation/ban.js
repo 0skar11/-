@@ -1,8 +1,8 @@
 import { SlashCommandBuilder, PermissionFlagsBits } from 'discord.js';
-import { successEmbed } from '../../utils/embeds.js';
 import { InteractionHelper } from '../../utils/interactionHelper.js';
 import { ModerationService } from '../../services/moderation/moderationService.js';
 import { TitanBotError, ErrorTypes } from '../../utils/errorHandler.js';
+import { oneLine, withReason } from '../../utils/oneLine.js';
 
 export default {
     data: new SlashCommandBuilder()
@@ -55,13 +55,6 @@ export default {
             reason,
         });
 
-        await InteractionHelper.universalReply(interaction, {
-            embeds: [
-                successEmbed(
-                    `🚫 **Banned** ${user.tag}`,
-                    `**Reason:** ${reason}\n**Case ID:** #${result.caseId}`,
-                ),
-            ],
-        });
+        await InteractionHelper.universalReply(interaction, oneLine('🔨', withReason(`<@${user.id}> Has Been Banned`, reason)));
     },
 };

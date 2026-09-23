@@ -1,9 +1,9 @@
 import { SlashCommandBuilder, PermissionFlagsBits } from 'discord.js';
-import { successEmbed } from '../../utils/embeds.js';
 import { logger } from '../../utils/logger.js';
 import { ModerationService } from '../../services/moderation/moderationService.js';
 import { TitanBotError, ErrorTypes } from '../../utils/errorHandler.js';
 import { InteractionHelper } from '../../utils/interactionHelper.js';
+import { oneLine, withReason } from '../../utils/oneLine.js';
 
 export default {
     data: new SlashCommandBuilder()
@@ -55,12 +55,6 @@ export default {
             moderator: interaction.member,
         });
 
-        await InteractionHelper.safeEditReply(interaction, {
-            embeds: [
-                successEmbed(
-                    `🔓 **Removed timeout** from ${targetUser.tag}`,
-                ),
-            ],
-        });
+        await InteractionHelper.safeEditReply(interaction, oneLine('🔓', `<@${targetUser.id}> Timeout Removed`));
     },
 };

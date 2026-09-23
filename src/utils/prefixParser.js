@@ -187,7 +187,9 @@ export function mapArgumentsToOptions(args, commandData) {
 
   for (let i = 0; i < Math.min(currentArgs.length, optionDefs.length); i++) {
     const optionDef = optionDefs[i];
-    const value = currentArgs[i];
+    // The last text option (usually `reason`) takes the rest of the message: `بان @user سبام كتير`.
+    const isLastTextOption = i === optionDefs.length - 1 && optionDef.type === 3;
+    const value = isLastTextOption ? currentArgs.slice(i).join(' ') : currentArgs[i];
     options[optionDef.name] = value;
   }
 

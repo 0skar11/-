@@ -5,6 +5,7 @@ import { logEvent } from '../../utils/moderation.js';
 import { logger } from '../../utils/logger.js';
 import { WarningService } from '../../services/moderation/warningService.js';
 import { InteractionHelper } from '../../utils/interactionHelper.js';
+import { oneLine } from '../../utils/oneLine.js';
 
 export default {
     data: new SlashCommandBuilder()
@@ -37,14 +38,7 @@ export default {
         const totalWarns = validWarnings.length;
 
         if (totalWarns === 0) {
-            await InteractionHelper.safeEditReply(interaction, {
-                embeds: [
-                    createEmbed({
-                        title: `Warnings: ${target.tag}`,
-                        description: "This user has no recorded warnings.",
-                    }).setColor(getColor('success')),
-                ],
-            });
+            await InteractionHelper.safeEditReply(interaction, oneLine('✅', `<@${target.id}> Has No Warnings`));
             return;
         }
 
@@ -93,6 +87,7 @@ export default {
             },
         });
 
-        await InteractionHelper.safeEditReply(interaction, { embeds: [embed], components: [actionRow] });
+        const reasons = validWarnings.map((w, i) => `${i + 1}. ${w.reason.substring(0, 60)}`).join(' | ');
+        await InteractionHelper.safeEditReply(interaction, oneLine('📋', `<@${target.id}> Warnings (${totalWarns}): ${reasons}`.substring(0, 1900), { components: [actionRow] }));
     },
 };

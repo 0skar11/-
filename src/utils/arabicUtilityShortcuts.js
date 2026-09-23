@@ -1,7 +1,7 @@
 import { PermissionFlagsBits } from 'discord.js';
 
 const COMMANDS = new Set(['ق', 'ف', 'نك', 'font']);
-const NO_PERMISSION = '❌ ليس لديك صلاحية لاستخدام هذا الأمر.';
+const NO_PERMISSION = '🚫 No Permission';
 const BOLD_UPPER_START = 0x1d400;
 const BOLD_LOWER_START = 0x1d41a;
 const BOLD_DIGIT_START = 0x1d7ce;
@@ -11,7 +11,7 @@ function hasPermission(member, permission) {
 }
 
 async function reply(message, content) {
-  await message.channel.send(content).catch(() => {});
+  await message.channel.send({ content, allowedMentions: { parse: [] } }).catch(() => {});
   return true;
 }
 
@@ -36,16 +36,16 @@ function toBoldFont(value) {
 async function lockChannel(message, locked) {
   if (!hasPermission(message.member, PermissionFlagsBits.ManageChannels)) return reply(message, NO_PERMISSION);
   const channel = message.channel;
-  if (!channel?.isTextBased?.() || !channel.permissionOverwrites?.edit) return reply(message, '❌ هذا الأمر يعمل داخل روم نصية فقط.');
+  if (!channel?.isTextBased?.() || !channel.permissionOverwrites?.edit) return reply(message, '❌ Text Channels Only');
   try {
     const everyoneRole = message.guild.roles.everyone;
     const currentPermissions = channel.permissionsFor(everyoneRole);
     const alreadyLocked = currentPermissions?.has(PermissionFlagsBits.SendMessages) === false;
-    if (locked === alreadyLocked) return reply(message, locked ? 'ℹ️ الشانيل مقفولة بالفعل.' : 'ℹ️ الشانيل مفتوحة بالفعل.');
+    if (locked === alreadyLocked) return reply(message, locked ? `ℹ️ ${channel} Already Locked` : `ℹ️ ${channel} Already Unlocked`);
     await channel.permissionOverwrites.edit(everyoneRole, { SendMessages: !locked }, { reason: `${locked ? 'Channel locked' : 'Channel unlocked'} by ${message.author.tag}` });
-    return reply(message, locked ? '🔒 تم قفل الشانيل.' : '🔓 تم فتح الشانيل.');
+    return reply(message, locked ? `🔒 ${channel} Locked` : `🔓 ${channel} Unlocked`);
   } catch (error) {
-    return reply(message, `❌ تعذر ${locked ? 'قفل' : 'فتح'} الشانيل: ${error.message}`);
+    return reply(message, `❌ ${error.message}`);
   }
 }
 
@@ -65,10 +65,10 @@ async function changeNickname(message, tail) {
   const targetMember = targetId
     ? await message.guild.members.fetch(targetId).catch(() => null)
     : await getReplyMember(message) || message.member;
-  if (!targetMember) return reply(message, '❌ العضو غير موجود في السيرفر.');
+  if (!targetMember) return reply(message, '❌ Member Not Found');
 
   const restoreOriginalName = !nickname;
-  if (nickname.length > 32) return reply(message, '❌ الاسم يجب ألا يتجاوز 32 حرفاً.');
+  if (nickname.length > 32) return reply(message, '❌ Max 32 Characters');
 
   // Manage Nicknames allows targeting members regardless of the requester's
   // role position. Discord still requires the bot's highest role to be above
@@ -76,16 +76,16 @@ async function changeNickname(message, tail) {
   const botMember = message.guild.members.me;
   if (targetMember.id !== message.member.id && botMember
     && targetMember.roles.highest.position >= botMember.roles.highest.position) {
-    return reply(message, '❌ لا أستطيع تغيير اسم هذا العضو بسبب ترتيب الرتب.');
+    return reply(message, '❌ Member Role Is Higher Than Mine');
   }
 
   try {
     await targetMember.setNickname(restoreOriginalName ? null : nickname, `Nickname ${restoreOriginalName ? 'restored' : 'changed'} by ${message.author.tag}`);
     return reply(message, restoreOriginalName
-      ? `تم إرجاع الاسم الأصلي لـ ${targetMember}.`
-      : `تم تغيير اسم ${targetMember}.`);
+      ? `↩️ ${targetMember} Nickname Reset`
+      : `✏️ ${targetMember} Nickname Changed`);
   } catch (error) {
-    return reply(message, `❌ تعذر تغيير الاسم: ${error.message}`);
+    return reply(message, `❌ ${error.message}`);
   }
 }
 
@@ -95,7 +95,7 @@ export async function handleArabicUtilityShortcuts(message) {
   if (parsed.command === 'ق') return lockChannel(message, true);
   if (parsed.command === 'ف') return lockChannel(message, false);
   if (parsed.command === 'نك') return changeNickname(message, parsed.tail);
-  if (!parsed.tail) return reply(message, '❌ اكتب النص بعد الأمر، مثال: `font CHAOS`');
+  if (!parsed.tail) return reply(message, '❌ Usage: `font text`');
   return reply(message, toBoldFont(parsed.tail));
 }
 

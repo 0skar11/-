@@ -6,6 +6,7 @@ import { getColor } from '../../config/bot.js';
 
 import { InteractionHelper } from '../../utils/interactionHelper.js';
 import { replyUserError, ErrorTypes } from '../../utils/errorHandler.js';
+import { oneLine } from '../../utils/oneLine.js';
 export default {
     data: new SlashCommandBuilder()
     .setName("purge")
@@ -61,15 +62,7 @@ export default {
         }
       });
 
-      await InteractionHelper.safeEditReply(interaction, {
-        embeds: [
-          successEmbed(
-            "Messages Purged",
-            `Deleted ${deletedCount} messages in ${channel}.`,
-          ),
-        ],
-        flags: MessageFlags.Ephemeral,
-      });
+      await InteractionHelper.safeEditReply(interaction, oneLine('🧹', `Deleted ${deletedCount} Messages`, { flags: MessageFlags.Ephemeral }));
 
       setTimeout(() => {
         interaction.deleteReply().catch(err => 

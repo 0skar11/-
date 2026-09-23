@@ -7,9 +7,8 @@ import { supportsPrefixExecution, executePrefixCommand, resolvePrefixAccessKey }
 import { resolveCommandAlias, resolveSubcommandAlias } from '../config/commands/commandAliases.js';
 import { getPrefixRestriction } from '../config/commands/prefixRestrictions.js';
 import { getGuildConfig } from '../services/config/guildConfig.js';
-import { getCommandPrefix, getBotMessage, isBotOwner, isCommandCategoryEnabled, isMaintenanceMode } from '../config/bot.js';
+import { getCommandPrefix, isBotOwner, isCommandCategoryEnabled, isMaintenanceMode } from '../config/bot.js';
 import { enforceAbuseProtection, formatCooldownDuration } from '../utils/abuseProtection.js';
-import { createEmbed } from '../utils/embeds.js';
 import { isCommandEnabled } from '../services/commandAccessService.js';
 import { getCountingGameConfig, saveCountingGameConfig, isValidCountingMessage, recordCorrectCount } from '../services/countingGameService.js';
 import { handleTrustedListCommand } from '../utils/trustedCommand.js';
@@ -54,7 +53,7 @@ async function handlePrefixCommand(message, client) {
     let { commandName, args } = parsed;
     if (commandName.toLowerCase() === 'trusted') {
       if (args.length) {
-        await message.channel.send(`❌ صيغة الأمر الصحيحة: \`${prefix}trusted\``).catch(() => {});
+        await message.channel.send(`❌ Usage: \`${prefix}trusted\``).catch(() => {});
       } else {
         await handleTrustedListCommand(message, client);
       }
@@ -71,7 +70,7 @@ async function handlePrefixCommand(message, client) {
     const command = client.commands.get(resolvedCommandName);
     if (!command) return;
     if (isMaintenanceMode() && !isBotOwner(message.author.id)) {
-      await message.channel.send({ embeds: [createEmbed({ title: 'Maintenance Mode', description: getBotMessage('maintenanceMode'), color: 'warning' })] }).catch(() => {});
+      await message.channel.send('🛠️ Maintenance Mode').catch(() => {});
       return;
     }
     if (!isCommandCategoryEnabled(command.category)) return;
@@ -88,13 +87,13 @@ async function handlePrefixCommand(message, client) {
 
     const abuseProtection = await enforceAbuseProtection({ guildId: message.guild.id, user: message.author }, command, resolvedCommandName);
     if (!abuseProtection.allowed) {
-      await message.channel.send({ embeds: [createEmbed({ title: 'Command Cooldown', description: `Please wait ${formatCooldownDuration(abuseProtection.remainingMs)}.`, color: 'error' })] }).catch(() => {});
+      await message.channel.send(`⏱️ Wait ${formatCooldownDuration(abuseProtection.remainingMs)}`).catch(() => {});
       return;
     }
     await executePrefixCommand(command, message, args, client, prefix, guildConfig);
   } catch (error) {
     logger.error('Error handling prefix command:', error);
-    await message.channel.send(`❌ تعذر تنفيذ الأمر: ${error.userMessage || error.message || 'خطأ غير معروف'}`).catch(() => {});
+    await message.channel.send({ content: `❌ ${error.userMessage || error.message || 'Something went wrong'}`, allowedMentions: { parse: [] } }).catch(() => {});
   }
 }
 
