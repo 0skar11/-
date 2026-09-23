@@ -15,11 +15,14 @@ import { handleTrustedListCommand } from '../utils/trustedCommand.js';
 import { handleArabicRoleShortcut, handleClearWarningsShortcut } from '../utils/arabicModerationShortcuts.js';
 import { handlePurgeMessage } from '../services/moderation/channelPurgeService.js';
 import { handleReportChannelMessage } from '../services/reportChannelService.js';
+import { handleTrustedBoardMessage } from '../services/trustedBoardService.js';
 
 export default {
   name: Events.MessageCreate,
   async execute(message, client) {
     try {
+      // Runs before the bot check so other bots cannot post in the trusted board channel either.
+      if (await handleTrustedBoardMessage(message)) return;
       if (message.author.bot || !message.guild) return;
       logger.debug(`Message received from ${message.author.tag}: ${message.content}`);
 

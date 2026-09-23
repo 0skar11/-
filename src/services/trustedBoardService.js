@@ -3,6 +3,9 @@ import { logger } from '../utils/logger.js';
 import { getGuildConfig } from './config/guildConfig.js';
 
 export const TRUSTED_BOARD_CHANNEL_ID = '1155236383464628325';
+// Only the owner and this bot may write in the board channel.
+const OWNER_ID = '1159601661392715906';
+const BLOCKED_NOTICE_DELETE_MS = 3_000;
 const TRUSTED_BOARD_TITLE = '🛡️ قائمة الـ Trusted';
 // An embed field value is capped at 1024 characters by Discord.
 const FIELD_LIMIT = 1024;
@@ -139,4 +142,23 @@ export async function refreshTrustedBoard(client, guildId) {
   const channel = client.channels.cache.get(TRUSTED_BOARD_CHANNEL_ID);
   if (channel?.guild && channel.guild.id !== guildId) return;
   await publishTrustedBoard(client).catch((error) => logger.error('Failed to refresh trusted board:', error));
+}
+
+/**
+ * Deletes anything posted in the board channel by someone other than the owner or this bot,
+ * and tells human authors that writing there is not allowed (the notice goes away after 3 seconds).
+ * Returns true when the message was blocked.
+ */
+export async function handleTrustedBoardMessage(message) {
+  if (message.channelId !== TRUSTED_BOARD_CHANNEL_ID || !message.guild) return false;
+  if (message.author?.id === OWNER_ID || message.author?.id === message.client.user?.id) return false;
+
+  await message.delete().catch(() => {});
+  if (message.author?.bot || message.webhookId) return true;
+  const notice = await message.channel.send({
+    content: `🚫 <@${message.author.id}> ممنوع الكتابة هنا.`,
+    allowedMentions: { users: [message.author.id] },
+  }).catch(() => null);
+  if (notice) setTimeout(() => notice.delete().catch(() => {}), BLOCKED_NOTICE_DELETE_MS);
+  return true;
 }
