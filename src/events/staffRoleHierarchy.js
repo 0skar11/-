@@ -1,6 +1,6 @@
 import { Events } from 'discord.js';
 import { logger, startupLog } from '../utils/logger.js';
-import { publishStaffPermissionBoard, synchronizeStaffRoles } from '../services/staffRoleHierarchyService.js';
+import { synchronizeStaffRoles } from '../services/staffRoleHierarchyService.js';
 
 export default {
   name: Events.ClientReady,
@@ -10,10 +10,10 @@ export default {
     let created = 0;
     let updated = 0;
     let positioned = 0;
-    let boards = 0;
 
     for (const guild of client.guilds.cache.values()) {
-      // Do not let a role-sync failure prevent the permission board from being sent.
+      // The permission board is never posted automatically on startup; it is only
+      // published on demand via /publish-admin-permissions.
       try {
         const summary = await synchronizeStaffRoles(guild);
         created += summary.created;
@@ -22,14 +22,8 @@ export default {
       } catch (error) {
         logger.error(`Failed to synchronize staff roles in ${guild.name}:`, error);
       }
-
-      try {
-        boards += await publishStaffPermissionBoard(guild);
-      } catch (error) {
-        logger.error(`Failed to publish staff permission board in ${guild.name}:`, error);
-      }
     }
 
-    startupLog(`Staff role hierarchy: created ${created}, updated ${updated}, positioned ${positioned}, permission messages ${boards}`);
+    startupLog(`Staff role hierarchy: created ${created}, updated ${updated}, positioned ${positioned}`);
   },
 };

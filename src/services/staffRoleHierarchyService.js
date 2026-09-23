@@ -81,9 +81,11 @@ export async function publishStaffPermissionBoard(guild) {
 
   // This board is intentionally persistent. Never delete/repost it on bot restarts.
   const oldMessages = await channel.messages.fetch({ limit: 100 }).catch(() => null);
-  const existingBoardMessages = oldMessages?.filter((message) =>
+  // If the history can't be read we can't tell whether the board exists, so don't post.
+  if (!oldMessages) throw new Error(`Could not read message history in channel ${ROLE_PERMISSIONS_CHANNEL_ID}`);
+  const existingBoardMessages = oldMessages.filter((message) =>
     message.author.id === guild.client.user.id && message.embeds[0]?.footer?.text === PERMISSION_BOARD_FOOTER
-  ) || [];
+  );
   if (existingBoardMessages.size > 0) {
     logger.info(`Permission board already exists in guild ${guild.id}; skipping repost.`);
     return { sent: 0, existing: existingBoardMessages.size, guildId: guild.id, channelId: channel.id };
