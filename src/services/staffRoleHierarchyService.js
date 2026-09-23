@@ -31,9 +31,11 @@ const ROLE_DEFINITIONS = [
   { name: '🛡️ Admin', color: '#e67e22', permissions: [PermissionFlagsBits.ViewAuditLog, PermissionFlagsBits.ManageGuild, PermissionFlagsBits.ManageChannels, PermissionFlagsBits.ManageRoles, PermissionFlagsBits.ManageMessages, PermissionFlagsBits.ManageNicknames, PermissionFlagsBits.KickMembers, PermissionFlagsBits.BanMembers, PermissionFlagsBits.ModerateMembers, PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.ReadMessageHistory] },
   { name: '🔨 Moderator', color: '#2ecc71', permissions: [PermissionFlagsBits.ViewAuditLog, PermissionFlagsBits.KickMembers, PermissionFlagsBits.BanMembers, PermissionFlagsBits.ModerateMembers, PermissionFlagsBits.ManageMessages, PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.ReadMessageHistory] },
   { name: '🔰 Trial Moderator', color: '#3498db', permissions: [PermissionFlagsBits.ViewAuditLog, PermissionFlagsBits.KickMembers, PermissionFlagsBits.ModerateMembers, PermissionFlagsBits.ManageMessages, PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.ReadMessageHistory] },
-  { name: '🧪 Developer', color: '#9b59b6', permissions: [PermissionFlagsBits.ViewAuditLog, PermissionFlagsBits.ManageGuild, PermissionFlagsBits.ManageChannels, PermissionFlagsBits.ManageWebhooks, PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.ReadMessageHistory] },
   { name: '📢 Event Manager', color: '#f39c12', permissions: [PermissionFlagsBits.Administrator] },
 ];
+
+// Roles removed from the server on purpose (🧪 Developer and the non-booster VIP); deleted on startup if they still exist.
+const RETIRED_ROLE_IDS = ['1551308801439698965', '1551311500025798736'];
 
 // role.permissions.toArray() returns flag names ('ViewAuditLog'), while the labels are keyed by bit.
 function permissionNames(permissions) {
@@ -47,6 +49,17 @@ function buildBoardEmbed(role, definition) {
     .setTitle(`${role.name} — الصلاحيات`)
     .setDescription(`الرتبة: ${role}\n\n${permissionLines.join('\n') || 'لا توجد صلاحيات إضافية'}`)
     .setFooter({ text: PERMISSION_BOARD_FOOTER });
+}
+
+export async function deleteRetiredRoles(guild) {
+  let deleted = 0;
+  for (const roleId of RETIRED_ROLE_IDS) {
+    const role = await guild.roles.fetch(roleId).catch(() => null);
+    if (!role) continue;
+    await role.delete('Retired role removed by the owner');
+    deleted += 1;
+  }
+  return deleted;
 }
 
 export async function synchronizeStaffRoles(guild) {
@@ -96,6 +109,11 @@ export async function publishStaffPermissionBoard(guild) {
   const existingBoardMessages = oldMessages.filter((message) =>
     message.author.id === guild.client.user.id && message.embeds[0]?.footer?.text === PERMISSION_BOARD_FOOTER
   );
+  // Board entries for roles that are no longer in ROLE_DEFINITIONS (e.g. the retired Developer role) are removed.
+  const staleBoardMessages = existingBoardMessages.filter((message) =>
+    !ROLE_DEFINITIONS.some((definition) => message.embeds[0]?.title?.startsWith(`${definition.name} — `))
+  );
+  for (const message of staleBoardMessages.values()) await message.delete().catch(() => null);
 
   const roles = await guild.roles.fetch();
   let sent = 0;
@@ -117,4 +135,4 @@ export async function publishStaffPermissionBoard(guild) {
   return { sent, edited, guildId: guild.id, channelId: channel.id };
 }
 
-export { ROLE_DEFINITIONS, ROLE_PERMISSIONS_CHANNEL_ID };
+export { ROLE_DEFINITIONS, ROLE_PERMISSIONS_CHANNEL_ID, RETIRED_ROLE_IDS };
