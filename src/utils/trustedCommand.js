@@ -1,9 +1,10 @@
 import { getGuildConfig } from '../services/config/guildConfig.js';
+import { replyToMessage } from './replyToMessage.js';
 
 const OWNER_ID = '1159601661392715906';
 
 async function reply(message, content) {
-  await message.channel.send({ content, allowedMentions: { parse: [] } }).catch(() => {});
+  await replyToMessage(message, { content, allowedMentions: { parse: [] } }).catch(() => {});
   return true;
 }
 

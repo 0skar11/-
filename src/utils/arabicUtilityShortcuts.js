@@ -1,5 +1,6 @@
 import { PermissionFlagsBits } from 'discord.js';
 import { scheduleNoPermissionDelete } from './noPermissionReply.js';
+import { replyToMessage } from './replyToMessage.js';
 
 const COMMANDS = new Set(['ق', 'ف', 'نك', 'font']);
 const NO_PERMISSION = '🚫 No Permission';
@@ -12,7 +13,7 @@ function hasPermission(member, permission) {
 }
 
 async function reply(message, content) {
-  await message.channel.send({ content, allowedMentions: { parse: [] } }).then(scheduleNoPermissionDelete).catch(() => {});
+  await replyToMessage(message, { content, allowedMentions: { parse: [] } }).then(scheduleNoPermissionDelete).catch(() => {});
   return true;
 }
 

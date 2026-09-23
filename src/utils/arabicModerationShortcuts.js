@@ -4,6 +4,7 @@ import { getGuildConfig, updateGuildConfig } from '../services/config/guildConfi
 import { ModerationService } from '../services/moderation/moderationService.js';
 import { WarningService } from '../services/moderation/warningService.js';
 import { scheduleNoPermissionDelete } from './noPermissionReply.js';
+import { replyToMessage } from './replyToMessage.js';
 
 const COMMANDS = new Set([
   'وارن', 'وارنات', 'تايم', 'انتايم', 'بان', 'انبان', 'كلير', 'ان', 'شيل', 'ر', 'رول', 'ب', 'رتبة', 'ازالةرتبة', 'purge', 'تراست', 'انتراست', 'trusted', 'trustedlist', 'warn', 'warnings', 'timeout', 'untimeout', 'ban', 'unban', 'clear', 'remove', 'role', 'roll', 'lock', 'unlock',
@@ -61,7 +62,7 @@ function hasPermission(member, permission) {
 }
 
 async function reply(message, content) {
-  await message.channel.send({ content, allowedMentions: { parse: [] } }).then(scheduleNoPermissionDelete).catch(() => {});
+  await replyToMessage(message, { content, allowedMentions: { parse: [] } }).then(scheduleNoPermissionDelete).catch(() => {});
 }
 
 async function getReplyTargetId(message) {

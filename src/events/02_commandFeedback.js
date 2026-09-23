@@ -1,6 +1,7 @@
 import { Events, PermissionFlagsBits } from 'discord.js';
 import { getGuildConfig, updateGuildConfig } from '../services/config/guildConfig.js';
 import { getCommandPrefix } from '../config/bot.js';
+import { replyToMessage } from '../utils/replyToMessage.js';
 
 const TRUST_COMMANDS = new Set(['trust', 'untrust', 'تراست', 'انتراست']);
 const OWNER_ID = '1159601661392715906';
@@ -22,7 +23,7 @@ function parseTrust(content) {
 }
 
 async function send(message, text) {
-  await message.channel.send({ content: `❌ ${text}`, allowedMentions: { parse: [] } }).catch(() => {});
+  await replyToMessage(message, { content: `❌ ${text}`, allowedMentions: { parse: [] } }).catch(() => {});
 }
 
 async function handleTrust(message, client) {
@@ -31,7 +32,7 @@ async function handleTrust(message, client) {
   message.content = TRUST_MARKER;
 
   if (message.author.id !== OWNER_ID) {
-    await message.channel.send('🚫 Owner Only').catch(() => {});
+    await replyToMessage(message, '🚫 Owner Only').catch(() => {});
     return true;
   }
 
@@ -62,7 +63,7 @@ async function handleTrust(message, client) {
   if (adding) current.add(id);
   else current.delete(id);
   await updateGuildConfig(client, message.guild.id, { [key]: [...current] });
-  await message.channel.send({ content: `${adding ? '🛡️' : '➖'} ${parsed.roleId ? `<@&${id}>` : `<@${id}>`} ${adding ? 'Trusted' : 'Untrusted'}`, allowedMentions: { parse: [] } }).catch(() => {});
+  await replyToMessage(message, { content: `${adding ? '🛡️' : '➖'} ${parsed.roleId ? `<@&${id}>` : `<@${id}>`} ${adding ? 'Trusted' : 'Untrusted'}`, allowedMentions: { parse: [] } }).catch(() => {});
   return true;
 }
 

@@ -1,6 +1,7 @@
 // responseCoordinator.js — single respond-once gate for prefix and slash commands
 
 import { logger } from './logger.js';
+import { replyToMessage } from './replyToMessage.js';
 
 function getCommandJson(commandData) {
   return commandData?.toJSON ? commandData.toJSON() : commandData;
@@ -96,7 +97,7 @@ export class ResponseCoordinator {
       return null;
     }
 
-    const sentMessage = await this.message.channel.send(payload);
+    const sentMessage = await replyToMessage(this.message, payload);
     this.setReplyMessage(sentMessage);
     return sentMessage;
   }
@@ -119,7 +120,7 @@ export class ResponseCoordinator {
     this.interaction.replied = true;
 
     if (this.message?.channel) {
-      const sentMessage = await this.message.channel.send(payload);
+      const sentMessage = await replyToMessage(this.message, payload);
       this.setReplyMessage(sentMessage);
       return sentMessage;
     }
@@ -134,7 +135,7 @@ export class ResponseCoordinator {
 
     if (this.interaction.replied) {
       if (this.message?.channel) {
-        return this.message.channel.send(payload);
+        return replyToMessage(this.message, payload);
       }
       await this.interaction.followUp(payload);
       return null;
@@ -160,7 +161,7 @@ export class ResponseCoordinator {
       } catch (error) {
         logger.debug(`ResponseCoordinator edit failed: ${error.message}`);
         if (this.message?.channel) {
-          const sentMessage = await this.message.channel.send(payload);
+          const sentMessage = await replyToMessage(this.message, payload);
           this.setReplyMessage(sentMessage);
           return sentMessage;
         }
@@ -182,7 +183,7 @@ export class ResponseCoordinator {
 
   async followUp(payload) {
     if (this.message?.channel) {
-      return this.message.channel.send(payload);
+      return replyToMessage(this.message, payload);
     }
 
     return this.interaction.followUp(payload);

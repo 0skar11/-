@@ -13,6 +13,7 @@ import { isCommandEnabled } from '../services/commandAccessService.js';
 import { getCountingGameConfig, saveCountingGameConfig, isValidCountingMessage, recordCorrectCount } from '../services/countingGameService.js';
 import { handleTrustedListCommand } from '../utils/trustedCommand.js';
 import { handleArabicRoleShortcut, handleClearWarningsShortcut } from '../utils/arabicModerationShortcuts.js';
+import { replyToMessage } from '../utils/replyToMessage.js';
 
 export default {
   name: Events.MessageCreate,
@@ -65,7 +66,7 @@ async function handlePrefixCommand(message, client) {
     let { commandName, args } = parsed;
     if (commandName.toLowerCase() === 'trusted') {
       if (args.length) {
-        await message.channel.send(`❌ Usage: \`${prefix}trusted\``).catch(() => {});
+        await replyToMessage(message, `❌ Usage: \`${prefix}trusted\``).catch(() => {});
       } else {
         await handleTrustedListCommand(message, client);
       }
@@ -93,7 +94,7 @@ async function handlePrefixCommand(message, client) {
     const command = client.commands.get(resolvedCommandName);
     if (!command) return;
     if (isMaintenanceMode() && !isBotOwner(message.author.id)) {
-      await message.channel.send('🛠️ Maintenance Mode').catch(() => {});
+      await replyToMessage(message, '🛠️ Maintenance Mode').catch(() => {});
       return;
     }
     if (!isCommandCategoryEnabled(command.category)) return;
@@ -113,13 +114,13 @@ async function handlePrefixCommand(message, client) {
 
     const abuseProtection = await enforceAbuseProtection({ guildId: message.guild.id, user: message.author }, command, resolvedCommandName);
     if (!abuseProtection.allowed) {
-      await message.channel.send(`⏱️ Wait ${formatCooldownDuration(abuseProtection.remainingMs)}`).catch(() => {});
+      await replyToMessage(message, `⏱️ Wait ${formatCooldownDuration(abuseProtection.remainingMs)}`).catch(() => {});
       return;
     }
     await executePrefixCommand(command, message, args, client, prefix, guildConfig);
   } catch (error) {
     logger.error('Error handling prefix command:', error);
-    await message.channel.send({ content: `❌ ${error.userMessage || error.message || 'Something went wrong'}`, allowedMentions: { parse: [] } }).catch(() => {});
+    await replyToMessage(message, { content: `❌ ${error.userMessage || error.message || 'Something went wrong'}`, allowedMentions: { parse: [] } }).catch(() => {});
   }
 }
 
