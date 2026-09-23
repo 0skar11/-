@@ -65,10 +65,11 @@ function embedSignature(embed) {
 }
 
 /**
- * Posts the Arabic moderation commands list once in its channel.
- * Returns { status, channelId } where status is 'sent', 'updated' or 'exists'; throws on failure.
+ * Keeps the Arabic moderation commands list in its channel up to date by editing the existing post.
+ * A new post is only sent with `allowSend` (the /publish-board command); startup never posts.
+ * Returns { status, channelId } where status is 'sent', 'updated', 'exists' or 'missing'; throws on failure.
  */
-export async function publishArabicModerationCommands(client) {
+export async function publishArabicModerationCommands(client, { allowSend = false } = {}) {
   const channel = await client.channels.fetch(MODERATION_COMMANDS_CHANNEL_ID).catch((error) => {
     throw new Error(`Channel ${MODERATION_COMMANDS_CHANNEL_ID} could not be fetched (is the bot in that server?): ${error.message}`);
   });
@@ -83,8 +84,9 @@ export async function publishArabicModerationCommands(client) {
     throw new Error(`Missing permissions in channel ${MODERATION_COMMANDS_CHANNEL_ID}: ${missing.join(', ')}`);
   }
 
+  // Only the owner and the bot can post here, so any embed from the bot is the list, whatever its title.
   const existing = await findBoardMessage(channel, BOARD_KEY, (message) => (
-    message.embeds[0]?.title === MODERATION_COMMANDS_TITLE || message.content?.includes(LEGACY_MARKER)
+    message.embeds.length > 0 || message.content?.includes(LEGACY_MARKER)
   ));
   if (existing) {
     // Keep the posted list in sync with the code (new commands, removed legacy marker).
@@ -97,6 +99,10 @@ export async function publishArabicModerationCommands(client) {
       return { status: 'updated', channelId: channel.id };
     }
     return { status: 'exists', channelId: channel.id };
+  }
+  if (!allowSend) {
+    logger.warn(`Arabic moderation commands message not found in channel ${MODERATION_COMMANDS_CHANNEL_ID}; use /publish-board moderation-commands to post it`);
+    return { status: 'missing', channelId: channel.id };
   }
 
   const sent = await channel.send({ embeds: [buildEmbed()] });

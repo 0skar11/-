@@ -17,8 +17,6 @@ export default {
     if (!interaction.memberPermissions?.has(PermissionFlagsBits.ManageGuild)) return interaction.reply({ content: '❌ تحتاج إلى صلاحية Manage Server.', ephemeral: true });
 
     try {
-      let sent;
-      let channelId;
       if (interaction.options.getSubcommand() === 'admin-permissions') {
         const result = await publishStaffPermissionBoard(interaction.guild);
         const parts = [];
@@ -27,17 +25,15 @@ export default {
         const summary = parts.length ? `✅ تم ${parts.join(' و ')} رسالة في الروم <#${result.channelId}>.` : `ℹ️ لم يتم العثور على رتب الستاف في الروم <#${result.channelId}>.`;
         return interaction.reply({ content: summary, ephemeral: true });
       } else if (interaction.options.getSubcommand() === 'trusted') {
-        const result = await publishTrustedBoard(interaction.client);
+        const result = await publishTrustedBoard(interaction.client, { allowSend: true });
         const verb = result.status === 'sent' ? 'إرسال' : 'تحديث';
         return interaction.reply({ content: `✅ تم ${verb} قائمة الـ Trusted في الروم <#${result.channelId}>.`, ephemeral: true });
-      } else {
-        const result = await publishArabicModerationCommands(interaction.client);
-        sent = result.status !== 'exists';
-        channelId = result.channelId;
       }
-      const content = sent
-        ? `✅ تم الإرسال في الروم <#${channelId}>.`
-        : `ℹ️ الرسالة موجودة بالفعل في الروم <#${channelId}>، لم يتم إرسال شيء جديد.`;
+      const result = await publishArabicModerationCommands(interaction.client, { allowSend: true });
+      const content = {
+        sent: `✅ تم الإرسال في الروم <#${result.channelId}>.`,
+        updated: `✅ تم تحديث الرسالة الموجودة في الروم <#${result.channelId}>.`,
+      }[result.status] || `ℹ️ الرسالة موجودة بالفعل في الروم <#${result.channelId}>، لم يتم إرسال شيء جديد.`;
       await interaction.reply({ content, ephemeral: true });
     } catch (error) {
       await interaction.reply({ content: `❌ فشل الإرسال: ${error.message}`, ephemeral: true });
