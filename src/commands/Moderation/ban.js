@@ -2,7 +2,7 @@ import { SlashCommandBuilder, PermissionFlagsBits } from 'discord.js';
 import { InteractionHelper } from '../../utils/interactionHelper.js';
 import { ModerationService } from '../../services/moderation/moderationService.js';
 import { TitanBotError, ErrorTypes } from '../../utils/errorHandler.js';
-import { oneLine, withReason } from '../../utils/oneLine.js';
+import { moderationCard, cardReason } from '../../utils/moderationCard.js';
 
 export default {
     data: new SlashCommandBuilder()
@@ -55,6 +55,11 @@ export default {
             reason,
         });
 
-        await InteractionHelper.universalReply(interaction, oneLine('🔨', withReason(`<@${user.id}> Has Been Banned`, reason)));
+        await InteractionHelper.universalReply(interaction, moderationCard({
+            emoji: '🔨',
+            title: 'BAN ISSUED',
+            fields: [['User', `<@${user.id}>`], ['Reason', cardReason(reason)]],
+            moderatorId: interaction.user.id,
+        }));
     },
 };

@@ -3,7 +3,7 @@ import { logger } from '../../utils/logger.js';
 import { TitanBotError, ErrorTypes } from '../../utils/errorHandler.js';
 import { InteractionHelper } from '../../utils/interactionHelper.js';
 import { ModerationService } from '../../services/moderation/moderationService.js';
-import { oneLine, withReason } from '../../utils/oneLine.js';
+import { moderationCard, cardReason, formatDurationMs } from '../../utils/moderationCard.js';
 
 const durationChoices = [
     { name: "5 minutes", value: 5 },
@@ -27,13 +27,6 @@ function resolveDurationMinutes(interaction) {
     const raw = String(interaction.options.getString("duration") || DEFAULT_DURATION_MINUTES).trim().toLowerCase();
     const match = raw.match(/^(\d+)\s*([smhdwثدسي])?$/u);
     return match ? Math.ceil(Number(match[1]) * UNIT_MINUTES[match[2] || "m"]) : null;
-}
-
-function formatDuration(minutes) {
-    if (minutes % 10080 === 0) return `${minutes / 10080}w`;
-    if (minutes % 1440 === 0) return `${minutes / 1440}d`;
-    if (minutes % 60 === 0) return `${minutes / 60}h`;
-    return `${minutes}m`;
 }
 
 export default {
@@ -130,6 +123,15 @@ export default {
             reason,
         });
 
-        await InteractionHelper.safeEditReply(interaction, oneLine('⏳', withReason(`<@${targetUser.id}> Has Been Timed Out ${formatDuration(durationMinutes)}`, reason)));
+        await InteractionHelper.safeEditReply(interaction, moderationCard({
+            emoji: '⏳',
+            title: 'TIMEOUT ISSUED',
+            fields: [
+                ['User', `<@${targetUser.id}>`],
+                ['Reason', cardReason(reason)],
+                ['Duration', `${formatDurationMs(durationMs)} (ends <t:${Math.floor((Date.now() + durationMs) / 1000)}:R>)`],
+            ],
+            moderatorId: interaction.user.id,
+        }));
     },
 };

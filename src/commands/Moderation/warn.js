@@ -2,11 +2,10 @@ import { SlashCommandBuilder, PermissionFlagsBits, PermissionsBitField, ChannelT
 import { createEmbed, errorEmbed, successEmbed, infoEmbed, warningEmbed } from '../../utils/embeds.js';
 import { logModerationAction } from '../../utils/moderation.js';
 import { logger } from '../../utils/logger.js';
-import { WarningService } from '../../services/moderation/warningService.js';
 import { ModerationService } from '../../services/moderation/moderationService.js';
 import { TitanBotError, ErrorTypes } from '../../utils/errorHandler.js';
 import { InteractionHelper } from '../../utils/interactionHelper.js';
-import { oneLine, withReason } from '../../utils/oneLine.js';
+import { issueWarning, warningCard } from '../../services/moderation/warnEscalation.js';
 export default {
     data: new SlashCommandBuilder()
         .setName("warn")
@@ -71,13 +70,13 @@ export default {
 
         ModerationService.assertModerationHierarchy(interaction.member, member, 'warn');
 
-        const { id, totalCount } = await WarningService.addWarning({
-            guildId,
-            userId: target.id,
-            moderatorId: moderator.id,
+        const result = await issueWarning({
+            guild: interaction.guild,
+            member,
+            moderator: interaction.member,
             reason,
-            timestamp: Date.now()
         });
+        const { id, totalCount } = result;
 
         await logModerationAction({
             client,
@@ -92,11 +91,12 @@ export default {
                     moderatorId: moderator.id,
                     totalWarns: totalCount,
                     warningNumber: totalCount,
-                    warningId: id
+                    warningId: id,
+                    autoTimeoutMs: result.timeoutApplied ? result.timeoutMs : 0
                 }
             }
         });
 
-        await InteractionHelper.safeEditReply(interaction, oneLine('⚠️', withReason(`<@${target.id}> Has Been Warned (${totalCount})`, reason)));
+        await InteractionHelper.safeEditReply(interaction, warningCard({ userId: target.id, moderatorId: moderator.id, result }));
     }
 };

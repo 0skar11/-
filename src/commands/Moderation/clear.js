@@ -6,7 +6,7 @@ import { getColor } from '../../config/bot.js';
 
 import { InteractionHelper } from '../../utils/interactionHelper.js';
 import { replyUserError, ErrorTypes } from '../../utils/errorHandler.js';
-import { oneLine } from '../../utils/oneLine.js';
+import { moderationCard } from '../../utils/moderationCard.js';
 // Admins with Manage Messages delete a set number of messages (`clear 10` / `مسح 10` / `م 10`).
 // Wiping the whole channel is `purge`, which only the owner can run.
 export default {
@@ -64,7 +64,12 @@ export default {
         }
       });
 
-      await InteractionHelper.safeEditReply(interaction, oneLine('🧹', `Deleted ${deletedCount} Messages`, { flags: MessageFlags.Ephemeral }));
+      await InteractionHelper.safeEditReply(interaction, moderationCard({
+        emoji: '🧹',
+        title: 'MESSAGES CLEARED',
+        fields: [['Channel', `${channel}`], ['Amount', `${deletedCount}`]],
+        moderatorId: interaction.user.id,
+      }, { flags: MessageFlags.Ephemeral }));
 
       setTimeout(() => {
         interaction.deleteReply().catch(err => 
