@@ -29,10 +29,6 @@ export default {
           else await channel.send({ content: messageContent, embeds: [new EmbedBuilder().setColor(welcomeConfig.welcomeEmbed?.color || getColor('success')).setTitle(formatWelcomeMessage(welcomeConfig.welcomeEmbed?.title || '🎉 Welcome!', formatData)).setDescription(welcomeMessage).setThumbnail(user.displayAvatarURL()).setTimestamp().setFooter({ text: welcomeConfig.welcomeEmbed?.footer ? formatWelcomeMessage(welcomeConfig.welcomeEmbed.footer, formatData) : `Welcome to ${guild.name}!` })] });
         }
       }
-      if (welcomeConfig?.roleIds?.length > 0) {
-        const assign = () => { const role = guild.roles.cache.get(welcomeConfig.roleIds[0]); if (role) member.roles.add(role).catch((error) => logger.warn(`Failed to assign role ${role.id}:`, error)); };
-        if (welcomeConfig.autoRoleDelay > 0) setTimeout(assign, welcomeConfig.autoRoleDelay * 1000); else assign();
-      }
       if (config?.verification?.enabled || config?.verification?.autoVerify?.enabled) await handleVerification(member, guild, config.verification, member.client);
       await logEvent({ client: member.client, guildId: guild.id, eventType: EVENT_TYPES.MEMBER_JOIN, data: { title: 'User joined', lines: [`**User:** ${user} (${user.id})`, `**Members:** ${guild.memberCount}`], userId: user.id } });
       for (const counter of await getServerCounters(member.client, guild.id)) if (counter?.type && counter.channelId && counter.enabled !== false) await updateCounter(member.client, guild, counter);
