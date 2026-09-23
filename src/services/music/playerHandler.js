@@ -6,7 +6,6 @@ import {
     buildNowPlayingEmbed,
     buildPlayerButtonRows,
 } from './musicEmbeds.js';
-import { deleteStalePlayerMessages } from './stalePlayerMessages.js';
 
 const UPDATE_INTERVAL_MS = 15 * 1000;
 const IDLE_DISCONNECT_MS = 30 * 1000;
@@ -37,7 +36,6 @@ async function editOrSendPlayerMessage(client, guildData, channelId, embed, comp
         const newMsg = await channel.send(payload);
         guildData.playerMessageId = newMsg.id;
         guildData.playerChannelId = channel.id;
-        await deleteStalePlayerMessages(channel, client.user.id, newMsg.id);
     } catch (error) {
         logger.error('Failed to send music player message:', error);
     }

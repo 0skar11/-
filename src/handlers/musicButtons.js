@@ -13,19 +13,12 @@ import {
 import { canControlMusic, VOICE_CHANNEL_DENIAL } from '../services/music/permissions.js';
 import { refreshPlayerMessage } from '../services/music/playerHandler.js';
 import { MUSIC_BUTTON_IDS } from '../services/music/musicEmbeds.js';
-import { isPlayerMessage } from '../services/music/stalePlayerMessages.js';
 import { replyUserError, ErrorTypes } from '../utils/errorHandler.js';
 
 async function handleMusicButton(interaction, client) {
     const player = getPlayer(client, interaction.guild.id);
     const guildData = getGuildMusicData(interaction.guild.id);
     const customId = interaction.customId;
-
-    // A player message from a session that already ended: remove it instead of leaving dead buttons.
-    if (isPlayerMessage(interaction.message, client.user.id) && (!player?.current || interaction.message.id !== guildData.playerMessageId)) {
-        await interaction.message.delete().catch(() => {});
-        return replyUserError(interaction, { type: ErrorTypes.USER_INPUT, message: 'Nothing is playing right now.' });
-    }
 
     if (customId === MUSIC_BUTTON_IDS.QUEUE) {
         if (!player?.current) {
