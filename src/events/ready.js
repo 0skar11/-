@@ -6,6 +6,7 @@ import { reconcileTicketPanels, reconcileVerificationPanels, reconcileReactionRo
 import { reconcileLevelRoles } from "../services/leveling/levelRoleSyncService.js";
 import { initRiffyAfterReady } from "../services/music/riffySetup.js";
 import { ensureAuditLogChannels } from "../services/auditLogChannelsService.js";
+import { publishArabicModerationCommands } from "../services/moderationCommandsBoardService.js";
 
 export default {
   name: Events.ClientReady,
@@ -18,6 +19,13 @@ export default {
       startupLog(`Serving ${client.guilds.cache.size} guild(s)`);
       startupLog(`Loaded ${client.commands.size} commands`);
 
+      // A failure here must not stop the rest of the startup work.
+      try {
+        const result = await publishArabicModerationCommands(client);
+        startupLog(`Arabic moderation commands: ${result.status} (channel ${result.channelId})`);
+      } catch (error) {
+        logger.error("Failed to publish Arabic moderation commands:", error);
+      }
       await ensureAuditLogChannels(client);
 
       if (client.config?.features?.music) initRiffyAfterReady(client);
