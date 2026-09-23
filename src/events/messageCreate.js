@@ -18,6 +18,7 @@ import { handleReportChannelMessage } from '../services/reportChannelService.js'
 import { handleProtectedChannelMessage } from '../services/protectedChannelsService.js';
 import { handleEveryoneMention } from '../services/everyoneMentionGuardService.js';
 import { handleForeignInviteLink } from '../services/inviteLinkGuardService.js';
+import { handleMediaMessage } from '../services/mediaRoleService.js';
 
 export default {
   name: Events.MessageCreate,
@@ -30,6 +31,7 @@ export default {
 
       if (await handleEveryoneMention(message)) return;
       if (await handleForeignInviteLink(message)) return;
+      if (await handleMediaMessage(message)) return;
       if (await handleReportChannelMessage(message)) return;
       if (await handleArabicUtilityShortcuts(message)) return;
       if (await handleMessageDeleteShortcut(message)) return;
