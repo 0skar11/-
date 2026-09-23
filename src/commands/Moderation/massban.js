@@ -7,7 +7,7 @@ import { TitanBotError, replyUserError, ErrorTypes } from '../../utils/errorHand
 
 import { InteractionHelper } from '../../utils/interactionHelper.js';
 import { groupLeadingUsers } from '../../utils/prefixArgs.js';
-import { addHardBans } from '../../services/moderation/hardBanService.js';
+import { addHardBans, canLiftHardBan } from '../../services/moderation/hardBanService.js';
 export default {
     data: new SlashCommandBuilder()
         .setName("massban")
@@ -49,6 +49,11 @@ export default {
                 commandName: 'massban'
             });
             return;
+        }
+
+        // Hard bans can only be lifted by trusted members, so only they can place one.
+        if (!(await canLiftHardBan(interaction.guild, interaction.user.id))) {
+            return await replyUserError(interaction, { type: ErrorTypes.PERMISSION, message: 'No Permission — هارد بان للـ trusted فقط' });
         }
 
         const usersInput = interaction.options.getString("users");
