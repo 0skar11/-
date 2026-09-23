@@ -1,11 +1,16 @@
 import { ChannelType } from 'discord.js';
 import { logger } from '../utils/logger.js';
+import { AUDIT_LOG_CATEGORY_ID } from './auditLogChannelsService.js';
 
 export const CHAT_CATEGORY_ID = '1547310338133860463';
 
-// Channels outside the chat category that get the same treatment, matched by
-// their cleaned name so the ID doesn't need to be known.
-const EXTRA_CHANNEL_NAMES = new Set(['boosters', 'booster', 'boosts']);
+// Categories that get tidied along with their channels, matched by their
+// cleaned name so the IDs don't need to be known.
+const TIDY_CATEGORY_NAMES = new Set(['staff', 'important', 'communication', 'voices', 'logs']);
+
+// The log channels are looked up by their exact name, so only their
+// category gets renamed.
+const KEEP_CHANNEL_NAMES_IN = new Set([AUDIT_LOG_CATEGORY_ID]);
 
 const SEPARATOR = '・';
 const DEFAULT_EMOJI = '💬';
@@ -13,6 +18,14 @@ const DEFAULT_EMOJI = '💬';
 // First matching keyword decides the emoji. Keys are checked against the
 // cleaned channel name, so Arabic, English and Franco names all work.
 const EMOJI_RULES = [
+  { emoji: '👑', words: ['staff', 'ستاف', 'الادارة', 'ادارة'] },
+  { emoji: '📌', words: ['important', 'مهم'] },
+  { emoji: '🔊', words: ['voices', 'voice', 'فويس', 'فويسات'] },
+  { emoji: '📁', words: ['logs', 'log', 'لوج', 'لوجات'] },
+  { emoji: '🛡️', words: ['nuke', 'antinuke', 'raid', 'antiraid', 'حماية'] },
+  { emoji: '🤝', words: ['trusted', 'trust', 'ترستد', 'موثوقين'] },
+  { emoji: '🔐', words: ['perms', 'perm', 'permissions', 'صلاحيات'] },
+  { emoji: '⚠️', words: ['مشاكل', 'مشكلة', 'problems', 'issues', 'reports', 'report', 'bugs', 'بلاغات'] },
   { emoji: '📢', words: ['announcement', 'announcements', 'news', 'اعلانات', 'إعلانات', 'اخبار', 'أخبار'] },
   { emoji: '📜', words: ['rules', 'قوانين', 'القوانين'] },
   { emoji: '👋', words: ['welcome', 'ترحيب', 'الترحيب'] },
@@ -39,7 +52,7 @@ const EMOJI_RULES = [
   { emoji: '📈', words: ['level', 'levels', 'rank', 'ranks', 'لفل', 'مستوى', 'مستويات'] },
   { emoji: '🤫', words: ['confess', 'confessions', 'اعترافات', 'صراحة'] },
   { emoji: '💤', words: ['afk'] },
-  { emoji: '💬', words: ['chat', 'general', 'شات', 'دردشة', 'عام', 'العام'] },
+  { emoji: '💬', words: ['chat', 'general', 'communication', 'تواصل', 'شات', 'دردشة', 'عام', 'العام'] },
 ];
 
 const RENAMABLE_TYPES = new Set([
@@ -71,41 +84,49 @@ export function pickChannelEmoji(cleanName) {
 // is kept instead of being swapped for the default one.
 const LEADING_EMOJI = /^\p{Extended_Pictographic}(?:\uFE0F|\p{Emoji_Modifier}|\u200D\p{Extended_Pictographic}\uFE0F?)*/u;
 
-export function formatChatChannelName(name) {
+// Categories always get the emoji from the rules, so "👉 | Staff" becomes
+// "👑・staff" like the rest.
+export function formatChatChannelName(name, { keepEmoji = true } = {}) {
   const clean = cleanChannelName(name);
   if (!clean) return null;
-  const emoji = String(name).trim().match(LEADING_EMOJI)?.[0] || pickChannelEmoji(clean);
+  const emoji = (keepEmoji && String(name).trim().match(LEADING_EMOJI)?.[0]) || pickChannelEmoji(clean);
   return `${emoji}${SEPARATOR}${clean}`.slice(0, 100);
+}
+
+async function renameIfNeeded(channel, newName, summary) {
+  if (!newName || newName === channel.name) {
+    summary.unchanged += 1;
+    return;
+  }
+
+  try {
+    const oldName = channel.name;
+    await channel.setName(newName, 'Tidy channel names');
+    logger.info(`Renamed channel ${channel.id}: "${oldName}" -> "${newName}"`);
+    summary.renamed += 1;
+  } catch (error) {
+    logger.error(`Failed to rename channel ${channel.id} ("${channel.name}"):`, error);
+    summary.errors += 1;
+  }
 }
 
 export async function tidyChatChannelNames(client) {
   const summary = { renamed: 0, unchanged: 0, errors: 0 };
 
   for (const guild of client.guilds.cache.values()) {
-    const category = guild.channels.cache.get(CHAT_CATEGORY_ID)
-      || await guild.channels.fetch(CHAT_CATEGORY_ID).catch(() => null);
-    const categoryId = category?.type === ChannelType.GuildCategory ? category.id : null;
-
-    const channels = guild.channels.cache.filter(channel => RENAMABLE_TYPES.has(channel.type) && (
-      (categoryId && channel.parentId === categoryId)
-      || EXTRA_CHANNEL_NAMES.has(cleanChannelName(channel.name))
+    const categories = guild.channels.cache.filter(channel => channel.type === ChannelType.GuildCategory && (
+      channel.id === CHAT_CATEGORY_ID || TIDY_CATEGORY_NAMES.has(cleanChannelName(channel.name))
     ));
 
-    for (const channel of channels.values()) {
-      const newName = formatChatChannelName(channel.name);
-      if (!newName || newName === channel.name) {
-        summary.unchanged += 1;
-        continue;
-      }
+    for (const category of categories.values()) {
+      await renameIfNeeded(category, formatChatChannelName(category.name, { keepEmoji: false }), summary);
+      if (KEEP_CHANNEL_NAMES_IN.has(category.id)) continue;
 
-      try {
-        const oldName = channel.name;
-        await channel.setName(newName, 'Tidy chat channel names');
-        logger.info(`Renamed chat channel ${channel.id}: "${oldName}" -> "${newName}"`);
-        summary.renamed += 1;
-      } catch (error) {
-        logger.error(`Failed to rename chat channel ${channel.id} ("${channel.name}"):`, error);
-        summary.errors += 1;
+      const channels = guild.channels.cache.filter(
+        channel => channel.parentId === category.id && RENAMABLE_TYPES.has(channel.type),
+      );
+      for (const channel of channels.values()) {
+        await renameIfNeeded(channel, formatChatChannelName(channel.name), summary);
       }
     }
   }

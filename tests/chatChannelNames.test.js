@@ -38,6 +38,25 @@ describe('formatChatChannelName', () => {
     assert.equal(formatChatChannelName('boosters'), '💎・boosters');
   });
 
+  test('names the staff channels', () => {
+    assert.equal(formatChatChannelName('important'), '📌・important');
+    assert.equal(formatChatChannelName('anti-nuke'), '🛡️・anti-nuke');
+    assert.equal(formatChatChannelName('trusted'), '🤝・trusted');
+    assert.equal(formatChatChannelName('perms'), '🔐・perms');
+    assert.equal(formatChatChannelName('commands'), '🤖・commands');
+    assert.equal(formatChatChannelName('مشاكل'), '⚠️・مشاكل');
+  });
+
+  test('names the categories with the rule emoji', () => {
+    const asCategory = name => formatChatChannelName(name, { keepEmoji: false });
+    assert.equal(asCategory('👉 | Staff'), '👑・staff');
+    assert.equal(asCategory('> important'), '📌・important');
+    assert.equal(asCategory('> communication'), '💬・communication');
+    assert.equal(asCategory('> Voices'), '🔊・voices');
+    assert.equal(asCategory('Logs'), '📁・logs');
+    assert.equal(asCategory('👑・staff'), '👑・staff');
+  });
+
   test('falls back to the chat emoji and skips empty names', () => {
     assert.equal(formatChatChannelName('random'), '💬・random');
     assert.equal(formatChatChannelName('・・'), null);
