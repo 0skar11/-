@@ -3,7 +3,7 @@ import { InteractionHelper } from '../../utils/interactionHelper.js';
 import { ModerationService } from '../../services/moderation/moderationService.js';
 import { TitanBotError, ErrorTypes } from '../../utils/errorHandler.js';
 import { moderationCard, cardReason } from '../../utils/moderationCard.js';
-import { fetchRepliedMessage, sendModerationActionLog } from '../../services/moderation/moderationActionLogService.js';
+import { sendModerationActionLog } from '../../services/moderation/moderationActionLogService.js';
 
 export default {
     data: new SlashCommandBuilder()
@@ -49,7 +49,6 @@ export default {
             );
         }
 
-        const repliedMessage = await fetchRepliedMessage(interaction);
         await ModerationService.banUser({
             guild: interaction.guild,
             user,
@@ -62,7 +61,6 @@ export default {
             moderatorUser: interaction.user,
             reason,
             channel: interaction.channel,
-            repliedMessage,
         });
 
         await InteractionHelper.universalReply(interaction, moderationCard({

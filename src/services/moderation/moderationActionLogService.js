@@ -1,5 +1,5 @@
 // moderationActionLogService.js — every ban / timeout / warn issued by a staff member is posted in one
-// channel: the member, the moderator, the reason, and the message the command replied to (if any).
+// channel: the member, the moderator and the reason.
 
 import { logger } from '../../utils/logger.js';
 import { cardReason, formatDurationMs } from '../../utils/moderationCard.js';
@@ -14,7 +14,6 @@ const ACTIONS = {
   warn: { title: '⚠️ وارن', color: 0xf1c40f },
 };
 
-const MAX_MESSAGE_CONTENT = 1000;
 const MAX_DESCRIPTION_LENGTH = 4000;
 
 function userLine(user, fallbackId) {
@@ -23,37 +22,12 @@ function userLine(user, fallbackId) {
 }
 
 /**
- * The message a prefix command replied to (`تايم 5m سبام` as a reply), or null.
- * Call it before the action so the message is captured even if it gets deleted afterwards.
- */
-export async function fetchRepliedMessage(interaction) {
-  const message = interaction?._sourceMessage;
-  if (!message?.reference?.messageId) return null;
-  return message.fetchReference().catch(() => null);
-}
-
-function repliedMessageText(message) {
-  const lines = [`**صاحب الرسالة:** ${userLine(message.author)}`];
-  const content = message.content?.trim();
-  if (content) {
-    const clipped = content.length > MAX_MESSAGE_CONTENT ? `${content.slice(0, MAX_MESSAGE_CONTENT - 3)}...` : content;
-    lines.push(clipped.split('\n').map((line) => `> ${line}`).join('\n'));
-  } else {
-    lines.push('*(بدون نص)*');
-  }
-  const attachments = [...(message.attachments?.values?.() || [])].map((attachment) => attachment.url);
-  if (attachments.length) lines.push(`**المرفقات:**\n${attachments.join('\n')}`);
-  if (message.url) lines.push(`[اذهب للرسالة](${message.url})`);
-  return lines.join('\n');
-}
-
-/**
  * Embed for one moderation action. `action` is one of `ban`, `hardban`, `timeout`, `warn`;
  * `targetUser`/`moderatorUser` are discord.js Users (ids are used when a user could not be fetched).
  */
 export function buildModerationActionLogEmbed({
   action, targetUser, targetId, moderatorUser, moderatorId, reason, durationMs, warnings, punishment,
-  channel, repliedMessage, timestamp = Date.now(),
+  channel, timestamp = Date.now(),
 }) {
   const { title, color } = ACTIONS[action] || { title: action, color: 0x95a5a6 };
   const lines = [
@@ -66,7 +40,6 @@ export function buildModerationActionLogEmbed({
   if (punishment) lines.push(`**العقوبة:** ${punishment}`);
   if (channel) lines.push(`**الروم:** ${channel}`);
   lines.push(`**الوقت:** <t:${Math.floor(timestamp / 1000)}:F>`);
-  if (repliedMessage) lines.push('', '**الرسالة اللي اتعمل عليها ريبلاي:**', repliedMessageText(repliedMessage));
 
   const avatar = targetUser?.displayAvatarURL?.();
   return {

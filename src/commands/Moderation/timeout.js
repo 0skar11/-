@@ -4,7 +4,7 @@ import { TitanBotError, ErrorTypes } from '../../utils/errorHandler.js';
 import { InteractionHelper } from '../../utils/interactionHelper.js';
 import { ModerationService } from '../../services/moderation/moderationService.js';
 import { moderationCard, cardReason, formatDurationMs } from '../../utils/moderationCard.js';
-import { fetchRepliedMessage, sendModerationActionLog } from '../../services/moderation/moderationActionLogService.js';
+import { sendModerationActionLog } from '../../services/moderation/moderationActionLogService.js';
 
 const durationChoices = [
     { name: "5 minutes", value: 5 },
@@ -116,7 +116,6 @@ export default {
         }
 
         const durationMs = durationMinutes * 60 * 1000;
-        const repliedMessage = await fetchRepliedMessage(interaction);
         await ModerationService.timeoutUser({
             guild: interaction.guild,
             member,
@@ -131,7 +130,6 @@ export default {
             reason,
             durationMs,
             channel: interaction.channel,
-            repliedMessage,
         });
 
         await InteractionHelper.safeEditReply(interaction, moderationCard({
