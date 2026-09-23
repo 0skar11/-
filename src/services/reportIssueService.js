@@ -3,7 +3,8 @@ import { logger } from '../utils/logger.js';
 
 // Every report is also opened as an issue (label 'بلاغ') in the bot's GitHub repo, so reports can be
 // searched and followed up there. Closing the issue marks the report as solved: the
-// watcher below then edits the report message in Discord (no new message is sent).
+// watcher below then edits the report message in Discord and pings the reporter with a
+// short reply that deletes itself after 5 seconds.
 //   GITHUB_TOKEN   fine-grained token with Issues read/write on REPORTS_REPO
 //   REPORTS_REPO   owner/name of the repo the report issues go to
 const REPORTS_REPO = process.env.REPORTS_REPO || '0skar11/-';
@@ -13,6 +14,7 @@ const CLOSED_LABEL = 'اتقفلت';
 const SOLVED_COLOR = 0x2ecc71;
 const CLOSED_COLOR = 0x95a5a6;
 const WATCH_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
+const MENTION_DELETE_MS = 5_000;
 const DISCORD_MARKER = /<!-- discord:(\d+)\/(\d+)\/(\d+)\/(\d+) -->/u;
 
 function github() {
@@ -77,7 +79,7 @@ async function notifyClosedReport(client, api, issue) {
   const label = solved ? SOLVED_LABEL : CLOSED_LABEL;
 
   if (marker) {
-    const [, , channelId, messageId] = marker;
+    const [, , channelId, messageId, reporterId] = marker;
     const channel = await client.channels.fetch(channelId).catch(() => null);
     const reportMessage = channel?.isTextBased?.() ? await channel.messages.fetch(messageId).catch(() => null) : null;
     if (reportMessage) {
@@ -89,6 +91,11 @@ async function notifyClosedReport(client, api, issue) {
           title: solved ? `✅ بلاغ #${issue.number} — اتحلت` : `🔒 بلاغ #${issue.number} — اتقفل`,
         }],
       }).catch((error) => logger.error(`Failed to update report #${issue.number} in Discord:`, error));
+      const mention = await reportMessage.reply({
+        content: solved ? `<@${reporterId}> بلاغك #${issue.number} اتحل ✅` : `<@${reporterId}> بلاغك #${issue.number} اتقفل.`,
+        allowedMentions: { users: [reporterId] },
+      }).catch(() => null);
+      if (mention) setTimeout(() => mention.delete().catch(() => null), MENTION_DELETE_MS);
     }
   }
 
