@@ -26,7 +26,6 @@ function buildEmbed() {
           '`انبان ID_العضو` — Unban',
           '`طرد @العضو السبب` — Kick',
           '`هارد بان @العضو ID2 السبب` — Hard ban (فكّه للـ trusted فقط)',
-          '`ماس طرد ID1 ID2 السبب` — Mass kick',
         ].join('\n'),
       },
       {
@@ -45,7 +44,6 @@ function buildEmbed() {
           '`قفل` — Lock channel',
           '`فتح` — Unlock channel',
           '`مسح 10` / `م 10` — Delete messages',
-          '`حالات` — Moderation cases',
           '`ملاحظات @العضو` — User notes',
           '`قل @العضو النص` — Say as the bot',
           '`خاص @العضو النص` — DM user',
