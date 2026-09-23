@@ -1,5 +1,6 @@
 import { EmbedBuilder, PermissionFlagsBits } from 'discord.js';
 import { logger } from '../utils/logger.js';
+import { findBoardMessage } from '../utils/boardMessage.js';
 
 export const MODERATION_COMMANDS_CHANNEL_ID = '1551621505991835699';
 const MODERATION_COMMANDS_TITLE = '🛡️ أوامر الموديريشن بالعربي';
@@ -81,13 +82,9 @@ export async function publishArabicModerationCommands(client) {
     throw new Error(`Missing permissions in channel ${MODERATION_COMMANDS_CHANNEL_ID}: ${missing.join(', ')}`);
   }
 
-  const recentMessages = await channel.messages.fetch({ limit: 100 });
-  const existing = recentMessages.find((message) =>
-    message.author?.id === client.user.id && (
-      message.embeds[0]?.title === MODERATION_COMMANDS_TITLE ||
-      message.content?.includes(LEGACY_MARKER)
-    )
-  );
+  const existing = await findBoardMessage(channel, (message) => (
+    message.embeds[0]?.title === MODERATION_COMMANDS_TITLE || message.content?.includes(LEGACY_MARKER)
+  ));
   if (existing) {
     // Keep the posted list in sync with the code (new commands, removed legacy marker).
     const embed = buildEmbed();
