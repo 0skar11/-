@@ -6,8 +6,11 @@ import { getGuildConfig } from './config/guildConfig.js';
 export const TRUSTED_BOARD_CHANNEL_ID = '1155236383464628325';
 const TRUSTED_BOARD_TITLE = '🛡️ قائمة الـ Trusted';
 const BOARD_KEY = 'trusted';
-// An embed field value is capped at 1024 characters by Discord.
+// Discord caps a field value at 1024 characters, an embed at 25 fields and 6000 characters in total.
 const FIELD_LIMIT = 1024;
+const EMBED_FIELD_LIMIT = 25;
+const EMBED_TOTAL_LIMIT = 6000;
+const EMPTY_SECTION = '> *لا يوجد*';
 
 const PERMISSION_NAMES = [
   [PermissionFlagsBits.ViewChannel, 'ViewChannel'],
@@ -35,11 +38,48 @@ function chunkLines(lines) {
   return chunks;
 }
 
-function addSection(embed, title, lines) {
-  const chunks = lines.length ? chunkLines(lines) : ['> *لا يوجد*'];
-  chunks.forEach((value, index) => {
-    embed.addFields({ name: index === 0 ? `${title} — ${lines.length}` : '\u200b', value });
+function sectionFields(title, total, lines) {
+  const chunks = lines.length ? chunkLines(lines) : [EMPTY_SECTION];
+  return chunks.map((value, index) => ({ name: index === 0 ? `${title} — ${total}` : '\u200b', value }));
+}
+
+const fieldsLength = (fields) => fields.reduce((sum, { name, value }) => sum + name.length + value.length, 0);
+
+/**
+ * Builds a section's fields within the given budgets. When every line does not fit,
+ * the list is cut and a last line says how many entries were left out.
+ */
+function fitSection({ title, lines }, charBudget, fieldBudget) {
+  for (let shown = lines.length; shown >= 0; shown -= 1) {
+    const visible = lines.slice(0, shown);
+    if (shown < lines.length) visible.push(`> … و ${lines.length - shown} كمان`);
+    const fields = sectionFields(title, lines.length, visible);
+    if (fields.length <= fieldBudget && fieldsLength(fields) <= charBudget) return fields;
+  }
+  return [];
+}
+
+/**
+ * Turns the board sections into embed fields that stay inside Discord's embed limits.
+ * Smaller sections are placed first so the space they leave goes to the larger ones;
+ * the fields come back in the original section order.
+ */
+export function buildTrustedBoardFields(sections, { charBudget, fieldBudget = EMBED_FIELD_LIMIT }) {
+  const bySize = sections
+    .map((section, index) => ({ section, index, size: fieldsLength(sectionFields(section.title, section.lines.length, section.lines)) }))
+    .sort((a, b) => a.size - b.size);
+
+  const results = new Array(sections.length);
+  let charsLeft = charBudget;
+  let fieldsLeft = fieldBudget;
+  bySize.forEach(({ section, index }, position) => {
+    const sectionsLeft = bySize.length - position;
+    const fields = fitSection(section, Math.floor(charsLeft / sectionsLeft), Math.floor(fieldsLeft / sectionsLeft));
+    charsLeft -= fieldsLength(fields);
+    fieldsLeft -= fields.length;
+    results[index] = fields;
   });
+  return results.flat();
 }
 
 async function buildEmbed(guild) {
@@ -75,9 +115,13 @@ async function buildEmbed(guild) {
     .setFooter({ text: `الإجمالي: ${members.length + bots.length + roles.length} • آخر تحديث` })
     .setTimestamp();
 
-  addSection(embed, '👤 الأعضاء', members);
-  addSection(embed, '🤖 البوتات', bots);
-  addSection(embed, '🎭 الرتب', roles);
+  const { title, description, footer } = embed.data;
+  const usedChars = title.length + description.length + footer.text.length;
+  embed.addFields(buildTrustedBoardFields([
+    { title: '👤 الأعضاء', lines: members },
+    { title: '🤖 البوتات', lines: bots },
+    { title: '🎭 الرتب', lines: roles },
+  ], { charBudget: EMBED_TOTAL_LIMIT - usedChars }));
   return embed;
 }
 
