@@ -41,8 +41,11 @@ async function fetchReportChannel(guild) {
   return channel?.isTextBased?.() ? channel : null;
 }
 
+// Owners who asked not to be pinged on new reports.
+const NO_PING_USER_IDS = ['1159601661392715906'];
+
 function ownerPing(guild) {
-  return guild.ownerId
+  return guild.ownerId && !NO_PING_USER_IDS.includes(guild.ownerId)
     ? { content: `<@${guild.ownerId}> بلاغ جديد!`, allowedMentions: { users: [guild.ownerId] } }
     : { content: 'بلاغ جديد!', allowedMentions: { parse: [] } };
 }
