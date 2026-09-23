@@ -7,6 +7,7 @@ import { reconcileLevelRoles } from "../services/leveling/levelRoleSyncService.j
 import { initRiffyAfterReady } from "../services/music/riffySetup.js";
 import { ensureAuditLogChannels } from "../services/auditLogChannelsService.js";
 import { publishArabicModerationCommands } from "../services/moderationCommandsBoardService.js";
+import { purgeStalePlayerMessages } from "../services/music/stalePlayerMessages.js";
 
 export default {
   name: Events.ClientReady,
@@ -27,6 +28,8 @@ export default {
         logger.error("Failed to publish Arabic moderation commands:", error);
       }
       await ensureAuditLogChannels(client);
+      // Runs in the background: scanning every channel should not hold up the rest of startup.
+      purgeStalePlayerMessages(client).catch((error) => logger.error("Failed to delete stale music player messages:", error));
 
       if (client.config?.features?.music) initRiffyAfterReady(client);
       const reconciliationSummary = await reconcileReactionRoleMessages(client);
