@@ -61,16 +61,18 @@ export async function issueWarning({ guild, member, moderator, reason }) {
   return { id, totalCount, reason: finalReason, timeoutMs, timeoutApplied, timeoutError };
 }
 
+/** The automatic timeout line for a result of `issueWarning`, or null when the warning triggered none. */
+export function warningPunishment(result) {
+  if (!result.timeoutMs) return null;
+  const duration = formatDurationMs(result.timeoutMs);
+  return result.timeoutApplied
+    ? `⏳ Timeout ${duration} (ends <t:${Math.floor((Date.now() + result.timeoutMs) / 1000)}:R>)`
+    : `❌ Timeout ${duration} failed: ${result.timeoutError}`;
+}
+
 /** The ⚠️ WARNING ISSUED card for a result of `issueWarning`. */
 export function warningCard({ userId, moderatorId, result, extra }) {
-  let punishment = null;
-  if (result.timeoutMs) {
-    const duration = formatDurationMs(result.timeoutMs);
-    punishment = result.timeoutApplied
-      ? `⏳ Timeout ${duration} (ends <t:${Math.floor((Date.now() + result.timeoutMs) / 1000)}:R>)`
-      : `❌ Timeout ${duration} failed: ${result.timeoutError}`;
-  }
-
+  const punishment = warningPunishment(result);
   return moderationCard({
     emoji: '⚠️',
     title: 'WARNING ISSUED',
