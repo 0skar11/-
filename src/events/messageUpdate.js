@@ -3,6 +3,7 @@ import { logEvent, EVENT_TYPES } from '../services/loggingService.js';
 import { logger } from '../utils/logger.js';
 import { formatLogLine } from '../utils/logging/logEmbeds.js';
 import { handleForeignInviteLink } from '../services/inviteLinkGuardService.js';
+import { handleMediaMessage } from '../services/mediaRoleService.js';
 
 const MAX_LOGGED_EDIT_CONTENT_LENGTH = 512;
 
@@ -16,8 +17,8 @@ export default {
 
       if (oldMessage.content === newMessage.content) return;
 
-      // An edit must not sneak in an invite to another server.
-      if (!newMessage.partial) await handleForeignInviteLink(newMessage);
+      // An edit must not sneak in an invite to another server, or a link without the media role.
+      if (!newMessage.partial && !(await handleForeignInviteLink(newMessage))) await handleMediaMessage(newMessage);
 
       const metaLines = [
         formatLogLine('Channel', newMessage.channel ? `${newMessage.channel.name} ${newMessage.channel.toString()}` : 'Unknown'),
