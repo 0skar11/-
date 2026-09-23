@@ -35,6 +35,7 @@ describe('formatChatChannelName', () => {
     assert.equal(formatChatChannelName('memes'), '😂・memes');
     assert.equal(formatChatChannelName('reveal'), '👀・reveal');
     assert.equal(formatChatChannelName('cmd'), '🤖・cmd');
+    assert.equal(formatChatChannelName('boosters'), '💎・boosters');
   });
 
   test('falls back to the chat emoji and skips empty names', () => {

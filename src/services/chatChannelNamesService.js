@@ -3,6 +3,10 @@ import { logger } from '../utils/logger.js';
 
 export const CHAT_CATEGORY_ID = '1547310338133860463';
 
+// Channels outside the chat category that get the same treatment, matched by
+// their cleaned name so the ID doesn't need to be known.
+const EXTRA_CHANNEL_NAMES = new Set(['boosters', 'booster', 'boosts']);
+
 const SEPARATOR = '・';
 const DEFAULT_EMOJI = '💬';
 
@@ -13,6 +17,7 @@ const EMOJI_RULES = [
   { emoji: '📜', words: ['rules', 'قوانين', 'القوانين'] },
   { emoji: '👋', words: ['welcome', 'ترحيب', 'الترحيب'] },
   { emoji: '📸', words: ['media', 'pics', 'pic', 'photos', 'photo', 'images', 'image', 'صور', 'الصور', 'ميديا'] },
+  { emoji: '💎', words: ['boosters', 'booster', 'boosts', 'boost', 'بوسترز', 'بوستر'] },
   { emoji: '👀', words: ['reveal', 'reveals', 'face-reveal', 'ريفيل'] },
   { emoji: '🤳', words: ['selfie', 'selfies', 'سيلفي'] },
   { emoji: '🎬', words: ['clips', 'clip', 'videos', 'video', 'فيديو', 'فيديوهات', 'مقاطع'] },
@@ -79,11 +84,12 @@ export async function tidyChatChannelNames(client) {
   for (const guild of client.guilds.cache.values()) {
     const category = guild.channels.cache.get(CHAT_CATEGORY_ID)
       || await guild.channels.fetch(CHAT_CATEGORY_ID).catch(() => null);
-    if (!category || category.type !== ChannelType.GuildCategory) continue;
+    const categoryId = category?.type === ChannelType.GuildCategory ? category.id : null;
 
-    const channels = guild.channels.cache.filter(
-      channel => channel.parentId === category.id && RENAMABLE_TYPES.has(channel.type),
-    );
+    const channels = guild.channels.cache.filter(channel => RENAMABLE_TYPES.has(channel.type) && (
+      (categoryId && channel.parentId === categoryId)
+      || EXTRA_CHANNEL_NAMES.has(cleanChannelName(channel.name))
+    ));
 
     for (const channel of channels.values()) {
       const newName = formatChatChannelName(channel.name);
