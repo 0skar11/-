@@ -1,11 +1,12 @@
 import { EmbedBuilder, PermissionFlagsBits } from 'discord.js';
 import { logger } from '../utils/logger.js';
-import { findBoardMessage } from '../utils/boardMessage.js';
+import { findBoardMessage, rememberBoardMessage } from '../utils/boardMessage.js';
 
 export const MODERATION_COMMANDS_CHANNEL_ID = '1551621505991835699';
 const MODERATION_COMMANDS_TITLE = '🛡️ أوامر الموديريشن بالعربي';
 // Older versions showed this marker in the message; it is stripped from existing posts.
 const LEGACY_MARKER = 'titanbot:arabic-moderation-commands:v1';
+const BOARD_KEY = 'moderationCommands';
 
 const PERMISSION_NAMES = [
   [PermissionFlagsBits.ViewChannel, 'ViewChannel'],
@@ -82,7 +83,7 @@ export async function publishArabicModerationCommands(client) {
     throw new Error(`Missing permissions in channel ${MODERATION_COMMANDS_CHANNEL_ID}: ${missing.join(', ')}`);
   }
 
-  const existing = await findBoardMessage(channel, (message) => (
+  const existing = await findBoardMessage(channel, BOARD_KEY, (message) => (
     message.embeds[0]?.title === MODERATION_COMMANDS_TITLE || message.content?.includes(LEGACY_MARKER)
   ));
   if (existing) {
@@ -98,7 +99,8 @@ export async function publishArabicModerationCommands(client) {
     return { status: 'exists', channelId: channel.id };
   }
 
-  await channel.send({ embeds: [buildEmbed()] });
+  const sent = await channel.send({ embeds: [buildEmbed()] });
+  await rememberBoardMessage(channel, BOARD_KEY, sent.id);
   logger.info(`Published Arabic moderation commands in channel ${MODERATION_COMMANDS_CHANNEL_ID}`);
   return { status: 'sent', channelId: channel.id };
 }

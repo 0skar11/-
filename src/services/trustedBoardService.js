@@ -1,10 +1,11 @@
 import { EmbedBuilder, PermissionFlagsBits } from 'discord.js';
 import { logger } from '../utils/logger.js';
-import { findBoardMessage } from '../utils/boardMessage.js';
+import { findBoardMessage, rememberBoardMessage } from '../utils/boardMessage.js';
 import { getGuildConfig } from './config/guildConfig.js';
 
 export const TRUSTED_BOARD_CHANNEL_ID = '1155236383464628325';
 const TRUSTED_BOARD_TITLE = '🛡️ قائمة الـ Trusted';
+const BOARD_KEY = 'trusted';
 // An embed field value is capped at 1024 characters by Discord.
 const FIELD_LIMIT = 1024;
 
@@ -15,7 +16,6 @@ const PERMISSION_NAMES = [
   [PermissionFlagsBits.ReadMessageHistory, 'ReadMessageHistory'],
 ];
 
-let boardMessageId = null;
 let queue = Promise.resolve();
 
 /** Splits lines into field values that stay under Discord's field limit. */
@@ -98,25 +98,16 @@ async function fetchBoardChannel(client) {
   return channel;
 }
 
-async function findTrustedBoardMessage(channel) {
-  if (boardMessageId) {
-    const cached = await channel.messages.fetch(boardMessageId).catch(() => null);
-    if (cached) return cached;
-  }
-  return findBoardMessage(channel, (message) => message.embeds[0]?.title === TRUSTED_BOARD_TITLE);
-}
-
 async function publish(client) {
   const channel = await fetchBoardChannel(client);
   const embed = await buildEmbed(channel.guild);
-  const existing = await findTrustedBoardMessage(channel);
+  const existing = await findBoardMessage(channel, BOARD_KEY, (message) => message.embeds[0]?.title === TRUSTED_BOARD_TITLE);
   if (existing) {
     await existing.edit({ content: '', embeds: [embed], allowedMentions: { parse: [] } });
-    boardMessageId = existing.id;
     return { status: 'updated', channelId: channel.id };
   }
   const sent = await channel.send({ embeds: [embed], allowedMentions: { parse: [] } });
-  boardMessageId = sent.id;
+  await rememberBoardMessage(channel, BOARD_KEY, sent.id);
   logger.info(`Published trusted board in channel ${TRUSTED_BOARD_CHANNEL_ID}`);
   return { status: 'sent', channelId: channel.id };
 }
