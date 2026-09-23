@@ -1,5 +1,6 @@
 import { EmbedBuilder, PermissionFlagsBits } from 'discord.js';
 import { logger } from '../utils/logger.js';
+import { findBoardMessage } from '../utils/boardMessage.js';
 import { getGuildConfig } from './config/guildConfig.js';
 
 export const TRUSTED_BOARD_CHANNEL_ID = '1155236383464628325';
@@ -97,21 +98,18 @@ async function fetchBoardChannel(client) {
   return channel;
 }
 
-async function findBoardMessage(channel) {
+async function findTrustedBoardMessage(channel) {
   if (boardMessageId) {
     const cached = await channel.messages.fetch(boardMessageId).catch(() => null);
     if (cached) return cached;
   }
-  const recentMessages = await channel.messages.fetch({ limit: 100 });
-  return recentMessages.find((message) => (
-    message.author?.id === channel.client.user.id && message.embeds[0]?.title === TRUSTED_BOARD_TITLE
-  )) || null;
+  return findBoardMessage(channel, (message) => message.embeds[0]?.title === TRUSTED_BOARD_TITLE);
 }
 
 async function publish(client) {
   const channel = await fetchBoardChannel(client);
   const embed = await buildEmbed(channel.guild);
-  const existing = await findBoardMessage(channel);
+  const existing = await findTrustedBoardMessage(channel);
   if (existing) {
     await existing.edit({ content: '', embeds: [embed], allowedMentions: { parse: [] } });
     boardMessageId = existing.id;

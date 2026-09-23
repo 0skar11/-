@@ -1,11 +1,12 @@
 import { Events, PermissionFlagsBits } from 'discord.js';
 import { getGuildConfig, updateGuildConfig } from '../services/config/guildConfig.js';
 import { getCommandPrefix } from '../config/bot.js';
-import { refreshTrustedBoard } from '../services/trustedBoardService.js';
+import { refreshTrustedBoard, TRUSTED_BOARD_CHANNEL_ID } from '../services/trustedBoardService.js';
 
 const TRUST_COMMANDS = new Set(['trust', 'untrust', 'تراست', 'انتراست']);
 const OWNER_ID = '1159601661392715906';
 const TRUST_MARKER = '__titanbot_trust_handled__';
+const BOARD_REPLY_DELETE_MS = 3_000;
 
 function parseTrust(content) {
   const parts = String(content || '').trim().split(/\s+/u).filter(Boolean);
@@ -22,8 +23,15 @@ function parseTrust(content) {
   };
 }
 
+// In the trusted board channel the board itself is the answer, so replies there clean up after themselves.
 async function send(message, text) {
-  await message.channel.send({ content: `❌ ${text}`, allowedMentions: { parse: [] } }).catch(() => {});
+  const reply = await message.channel.send({ content: `❌ ${text}`, allowedMentions: { parse: [] } }).catch(() => null);
+  if (reply && message.channelId === TRUSTED_BOARD_CHANNEL_ID) {
+    setTimeout(() => {
+      reply.delete().catch(() => {});
+      message.delete().catch(() => {});
+    }, BOARD_REPLY_DELETE_MS);
+  }
 }
 
 async function handleTrust(message, client) {
@@ -32,7 +40,8 @@ async function handleTrust(message, client) {
   message.content = TRUST_MARKER;
 
   if (message.author.id !== OWNER_ID) {
-    await message.channel.send('🚫 Owner Only').catch(() => {});
+    // The protected channel guard already deletes the message and warns the author there.
+    if (message.channelId !== TRUSTED_BOARD_CHANNEL_ID) await message.channel.send('🚫 Owner Only').catch(() => {});
     return true;
   }
 
@@ -64,6 +73,10 @@ async function handleTrust(message, client) {
   else current.delete(id);
   await updateGuildConfig(client, message.guild.id, { [key]: [...current] });
   await refreshTrustedBoard(client, message.guild.id);
+  if (message.channelId === TRUSTED_BOARD_CHANNEL_ID) {
+    await message.delete().catch(() => {});
+    return true;
+  }
   await message.channel.send({ content: `${adding ? '🛡️' : '➖'} ${parsed.roleId ? `<@&${id}>` : `<@${id}>`} ${adding ? 'Trusted' : 'Untrusted'}`, allowedMentions: { parse: [] } }).catch(() => {});
   return true;
 }
