@@ -23,7 +23,7 @@ export default {
 
     async execute(interaction, config, client) {
         const user = interaction.options.getUser("target");
-        const reason = interaction.options.getString("reason") || "No reason provided";
+        const reason = cardReason(interaction.options.getString("reason"));
 
         if (!user) {
             throw new TitanBotError(
@@ -68,7 +68,7 @@ export default {
         await InteractionHelper.universalReply(interaction, moderationCard({
             emoji: '🔨',
             title: 'BAN ISSUED',
-            fields: [['User', `<@${user.id}>`], ['Reason', cardReason(reason)]],
+            fields: [['User', `<@${user.id}>`], ['Reason', reason]],
             moderatorId: interaction.user.id,
         }));
     },

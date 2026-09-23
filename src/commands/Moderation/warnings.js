@@ -1,6 +1,7 @@
 import { getColor } from '../../config/bot.js';
 import { SlashCommandBuilder, PermissionFlagsBits, ActionRowBuilder, ButtonBuilder, ButtonStyle } from 'discord.js';
 import { createEmbed } from '../../utils/embeds.js';
+import { cardReason } from '../../utils/moderationCard.js';
 import { logEvent } from '../../utils/moderation.js';
 import { logger } from '../../utils/logger.js';
 import { WarningService } from '../../services/moderation/warningService.js';
@@ -51,7 +52,7 @@ export default {
             .map((w, i) => {
                 const discordTimestamp = Math.floor(w.timestamp / 1000);
                 return {
-                    name: `[#${i + 1}] Reason: ${w.reason.substring(0, 100)}`,
+                    name: `[#${i + 1}] Reason: ${cardReason(w.reason).substring(0, 100)}`,
                     value: `**Moderator:** <@${w.moderatorId}>\n**Date:** <t:${discordTimestamp}:F> (<t:${discordTimestamp}:R>)`,
                     inline: false,
                 };
@@ -87,7 +88,7 @@ export default {
             },
         });
 
-        const reasons = validWarnings.map((w, i) => `${i + 1}. ${w.reason.substring(0, 60)}`).join(' | ');
+        const reasons = validWarnings.map((w, i) => `${i + 1}. ${cardReason(w.reason).substring(0, 60)}`).join(' | ');
         await InteractionHelper.safeEditReply(interaction, oneLine('📋', `<@${target.id}> Warnings (${totalWarns}): ${reasons}`.substring(0, 1900), { components: [actionRow] }));
     },
 };

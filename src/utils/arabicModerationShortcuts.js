@@ -8,7 +8,7 @@ import { scheduleNoPermissionDelete } from './noPermissionReply.js';
 import { handlePurgeMessage } from '../services/moderation/channelPurgeService.js';
 import { refreshTrustedBoard } from '../services/trustedBoardService.js';
 import { issueWarning, warningCard } from '../services/moderation/warnEscalation.js';
-import { moderationCard, cardReason, formatDurationMs } from './moderationCard.js';
+import { moderationCard, cardReason, formatDurationMs, NO_REASON } from './moderationCard.js';
 
 const COMMANDS = new Set([
   'وارن', 'وارنات', 'تايم', 'انتايم', 'بان', 'انبان', 'كلير', 'ان', 'شيل', 'ر', 'رول', 'ب', 'رتبة', 'ازالةرتبة', 'purge', 'تراست', 'انتراست', 'trusted', 'trustedlist', 'warn', 'warnings', 'timeout', 'untimeout', 'ban', 'unban', 'clear', 'remove', 'role', 'roll', 'lock', 'unlock',
@@ -153,7 +153,7 @@ async function listWarnings(message, targetMember, guildId) {
   for (const [index, warning] of warnings.entries()) {
     const moderator = await message.guild.members.fetch(warning.moderatorId).catch(() => null);
     const timestamp = Math.floor((warning.timestamp || Date.now()) / 1000);
-    lines.push(`**${index + 1}.** <t:${timestamp}:f> — ${warning.reason || 'لم يتم تحديد سبب'} — بواسطة ${moderator ? `<@${moderator.id}>` : `<@${warning.moderatorId}>`}`);
+    lines.push(`**${index + 1}.** <t:${timestamp}:f> — ${warning.reason || NO_REASON} — بواسطة ${moderator ? `<@${moderator.id}>` : `<@${warning.moderatorId}>`}`);
   }
 
   let chunk = '';
@@ -259,7 +259,7 @@ export async function handleArabicModerationShortcut(message) {
       if (!targetMember) return true;
       const [durationText, ...reasonParts] = tail.split(/\s+/u);
       const durationMs = parseDuration(durationText);
-      const reason = reasonParts.join(' ') || 'لم يتم تحديد سبب';
+      const reason = reasonParts.join(' ') || NO_REASON;
       if (!durationMs) return reply(message, '❌ اكتب المدة هكذا: `تايم 5m السبب`.');
       ModerationService.assertModerationHierarchy(message.member, targetMember, 'timeout');
       await ModerationService.timeoutUser({ guild, member: targetMember, moderator: message.member, durationMs, reason });
@@ -274,21 +274,21 @@ export async function handleArabicModerationShortcut(message) {
     if (command === 'انتايم' || command === 'untimeout') {
       if (!hasPermission(message.member, PermissionFlagsBits.ModerateMembers)) return reply(message, '🚫 No Permission');
       if (!targetMember) return true;
-      await ModerationService.removeTimeoutUser({ guild, member: targetMember, moderator: message.member, reason: tail || 'لم يتم تحديد سبب' });
+      await ModerationService.removeTimeoutUser({ guild, member: targetMember, moderator: message.member, reason: tail || NO_REASON });
       return sendCard(message, { emoji: '🔓', title: 'TIMEOUT REMOVED', fields: [['User', `<@${targetId}>`], ['Reason', cardReason(tail)]], moderatorId: message.member.id });
     }
 
     if (command === 'بان' || command === 'ban') {
       if (!hasPermission(message.member, PermissionFlagsBits.BanMembers)) return reply(message, '🚫 No Permission');
       if (!targetUser) return true;
-      await ModerationService.banUser({ guild, user: targetUser, moderator: message.member, reason: tail || 'لم يتم تحديد سبب' });
+      await ModerationService.banUser({ guild, user: targetUser, moderator: message.member, reason: tail || NO_REASON });
       return sendCard(message, { emoji: '🔨', title: 'BAN ISSUED', fields: [['User', `<@${targetId}>`], ['Reason', cardReason(tail)]], moderatorId: message.member.id });
     }
 
     if (command === 'انبان' || command === 'unban') {
       if (!hasPermission(message.member, PermissionFlagsBits.BanMembers)) return reply(message, '🚫 No Permission');
       if (!targetUser) return true;
-      await ModerationService.unbanUser({ guild, user: targetUser, moderator: message.member, reason: tail || 'لم يتم تحديد سبب' });
+      await ModerationService.unbanUser({ guild, user: targetUser, moderator: message.member, reason: tail || NO_REASON });
       return sendCard(message, { emoji: '✅', title: 'BAN REMOVED', fields: [['User', `<@${targetId}>`], ['Reason', cardReason(tail)]], moderatorId: message.member.id });
     }
 

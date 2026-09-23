@@ -1,6 +1,6 @@
 // oneLine.js — short single-line command replies (`⏳ @user Has Been Timed Out, Reason: spam`).
 
-const DEFAULT_REASONS = new Set(['No reason provided', 'لم يتم تحديد سبب', 'Timeout removed by moderator']);
+const DEFAULT_REASONS = new Set(['No reason provided', 'No reason provided.', 'لم يتم تحديد سبب', 'Timeout removed by moderator', 'Mass ban - No reason provided', 'Mass kick - No reason provided']);
 
 /** Mentions render as names but never ping anyone. */
 export const NO_PINGS = Object.freeze({ parse: [] });

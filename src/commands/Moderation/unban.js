@@ -52,7 +52,7 @@ export default {
             });
         }
 
-        const reason = interaction.options.getString("reason") || "No reason provided";
+        const reason = cardReason(interaction.options.getString("reason"));
 
         const result = await ModerationService.unbanUser({
             guild: interaction.guild,
@@ -64,7 +64,7 @@ export default {
         await InteractionHelper.safeEditReply(interaction, moderationCard({
             emoji: '✅',
             title: 'BAN REMOVED',
-            fields: [['User', `<@${targetUser.id}>`], ['Reason', cardReason(reason)]],
+            fields: [['User', `<@${targetUser.id}>`], ['Reason', reason]],
             moderatorId: interaction.user.id,
         }));
     },
