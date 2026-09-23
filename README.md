@@ -112,7 +112,7 @@ TitanBot is fully containerized for easy deployment.
    ```bash
    cp .env.example .env
    ```
-   Set at minimum `DISCORD_TOKEN`, `CLIENT_ID`, and `GUILD_ID`. Docker Compose also reads `POSTGRES_USER`, `POSTGRES_PASSWORD`, and `POSTGRES_DB` from `.env` (defaults: `titanbot` / `password` / `titanbot`).
+   Set at minimum `DISCORD_TOKEN`, `CLIENT_ID`, and `GUILD_ID`. Docker Compose also reads `POSTGRES_USER`, `POSTGRES_PASSWORD`, and `POSTGRES_DB` from `.env`. `POSTGRES_PASSWORD` is required (Compose refuses to start without it); the user and database default to `titanbot`. If your database volume was created with the old default password `password`, keep that value or change the password inside Postgres first.
 
 3. **Build and start the containers:**
    ```bash
