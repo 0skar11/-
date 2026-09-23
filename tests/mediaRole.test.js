@@ -1,7 +1,7 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import { PermissionsBitField } from 'discord.js';
-import { hasMediaContent, ensureMediaRole, CHAOS_ROLE_ID, MEDIA_PERMISSIONS } from '../src/services/mediaRoleService.js';
+import { hasMediaContent, ensureMediaRole, grantMediaRoleToAllMembers, CHAOS_ROLE_ID, MEDIA_PERMISSIONS } from '../src/services/mediaRoleService.js';
 
 const message = (content, attachments = 0) => ({ content, attachments: { size: attachments } });
 
@@ -49,5 +49,30 @@ describe('media lock', () => {
     assert.equal(media.position, chaos.position);
     assert.equal(everyone.permissions.any(MEDIA_PERMISSIONS), false);
     assert.equal(chaos.permissions.any(MEDIA_PERMISSIONS), false);
+  });
+
+  test('gives the media role to every current member once, skipping bots', async () => {
+    const store = new Map();
+    const media = { id: 'media-role', name: 'media', managed: false, editable: true };
+    const member = (id, { bot = false, hasMedia = false } = {}) => {
+      const ids = new Set(hasMedia ? [media.id] : []);
+      return { user: { tag: id, bot }, roles: { cache: { has: (roleId) => ids.has(roleId) }, add: async (role) => { ids.add(role.id); } }, ids };
+    };
+    const members = new Map([['a', member('a')], ['b', member('b', { hasMedia: true })], ['bot', member('bot', { bot: true })]]);
+    const guild = {
+      id: 'g1',
+      name: 'test',
+      client: { db: { get: async (key, fallback) => (store.has(key) ? store.get(key) : fallback), set: async (key, value) => { store.set(key, value); return true; } } },
+      roles: { cache: { find: (fn) => [media].find(fn) } },
+      members: { fetch: async () => members },
+    };
+
+    assert.deepEqual(await grantMediaRoleToAllMembers(guild), { skipped: false, granted: 1, failed: 0 });
+    assert.equal(members.get('a').ids.has(media.id), true);
+    assert.equal(members.get('bot').ids.has(media.id), false);
+
+    members.set('late', member('late'));
+    assert.deepEqual(await grantMediaRoleToAllMembers(guild), { skipped: true, granted: 0, failed: 0 });
+    assert.equal(members.get('late').ids.has(media.id), false);
   });
 });
