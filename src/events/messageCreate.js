@@ -16,6 +16,7 @@ import { handleArabicRoleShortcut, handleClearWarningsShortcut } from '../utils/
 import { handlePurgeMessage } from '../services/moderation/channelPurgeService.js';
 import { handleReportChannelMessage } from '../services/reportChannelService.js';
 import { handleProtectedChannelMessage } from '../services/protectedChannelsService.js';
+import { handleAiChatMessage } from '../services/aiChatService.js';
 
 export default {
   name: Events.MessageCreate,
@@ -30,7 +31,9 @@ export default {
       if (await handleArabicUtilityShortcuts(message)) return;
       if (await handleMessageDeleteShortcut(message)) return;
       if (await handleCountingGame(message, client)) return;
-      await handlePrefixCommand(message, client);
+      // A command always wins; only a message that is not a command gets an AI reply.
+      if (await handlePrefixCommand(message, client)) return;
+      await handleAiChatMessage(message, client);
     } catch (error) {
       logger.error('Error in messageCreate event:', error);
     }
@@ -60,13 +63,14 @@ async function applyReplyTarget(message, commandData, args) {
   return [referenced.author.id, ...args];
 }
 
+// Returns true when the message was a command (run, refused or failed), false when it was not one.
 async function handlePrefixCommand(message, client) {
   try {
     const guildConfig = await getGuildConfig(client, message.guild.id);
     const prefix = guildConfig?.prefix || getCommandPrefix();
-    if (await handleArabicRoleShortcut(message, [prefix, getCommandPrefix()])) return;
+    if (await handleArabicRoleShortcut(message, [prefix, getCommandPrefix()])) return true;
     const parsed = parseCommandMessage(message.content, prefix);
-    if (!parsed) return;
+    if (!parsed) return false;
 
     let { commandName, args } = parsed;
     if (commandName.toLowerCase() === 'trusted') {
@@ -75,18 +79,18 @@ async function handlePrefixCommand(message, client) {
       } else {
         await handleTrustedListCommand(message, client);
       }
-      return;
+      return true;
     }
 
     const typedCommand = commandName.toLowerCase();
     // `purge` wipes the whole channel: owner only, confirmed with a button. `clear`/`مسح`/`م` delete N messages.
     if (typedCommand === 'purge') {
       await handlePurgeMessage(message);
-      return;
+      return true;
     }
     if (typedCommand === 'مسح' && args[0] === 'تحذيرات') {
       await handleClearWarningsShortcut(message, args.slice(1));
-      return;
+      return true;
     }
     const twoWordCommand = twoWordCommandAliases[`${typedCommand} ${args[0] || ''}`];
     if (twoWordCommand) {
@@ -102,35 +106,37 @@ async function handlePrefixCommand(message, client) {
 
     const resolvedCommandName = resolveCommandAlias(commandName);
     const command = client.commands.get(resolvedCommandName);
-    if (!command) return;
+    if (!command) return false;
     if (isMaintenanceMode() && !isBotOwner(message.author.id)) {
       await message.channel.send('🛠️ Maintenance Mode').catch(() => {});
-      return;
+      return true;
     }
-    if (!isCommandCategoryEnabled(command.category)) return;
+    if (!isCommandCategoryEnabled(command.category)) return true;
 
     args = await applyReplyTarget(message, command.data, args);
     if (typeof command.normalizePrefixArgs === 'function') args = command.normalizePrefixArgs(args);
 
     const restriction = getPrefixRestriction(command, args, resolveSubcommandAlias);
-    if (restriction.blocked || !supportsPrefixExecution(command)) return;
-    if (!(await isCommandEnabled(client, message.guild.id, resolvePrefixAccessKey(command.data, args), command.category))) return;
+    if (restriction.blocked || !supportsPrefixExecution(command)) return true;
+    if (!(await isCommandEnabled(client, message.guild.id, resolvePrefixAccessKey(command.data, args), command.category))) return true;
 
     // Wrong usage (e.g. `تايم الغداء`) only shows the permission/usage reply and must not start a cooldown.
     if (!mapArgumentsToOptions(args, command.data).validateRequired().valid) {
       await executePrefixCommand(command, message, args, client, prefix, guildConfig);
-      return;
+      return true;
     }
 
     const abuseProtection = await enforceAbuseProtection({ guildId: message.guild.id, user: message.author }, command, resolvedCommandName);
     if (!abuseProtection.allowed) {
       await message.channel.send(`⏱️ Wait ${formatCooldownDuration(abuseProtection.remainingMs)}`).catch(() => {});
-      return;
+      return true;
     }
     await executePrefixCommand(command, message, args, client, prefix, guildConfig);
+    return true;
   } catch (error) {
     logger.error('Error handling prefix command:', error);
     await message.channel.send({ content: `❌ ${error.userMessage || error.message || 'Something went wrong'}`, allowedMentions: { parse: [] } }).catch(() => {});
+    return true;
   }
 }
 

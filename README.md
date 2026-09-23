@@ -38,6 +38,7 @@ TitanBot offers a complete suite of tools for Discord server management and comm
 - **Random Facts** - Learn something new
 - **Wanted Poster** - Create fun wanted images
 - **Text Reversal** - Reverse any text
+- **AI Chat Member** (`/ai setup`) - Replies when mentioned or when someone replies to it, posts an hourly chat starter (no pings) and a periodic fact it looks up on the web. Needs `ANTHROPIC_API_KEY`.
 
 ### Advanced Ticket System
 - **Claim & Priority** - Staff ticket management
