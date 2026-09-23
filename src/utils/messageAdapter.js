@@ -66,6 +66,11 @@ export function createMockInteraction(message, commandData, args) {
     channel: message.channel,
     guild: message.guild,
     guildId: message.guild?.id,
+    inGuild: () => Boolean(message.guild),
+    inCachedGuild: () => Boolean(message.guild),
+    isChatInputCommand: () => true,
+    isModalSubmit: () => false,
+    isRepliable: () => true,
 
     commandName: commandData?.name || null,
     commandId: message.id,
@@ -109,7 +114,8 @@ export function createMockInteraction(message, commandData, args) {
         const mentionMatch = channelId.match(/<#(\d+)>/);
         const id = mentionMatch ? mentionMatch[1] : channelId;
 
-        return message.guild.channels.fetch(id).catch(() => null);
+        // Slash options resolve synchronously; guild channels are always cached with the Guilds intent.
+        return message.guild.channels.cache.get(id) ?? null;
       },
       getRole: (name) => {
         const roleId = options.getString(name);
@@ -118,9 +124,14 @@ export function createMockInteraction(message, commandData, args) {
         const mentionMatch = roleId.match(/<@&(\d+)>/);
         const id = mentionMatch ? mentionMatch[1] : roleId;
 
-        return message.guild.roles.fetch(id).catch(() => null);
+        return message.guild.roles.cache.get(id) ?? null;
       },
       getInteger: (name) => options.getInteger(name),
+      getNumber: (name) => {
+        const value = options.getString(name);
+        const parsed = value == null ? NaN : Number(value);
+        return Number.isFinite(parsed) ? parsed : null;
+      },
       getBoolean: (name) => options.getBoolean(name),
       getSubcommand: () => options.getSubcommand(),
       getSubcommandGroup: () => options.getSubcommandGroup(),

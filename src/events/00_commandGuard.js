@@ -23,8 +23,11 @@ export default {
   async execute(message) {
     if (!message.guild || message.author?.bot) return;
     const { first, parts } = firstCommand(message.content);
+    // Prefixed commands (e.g. `!todo remove 1`) legitimately contain these words as
+    // subcommands/arguments, so only plain chat is neutralised here.
+    const isPrefixed = /^[^\p{L}\p{N}\s<]/u.test(first || '');
     const commandIndex = parts.findIndex((part) => COMMANDS.has(part.toLowerCase()));
-    if (commandIndex > 0) {
+    if (!isPrefixed && commandIndex > 0) {
       message.content = '';
       return;
     }

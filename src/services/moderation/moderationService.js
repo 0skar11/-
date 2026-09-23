@@ -18,6 +18,21 @@ export class ModerationService {
     return `❌ لا أستطيع ${action} **${targetLabel}** لأن رتبة البوت (**${actorRole.name}**) مساوية أو أقل من رتبته (**${targetRole.name}**). ارفع رتبة البوت.`;
   }
 
+  static buildHierarchySkipReason(moderator, target, action, actor = 'moderator') {
+    const targetLabel = getTargetLabel(target);
+    const targetRole = getHighestRole(target);
+
+    if (actor === 'bot') {
+      const botRole = getHighestRole(target?.guild?.members?.me);
+      if (!botRole || !targetRole) return `Bot role hierarchy blocked ${action} for ${targetLabel}`;
+      return `Bot role **${botRole.name}** is too low for **${targetRole.name}** — move the bot role higher`;
+    }
+
+    const modRole = getHighestRole(moderator);
+    if (!modRole || !targetRole) return `Role hierarchy blocked ${action} for ${targetLabel}`;
+    return `Your role **${modRole.name}** is too low for **${targetRole.name}** — move your role higher`;
+  }
+
   static validateHierarchy(moderator, target, action) {
     if (!moderator || !target) return { valid: false, error: '❌ لم يتم العثور على العضو أو المشرف.' };
     if (moderator.guild?.ownerId === moderator.id || moderator.permissions?.has(PermissionFlagsBits.Administrator)) return { valid: true };
@@ -67,6 +82,65 @@ export class ModerationService {
       metadata: { userId: user.id, moderatorId: moderator.id, permanent: true, deleteDays },
     }});
     logger.info(`User banned: ${user.tag} by ${moderator.user?.tag || moderator.id} in ${guild.name}`);
+    return { caseId, user: user.tag, reason };
+  }
+
+  static async kickUser({ guild, member, moderator, reason = 'No reason provided' }) {
+    if (!guild || !member || !moderator) throw new TitanBotError('Missing required parameters', ErrorTypes.VALIDATION, '❌ بيانات السيرفر أو العضو ناقصة.');
+    this.assertModerationHierarchy(moderator, member, 'طرد');
+    if (!member.kickable) throw new TitanBotError('Member not kickable', ErrorTypes.PERMISSION, '❌ لا أستطيع طرد هذا العضو. تحقق من صلاحية Kick Members وترتيب الرتب.');
+
+    await member.kick(reason);
+    const caseId = await logModerationAction({ client: guild.client, guild, event: {
+      action: 'Member Kicked', target: `${member.user.tag} (${member.id})`, executor: `${moderator.user?.tag || moderator.id} (${moderator.id})`, reason,
+      metadata: { userId: member.id, moderatorId: moderator.id },
+    }});
+    logger.info(`User kicked: ${member.user.tag} by ${moderator.user?.tag || moderator.id} in ${guild.name}`);
+    return { caseId, user: member.user.tag, reason };
+  }
+
+  static async timeoutUser({ guild, member, moderator, durationMs, reason = 'No reason provided' }) {
+    if (!guild || !member || !moderator || !durationMs) throw new TitanBotError('Missing required parameters', ErrorTypes.VALIDATION, '❌ بيانات العضو أو المدة ناقصة.');
+    this.assertModerationHierarchy(moderator, member, 'إعطاء تايم أوت لـ');
+    if (!member.moderatable) throw new TitanBotError('Member not moderatable', ErrorTypes.PERMISSION, '❌ لا أستطيع إعطاء تايم أوت لهذا العضو. تحقق من صلاحية Moderate Members وترتيب الرتب.');
+
+    await member.timeout(durationMs, reason);
+    const durationMinutes = Math.floor(durationMs / 60000);
+    const caseId = await logModerationAction({ client: guild.client, guild, event: {
+      action: 'Member Timed Out', target: `${member.user.tag} (${member.id})`, executor: `${moderator.user?.tag || moderator.id} (${moderator.id})`, reason,
+      duration: `${durationMinutes} minutes`,
+      metadata: { userId: member.id, moderatorId: moderator.id, durationMs },
+    }});
+    logger.info(`User timed out: ${member.user.tag} by ${moderator.user?.tag || moderator.id} in ${guild.name}`);
+    return { caseId, user: member.user.tag, duration: durationMinutes, reason };
+  }
+
+  static async removeTimeoutUser({ guild, member, moderator, reason = 'Timeout removed by moderator' }) {
+    if (!guild || !member || !moderator) throw new TitanBotError('Missing required parameters', ErrorTypes.VALIDATION, '❌ بيانات السيرفر أو العضو ناقصة.');
+    this.assertModerationHierarchy(moderator, member, 'إزالة التايم أوت عن');
+    if (!member.moderatable) throw new TitanBotError('Member not moderatable', ErrorTypes.PERMISSION, '❌ لا أستطيع تعديل هذا العضو. تحقق من صلاحية Moderate Members وترتيب الرتب.');
+    if (!member.isCommunicationDisabled()) throw new TitanBotError('User not timed out', ErrorTypes.VALIDATION, `❌ ${member.user.tag} ليس عليه تايم أوت حالياً.`);
+
+    await member.timeout(null, reason);
+    await logModerationAction({ client: guild.client, guild, event: {
+      action: 'Member Untimeouted', target: `${member.user.tag} (${member.id})`, executor: `${moderator.user?.tag || moderator.id} (${moderator.id})`, reason,
+      metadata: { userId: member.id, moderatorId: moderator.id },
+    }});
+    logger.info(`Timeout removed: ${member.user.tag} by ${moderator.user?.tag || moderator.id} in ${guild.name}`);
+    return { user: member.user.tag };
+  }
+
+  static async unbanUser({ guild, user, moderator, reason = 'No reason provided' }) {
+    if (!guild || !user || !moderator) throw new TitanBotError('Missing required parameters', ErrorTypes.VALIDATION, '❌ بيانات السيرفر أو العضو ناقصة.');
+    const banInfo = await guild.bans.fetch(user.id).catch(() => null);
+    if (!banInfo) throw new TitanBotError('User not banned', ErrorTypes.VALIDATION, `❌ ${user.tag} غير محظور من هذا السيرفر.`);
+
+    await guild.members.unban(user.id, reason);
+    const caseId = await logModerationAction({ client: guild.client, guild, event: {
+      action: 'Member Unbanned', target: `${user.tag} (${user.id})`, executor: `${moderator.user?.tag || moderator.id} (${moderator.id})`, reason,
+      metadata: { userId: user.id, moderatorId: moderator.id },
+    }});
+    logger.info(`User unbanned: ${user.tag} by ${moderator.user?.tag || moderator.id} in ${guild.name}`);
     return { caseId, user: user.tag, reason };
   }
 }
