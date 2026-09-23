@@ -4,6 +4,8 @@ import { getGuildConfig } from '../services/config/guildConfig.js';
 
 const TEN_SECONDS = 10_000;
 const ONE_MINUTE = 60_000;
+// Role pinged by the red anti-nuke alert (instead of @everyone).
+const ALERT_ROLE_ID = '1155237751109730435';
 const counters = new Map();
 const seenEntries = new Map();
 // threshold = actions within windowMs that trigger stripping permissions; threshold + 2 triggers a ban.
@@ -93,11 +95,11 @@ function warn(guild, executorId, action, count, threshold) {
   return send(guild, { embeds: [embed], allowedMentions: { parse: [] } });
 }
 
-// Sent only after the member has already been dealt with: red, pings everyone.
+// Sent only after the member has already been dealt with: red, pings the alert role.
 function alert(guild, executorId, punishment, reason) {
   const embed = new EmbedBuilder().setColor(0xed4245).setTitle(`🚨 ${punishment}`)
     .setDescription(`**العضو:** <@${executorId}>\n**السبب:** ${reason}\n**الوقت:** ${time()}`);
-  return send(guild, { content: '@everyone', embeds: [embed], allowedMentions: { parse: ['everyone'] } });
+  return send(guild, { content: `<@&${ALERT_ROLE_ID}>`, embeds: [embed], allowedMentions: { roles: [ALERT_ROLE_ID] } });
 }
 
 async function punish(member, reason) {
