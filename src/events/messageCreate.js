@@ -13,6 +13,7 @@ import { isCommandEnabled } from '../services/commandAccessService.js';
 import { getCountingGameConfig, saveCountingGameConfig, isValidCountingMessage, recordCorrectCount } from '../services/countingGameService.js';
 import { handleTrustedListCommand } from '../utils/trustedCommand.js';
 import { handleArabicRoleShortcut, handleClearWarningsShortcut } from '../utils/arabicModerationShortcuts.js';
+import { handlePurgeMessage } from '../services/moderation/channelPurgeService.js';
 
 export default {
   name: Events.MessageCreate,
@@ -73,6 +74,11 @@ async function handlePrefixCommand(message, client) {
     }
 
     const typedCommand = commandName.toLowerCase();
+    // `purge` wipes the whole channel: owner only, confirmed with a button. `clear`/`مسح`/`م` delete N messages.
+    if (typedCommand === 'purge') {
+      await handlePurgeMessage(message);
+      return;
+    }
     if (typedCommand === 'مسح' && args[0] === 'تحذيرات') {
       await handleClearWarningsShortcut(message, args.slice(1));
       return;

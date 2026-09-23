@@ -4,6 +4,7 @@ import { getGuildConfig, updateGuildConfig } from '../services/config/guildConfi
 import { ModerationService } from '../services/moderation/moderationService.js';
 import { WarningService } from '../services/moderation/warningService.js';
 import { scheduleNoPermissionDelete } from './noPermissionReply.js';
+import { handlePurgeMessage } from '../services/moderation/channelPurgeService.js';
 
 const COMMANDS = new Set([
   'وارن', 'وارنات', 'تايم', 'انتايم', 'بان', 'انبان', 'كلير', 'ان', 'شيل', 'ر', 'رول', 'ب', 'رتبة', 'ازالةرتبة', 'purge', 'تراست', 'انتراست', 'trusted', 'trustedlist', 'warn', 'warnings', 'timeout', 'untimeout', 'ban', 'unban', 'clear', 'remove', 'role', 'roll', 'lock', 'unlock',
@@ -104,20 +105,6 @@ async function handleTrust(message, targetId) {
   trustedUsers.add(member.id);
   await updateGuildConfig(message.client, message.guild.id, { antiNukeTrustedUsers: [...trustedUsers] });
   return reply(message, alreadyTrusted ? `ℹ️ ${member} محمي بالفعل من نظام Anti-Raid.` : `🛡️ تم إعطاء ${member} حماية من نظام Anti-Raid.`);
-}
-
-async function purgeEntireChannel(message) {
-  if (message.author.id !== OWNER_ID) return reply(message, '❌ هذا الأمر متاح لصاحب البوت فقط.');
-  if (!message.channel?.isTextBased?.() || typeof message.channel.bulkDelete !== 'function') return reply(message, '❌ هذا الأمر يعمل داخل روم نصية فقط.');
-  let deletedCount = 0;
-  while (true) {
-    const batch = await message.channel.messages.fetch({ limit: 100 });
-    if (!batch.size) break;
-    const deleted = await message.channel.bulkDelete(batch, true);
-    deletedCount += deleted.size;
-    if (!deleted.size || batch.size < 100) break;
-  }
-  return reply(message, `🧹 تم تنظيف الروم بالكامل. عدد الرسائل المحذوفة: **${deletedCount}**`);
 }
 
 async function lockChannel(message) {
@@ -239,7 +226,7 @@ export async function handleArabicModerationShortcut(message) {
   const guildConfig = await getGuildConfig(message.client, message.guild.id).catch(() => null);
   const parsed = tokenize(message.content, [guildConfig?.prefix, getCommandPrefix()]);
   if (!parsed) return false;
-  if (parsed.command === 'purge') return purgeEntireChannel(message);
+  if (parsed.command === 'purge') return handlePurgeMessage(message);
   if (parsed.command === 'ق') return lockChannel(message);
 
   const { command } = parsed;
