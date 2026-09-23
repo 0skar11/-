@@ -14,6 +14,7 @@ import { getCountingGameConfig, saveCountingGameConfig, isValidCountingMessage, 
 import { handleTrustedListCommand } from '../utils/trustedCommand.js';
 import { handleArabicRoleShortcut, handleClearWarningsShortcut } from '../utils/arabicModerationShortcuts.js';
 import { handlePurgeMessage } from '../services/moderation/channelPurgeService.js';
+import { handleReportChannelMessage } from '../services/reportChannelService.js';
 
 export default {
   name: Events.MessageCreate,
@@ -22,6 +23,7 @@ export default {
       if (message.author.bot || !message.guild) return;
       logger.debug(`Message received from ${message.author.tag}: ${message.content}`);
 
+      if (await handleReportChannelMessage(message)) return;
       if (await handleArabicUtilityShortcuts(message)) return;
       if (await handleMessageDeleteShortcut(message)) return;
       if (await handleCountingGame(message, client)) return;
