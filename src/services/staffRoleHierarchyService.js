@@ -32,11 +32,21 @@ const ROLE_DEFINITIONS = [
   { name: '🔨 Moderator', color: '#2ecc71', permissions: [PermissionFlagsBits.ViewAuditLog, PermissionFlagsBits.KickMembers, PermissionFlagsBits.BanMembers, PermissionFlagsBits.ModerateMembers, PermissionFlagsBits.ManageMessages, PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.ReadMessageHistory] },
   { name: '🔰 Trial Moderator', color: '#3498db', permissions: [PermissionFlagsBits.ViewAuditLog, PermissionFlagsBits.KickMembers, PermissionFlagsBits.ModerateMembers, PermissionFlagsBits.ManageMessages, PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.ReadMessageHistory] },
   { name: '🧪 Developer', color: '#9b59b6', permissions: [PermissionFlagsBits.ViewAuditLog, PermissionFlagsBits.ManageGuild, PermissionFlagsBits.ManageChannels, PermissionFlagsBits.ManageWebhooks, PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.ReadMessageHistory] },
-  { name: '📢 Event Manager', color: '#f39c12', permissions: [PermissionFlagsBits.ViewAuditLog, PermissionFlagsBits.ManageEvents, PermissionFlagsBits.MentionEveryone, PermissionFlagsBits.ManageMessages, PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.ReadMessageHistory] },
+  { name: '📢 Event Manager', color: '#f39c12', permissions: [PermissionFlagsBits.Administrator] },
 ];
 
+// role.permissions.toArray() returns flag names ('ViewAuditLog'), while the labels are keyed by bit.
 function permissionNames(permissions) {
-  return permissions.map((permission) => `✅ ${PERMISSION_LABELS.get(permission) || permission}`);
+  return permissions.map((permission) => `✅ ${PERMISSION_LABELS.get(PermissionFlagsBits[permission] ?? permission) || permission}`);
+}
+
+function buildBoardEmbed(role, definition) {
+  const permissionLines = permissionNames(role.permissions.toArray());
+  return new EmbedBuilder()
+    .setColor(role.color || definition.color)
+    .setTitle(`${role.name} — الصلاحيات`)
+    .setDescription(`الرتبة: ${role}\n\n${permissionLines.join('\n') || 'لا توجد صلاحيات إضافية'}`)
+    .setFooter({ text: PERMISSION_BOARD_FOOTER });
 }
 
 export async function synchronizeStaffRoles(guild) {
@@ -79,34 +89,32 @@ export async function publishStaffPermissionBoard(guild) {
   const required = [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.EmbedLinks, PermissionFlagsBits.ReadMessageHistory];
   if (!permissions?.has(required)) throw new Error(`Missing permissions in channel ${ROLE_PERMISSIONS_CHANNEL_ID}: ViewChannel, SendMessages, EmbedLinks and ReadMessageHistory are required`);
 
-  // This board is intentionally persistent. Never delete/repost it on bot restarts.
+  // This board is intentionally persistent: existing messages are edited in place, never deleted/reposted.
   const oldMessages = await channel.messages.fetch({ limit: 100 }).catch(() => null);
   // If the history can't be read we can't tell whether the board exists, so don't post.
   if (!oldMessages) throw new Error(`Could not read message history in channel ${ROLE_PERMISSIONS_CHANNEL_ID}`);
   const existingBoardMessages = oldMessages.filter((message) =>
     message.author.id === guild.client.user.id && message.embeds[0]?.footer?.text === PERMISSION_BOARD_FOOTER
   );
-  if (existingBoardMessages.size > 0) {
-    logger.info(`Permission board already exists in guild ${guild.id}; skipping repost.`);
-    return { sent: 0, existing: existingBoardMessages.size, guildId: guild.id, channelId: channel.id };
-  }
 
   const roles = await guild.roles.fetch();
   let sent = 0;
+  let edited = 0;
   for (const definition of ROLE_DEFINITIONS) {
     const role = roles.find((candidate) => candidate.name === definition.name && !candidate.managed);
     if (!role) continue;
-    const permissionLines = permissionNames(role.permissions.toArray());
-    const embed = new EmbedBuilder()
-      .setColor(role.color || definition.color)
-      .setTitle(`${role.name} — الصلاحيات`)
-      .setDescription(`الرتبة: ${role}\n\n${permissionLines.join('\n') || 'لا توجد صلاحيات إضافية'}`)
-      .setFooter({ text: PERMISSION_BOARD_FOOTER });
-    await channel.send({ embeds: [embed] });
-    sent += 1;
+    const embed = buildBoardEmbed(role, definition);
+    const existing = existingBoardMessages.find((message) => message.embeds[0]?.title?.startsWith(`${definition.name} — `));
+    if (existing) {
+      await existing.edit({ embeds: [embed] });
+      edited += 1;
+    } else {
+      await channel.send({ embeds: [embed] });
+      sent += 1;
+    }
   }
-  logger.info(`Published ${sent} admin permission messages in guild ${guild.id}, channel ${ROLE_PERMISSIONS_CHANNEL_ID}`);
-  return { sent, existing: 0, guildId: guild.id, channelId: channel.id };
+  logger.info(`Permission board in guild ${guild.id}, channel ${ROLE_PERMISSIONS_CHANNEL_ID}: sent ${sent}, updated ${edited}`);
+  return { sent, edited, guildId: guild.id, channelId: channel.id };
 }
 
 export { ROLE_DEFINITIONS, ROLE_PERMISSIONS_CHANNEL_ID };
