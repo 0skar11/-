@@ -1,6 +1,7 @@
 import { Events, PermissionFlagsBits } from 'discord.js';
 import { getGuildConfig, updateGuildConfig } from '../services/config/guildConfig.js';
 import { getCommandPrefix } from '../config/bot.js';
+import { refreshTrustedBoard } from '../services/trustedBoardService.js';
 
 const TRUST_COMMANDS = new Set(['trust', 'untrust', 'تراست', 'انتراست']);
 const OWNER_ID = '1159601661392715906';
@@ -62,6 +63,7 @@ async function handleTrust(message, client) {
   if (adding) current.add(id);
   else current.delete(id);
   await updateGuildConfig(client, message.guild.id, { [key]: [...current] });
+  await refreshTrustedBoard(client, message.guild.id);
   await message.channel.send({ content: `${adding ? '🛡️' : '➖'} ${parsed.roleId ? `<@&${id}>` : `<@${id}>`} ${adding ? 'Trusted' : 'Untrusted'}`, allowedMentions: { parse: [] } }).catch(() => {});
   return true;
 }
