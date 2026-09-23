@@ -115,8 +115,10 @@ async function buildEmbed(guild) {
     .setFooter({ text: `الإجمالي: ${members.length + bots.length + roles.length} • آخر تحديث` })
     .setTimestamp();
 
+  // The global embed patch (utils/embeds.js) strips emojis and drops footers it deems unimportant,
+  // so measure what actually ended up on the embed.
   const { title, description, footer } = embed.data;
-  const usedChars = title.length + description.length + footer.text.length;
+  const usedChars = (title?.length ?? 0) + (description?.length ?? 0) + (footer?.text?.length ?? 0);
   embed.addFields(buildTrustedBoardFields([
     { title: '👤 الأعضاء', lines: members },
     { title: '🤖 البوتات', lines: bots },
@@ -142,13 +144,18 @@ async function fetchBoardChannel(client) {
   return channel;
 }
 
-async function publish(client) {
+async function publish(client, allowSend) {
   const channel = await fetchBoardChannel(client);
   const embed = await buildEmbed(channel.guild);
-  const existing = await findBoardMessage(channel, BOARD_KEY, (message) => message.embeds[0]?.title === TRUSTED_BOARD_TITLE);
+  // Only the owner and the bot can post here, so any embed from the bot is the board, whatever its title.
+  const existing = await findBoardMessage(channel, BOARD_KEY, (message) => message.embeds.length > 0);
   if (existing) {
     await existing.edit({ content: '', embeds: [embed], allowedMentions: { parse: [] } });
     return { status: 'updated', channelId: channel.id };
+  }
+  if (!allowSend) {
+    logger.warn(`Trusted board message not found in channel ${TRUSTED_BOARD_CHANNEL_ID}; use /publish-board trusted to post it`);
+    return { status: 'missing', channelId: channel.id };
   }
   const sent = await channel.send({ embeds: [embed], allowedMentions: { parse: [] } });
   await rememberBoardMessage(channel, BOARD_KEY, sent.id);
@@ -157,12 +164,13 @@ async function publish(client) {
 }
 
 /**
- * Posts the trusted list in its channel, or edits the existing post to match the current config.
+ * Edits the existing trusted list post to match the current config.
+ * A new post is only sent with `allowSend` (the /publish-board command); startup and trust changes never post.
  * Calls run one after another so quick trust/untrust changes never produce two posts.
- * Returns { status, channelId } where status is 'sent' or 'updated'; throws on failure.
+ * Returns { status, channelId } where status is 'sent', 'updated' or 'missing'; throws on failure.
  */
-export function publishTrustedBoard(client) {
-  const run = queue.then(() => publish(client));
+export function publishTrustedBoard(client, { allowSend = false } = {}) {
+  const run = queue.then(() => publish(client, allowSend));
   queue = run.catch(() => {});
   return run;
 }
