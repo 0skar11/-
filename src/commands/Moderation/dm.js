@@ -6,6 +6,7 @@ import { sanitizeMarkdown } from '../../utils/validation.js';
 
 import { InteractionHelper } from '../../utils/interactionHelper.js';
 import { replyUserError, ErrorTypes } from '../../utils/errorHandler.js';
+import { isUserArg } from '../../utils/prefixArgs.js';
 export default {
     data: new SlashCommandBuilder()
         .setName("dm")
@@ -31,6 +32,12 @@ export default {
         .setDefaultMemberPermissions(PermissionFlagsBits.ModerateMembers)
         .setDMPermission(false),
     category: "moderation",
+
+    // Prefix usage: `خاص @member النص` — everything after the member is the message.
+    normalizePrefixArgs(args) {
+        if (!isUserArg(args[0]) || args.length < 3) return args;
+        return [args[0], args.slice(1).join(' ')];
+    },
 
     async execute(interaction, config, client) {
         const deferSuccess = await InteractionHelper.safeDefer(interaction);

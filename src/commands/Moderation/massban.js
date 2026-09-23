@@ -6,6 +6,7 @@ import { ModerationService } from '../../services/moderation/moderationService.j
 import { TitanBotError, replyUserError, ErrorTypes } from '../../utils/errorHandler.js';
 
 import { InteractionHelper } from '../../utils/interactionHelper.js';
+import { groupLeadingUsers } from '../../utils/prefixArgs.js';
 export default {
     data: new SlashCommandBuilder()
         .setName("massban")
@@ -31,6 +32,11 @@ export default {
         )
         .setDefaultMemberPermissions(PermissionFlagsBits.BanMembers),
     category: "moderation",
+
+    // Prefix usage: `ماس بان ID1 ID2 السبب` — all leading IDs go into `users`, the rest is the reason.
+    normalizePrefixArgs(args) {
+        return groupLeadingUsers(args);
+    },
     abuseProtection: { maxAttempts: 3, windowMs: 60_000 },
 
     async execute(interaction, config, client) {

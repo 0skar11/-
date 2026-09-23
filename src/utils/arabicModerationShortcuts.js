@@ -215,6 +215,25 @@ export async function handleArabicRoleShortcut(message, prefixes = []) {
   return true;
 }
 
+/** `مسح تحذيرات @member` (or as a reply) — clears all of a member's warnings. */
+export async function handleClearWarningsShortcut(message, args) {
+  if (!hasPermission(message.member, PermissionFlagsBits.ModerateMembers)) return reply(message, '🚫 No Permission');
+  const body = args.join(' ');
+  const mention = body.match(/<@!?(\d+)>/u);
+  const id = body.match(/(?:^|\s)(\d{17,20})(?:\s|$)/u);
+  const targetId = mention?.[1] || id?.[1] || await getReplyTargetId(message);
+  if (!targetId) return reply(message, '❌ Usage: `مسح تحذيرات @user`');
+  const targetMember = await message.guild.members.fetch(targetId).catch(() => null);
+  if (!targetMember) return reply(message, '❌ Member Not Found');
+  try {
+    ModerationService.assertModerationHierarchy(message.member, targetMember, 'warn');
+    const result = await WarningService.clearWarnings(message.guild.id, targetId);
+    return reply(message, `🧹 تم مسح كل تحذيرات ${targetMember}.\nعدد التحذيرات المحذوفة: ${result.count}`);
+  } catch (error) {
+    return reply(message, `❌ ${error.userMessage || error.message || 'حدث خطأ أثناء تنفيذ الأمر.'}`);
+  }
+}
+
 export async function handleArabicModerationShortcut(message) {
   const guildConfig = await getGuildConfig(message.client, message.guild.id).catch(() => null);
   const parsed = tokenize(message.content, [guildConfig?.prefix, getCommandPrefix()]);

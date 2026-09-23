@@ -6,6 +6,7 @@ import { sanitizeInput } from '../../utils/validation.js';
 
 import { InteractionHelper } from '../../utils/interactionHelper.js';
 import { replyUserError, ErrorTypes } from '../../utils/errorHandler.js';
+import { isUserArg } from '../../utils/prefixArgs.js';
 
 export default {
     data: new SlashCommandBuilder()
@@ -82,6 +83,11 @@ export default {
         )
         .setDefaultMemberPermissions(PermissionFlagsBits.ManageMessages),
     category: "moderation",
+
+    // Prefix usage: `ملاحظات @member` shows that member's notes.
+    normalizePrefixArgs(args) {
+        return isUserArg(args[0]) ? ['view', ...args] : args;
+    },
 
     async execute(interaction, config, client) {
         const subcommand = interaction.options.getSubcommand();

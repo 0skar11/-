@@ -10,6 +10,7 @@ import { logger } from '../../utils/logger.js';
 import { InteractionHelper } from '../../utils/interactionHelper.js';
 import { replyUserError, ErrorTypes } from '../../utils/errorHandler.js';
 import { sanitizeInput } from '../../utils/validation.js';
+import { isChannelArg } from '../../utils/prefixArgs.js';
 
 const TEXT_CHANNEL_TYPES = [
     ChannelType.GuildText,
@@ -50,6 +51,15 @@ export default {
         .setDefaultMemberPermissions(PermissionFlagsBits.ManageMessages)
         .setDMPermission(false),
     category: 'moderation',
+
+    // Prefix usage: `قل النص` / `قل @member النص` — the whole text is the message,
+    // except a trailing #channel which picks the channel.
+    normalizePrefixArgs(args) {
+        if (args.length < 2) return args;
+        const channel = isChannelArg(args.at(-1)) ? args.at(-1) : null;
+        const text = (channel ? args.slice(0, -1) : args).join(' ');
+        return channel ? [text, channel] : [text];
+    },
     abuseProtection: { maxAttempts: 8, windowMs: 60_000 },
 
     async execute(interaction, _config, client) {

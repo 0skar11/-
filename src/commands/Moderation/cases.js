@@ -4,6 +4,7 @@ import { getModerationCases } from '../../utils/moderation.js';
 import { logger } from '../../utils/logger.js';
 import { InteractionHelper } from '../../utils/interactionHelper.js';
 import { replyUserError, ErrorTypes } from '../../utils/errorHandler.js';
+import { isUserArg } from '../../utils/prefixArgs.js';
 export default {
     data: new SlashCommandBuilder()
         .setName('cases')
@@ -33,6 +34,11 @@ export default {
         ),
 
     category: 'moderation',
+
+    // Prefix usage: `حالات @member` lists that member's cases.
+    normalizePrefixArgs(args) {
+        return isUserArg(args[0]) ? ['all', ...args] : args;
+    },
 
     async execute(interaction, config, client) {
         const deferSuccess = await InteractionHelper.safeDefer(interaction);
