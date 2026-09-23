@@ -20,7 +20,7 @@ export default {
         .addStringOption((o) =>
             o
                 .setName("reason")
-                .setRequired(true)
+                .setRequired(false)
                 .setDescription("Reason for the warning"),
         )
         .setDefaultMemberPermissions(PermissionFlagsBits.ModerateMembers),
@@ -39,7 +39,8 @@ export default {
 
         const target = interaction.options.getUser("target");
         const member = interaction.options.getMember("target");
-        const reason = interaction.options.getString("reason");
+        // The reason is optional so replying to a message with just `وارن` works; the card shows "no reason".
+        const reason = interaction.options.getString("reason") || "No reason provided";
         const moderator = interaction.user;
         const guildId = interaction.guildId;
 
@@ -49,15 +50,6 @@ export default {
                 ErrorTypes.USER_INPUT,
                 'You must specify a user to warn.',
                 { subtype: 'invalid_user' },
-            );
-        }
-
-        if (!reason) {
-            throw new TitanBotError(
-                'Missing warning reason',
-                ErrorTypes.VALIDATION,
-                'You must provide a reason for the warning.',
-                { subtype: 'missing_required' },
             );
         }
 

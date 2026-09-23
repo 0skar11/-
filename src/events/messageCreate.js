@@ -51,12 +51,14 @@ function parseCommandMessage(content, prefix) {
 const USER_ARG = /^(?:<@!?\d{17,20}>|\d{17,20})$/u;
 
 // Replying to someone's message makes them the target: (reply) `تايم 5m سبام` = `تايم @member 5m سبام`.
-async function applyReplyTarget(message, commandData, args) {
+export async function applyReplyTarget(message, commandData, args) {
   if (!message.reference?.messageId || USER_ARG.test(args[0] || '')) return args;
   const firstOption = (commandData?.toJSON ? commandData.toJSON() : commandData)?.options?.[0];
   if (firstOption?.type !== 6) return args;
   const referenced = await message.fetchReference().catch(() => null);
   if (!referenced?.author || referenced.author.bot) return args;
+  // Commands read the target from the member cache, so make sure the replied member is in it.
+  await message.guild.members.fetch(referenced.author.id).catch(() => null);
   return [referenced.author.id, ...args];
 }
 
