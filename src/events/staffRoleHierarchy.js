@@ -13,7 +13,7 @@ export default {
 
     for (const guild of client.guilds.cache.values()) {
       // The permission board is never posted automatically on startup; it is only
-      // published on demand via /publish-admin-permissions.
+      // published on demand via /publish-board admin-permissions.
       try {
         const summary = await synchronizeStaffRoles(guild);
         created += summary.created;
