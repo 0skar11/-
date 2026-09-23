@@ -8,6 +8,7 @@ import { initRiffyAfterReady } from "../services/music/riffySetup.js";
 import { ensureAuditLogChannels } from "../services/auditLogChannelsService.js";
 import { publishArabicModerationCommands } from "../services/moderationCommandsBoardService.js";
 import { publishTrustedBoard } from "../services/trustedBoardService.js";
+import { tidyChatChannelNames } from "../services/chatChannelNamesService.js";
 
 export default {
   name: Events.ClientReady,
@@ -32,6 +33,12 @@ export default {
         startupLog(`Trusted board: ${result.status} (channel ${result.channelId})`);
       } catch (error) {
         logger.error("Failed to publish trusted board:", error);
+      }
+      try {
+        const result = await tidyChatChannelNames(client);
+        startupLog(`Chat channel names: renamed ${result.renamed}, unchanged ${result.unchanged}, errors ${result.errors}`);
+      } catch (error) {
+        logger.error("Failed to tidy chat channel names:", error);
       }
       await ensureAuditLogChannels(client);
 
