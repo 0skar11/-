@@ -13,8 +13,13 @@ export async function inspectRoleUpdate(role) {
   return inspectAuditAction(role?.guild, 'permissionUpdate', role?.id);
 }
 
-export async function inspectMessageDelete(message) {
-  return inspectAuditAction(message?.guild, 'bulkDelete', message?.channelId);
+export async function inspectMessageDelete(channel) {
+  return inspectAuditAction(channel?.guild, 'bulkDelete', channel?.id);
+}
+
+export async function inspectMemberRoleAdd(member) {
+  const addedRole = (item) => item.changes?.some((change) => change.key === '$add');
+  return inspectAuditAction(member?.guild, 'memberRoleAdd', member?.id, addedRole);
 }
 
 export async function inspectMemberRemoval(member, event = Events.GuildMemberRemove) {
