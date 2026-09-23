@@ -74,7 +74,7 @@ export default {
         const targetUser = interaction.options.getUser("target");
         const member = interaction.options.getMember("target");
         const durationMinutes = resolveDurationMinutes(interaction);
-        const reason = interaction.options.getString("reason") || "No reason provided";
+        const reason = cardReason(interaction.options.getString("reason"));
 
         if (!targetUser) {
             throw new TitanBotError(
@@ -139,7 +139,7 @@ export default {
             title: 'TIMEOUT ISSUED',
             fields: [
                 ['User', `<@${targetUser.id}>`],
-                ['Reason', cardReason(reason)],
+                ['Reason', reason],
                 ['Duration', `${formatDurationMs(durationMs)} (ends <t:${Math.floor((Date.now() + durationMs) / 1000)}:R>)`],
             ],
             moderatorId: interaction.user.id,

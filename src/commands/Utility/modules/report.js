@@ -1,4 +1,5 @@
 import { createEmbed } from '../../../utils/embeds.js';
+import { NO_REASON } from '../../../utils/moderationCard.js';
 import { sendReport, REPORT_CHANNEL_ID } from '../../../services/reportChannelService.js';
 import { InteractionHelper } from '../../../utils/interactionHelper.js';
 import { replyUserError, ErrorTypes } from '../../../utils/errorHandler.js';
@@ -13,7 +14,7 @@ export default {
         }
 
         const targetUser = interaction.options.getUser('user');
-        const reason = interaction.options.getString('reason');
+        const reason = interaction.options.getString('reason')?.trim() || NO_REASON;
         const guildId = interaction.guildId;
 
         const sent = await sendReport(interaction.guild, {

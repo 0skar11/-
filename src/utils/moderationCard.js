@@ -14,9 +14,17 @@ import { NO_PINGS, toOneLine } from './oneLine.js';
 export const CARD_DIVIDER = '━━━━━━━━━━━━━━━━━━';
 export const NO_REASON = 'لم يتم تحديد سبب';
 
-const DEFAULT_REASONS = new Set(['No reason provided', 'Timeout removed by moderator', NO_REASON]);
+// Defaults some commands used to fill in when no reason was typed; they all mean "no reason given".
+const DEFAULT_REASONS = new Set([
+  'No reason provided',
+  'No reason provided.',
+  'Timeout removed by moderator',
+  'Mass ban - No reason provided',
+  'Mass kick - No reason provided',
+  NO_REASON,
+]);
 
-/** A real reason, or the Arabic "no reason given" text. */
+/** A real reason, or the Arabic "no reason given" text when none was written. */
 export function cardReason(reason) {
   const value = toOneLine(reason);
   return value && !DEFAULT_REASONS.has(value) ? value : NO_REASON;

@@ -20,7 +20,7 @@ export default {
         .addStringOption((o) =>
             o
                 .setName("reason")
-                .setRequired(true)
+                .setRequired(false)
                 .setDescription("Reason for the warning"),
         )
         .setDefaultMemberPermissions(PermissionFlagsBits.ModerateMembers),
@@ -52,15 +52,6 @@ export default {
             );
         }
 
-        if (!reason) {
-            throw new TitanBotError(
-                'Missing warning reason',
-                ErrorTypes.VALIDATION,
-                'You must provide a reason for the warning.',
-                { subtype: 'missing_required' },
-            );
-        }
-
         if (!member) {
             throw new TitanBotError(
                 "Target not found",
@@ -87,7 +78,7 @@ export default {
                 action: "User Warned",
                 target: `${target.tag} (${target.id})`,
                 executor: `${moderator.tag} (${moderator.id})`,
-                reason,
+                reason: result.reason,
                 metadata: {
                     userId: target.id,
                     moderatorId: moderator.id,
