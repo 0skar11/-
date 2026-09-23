@@ -42,6 +42,18 @@ function parseCommandMessage(content, prefix) {
   return parsed && { commandName: parsed.commandName, args: parsed.args.map(toWesternDigits) };
 }
 
+const USER_ARG = /^(?:<@!?\d{17,20}>|\d{17,20})$/u;
+
+// Replying to someone's message makes them the target: (reply) `تايم 5m سبام` = `تايم @member 5m سبام`.
+async function applyReplyTarget(message, commandData, args) {
+  if (!message.reference?.messageId || USER_ARG.test(args[0] || '')) return args;
+  const firstOption = (commandData?.toJSON ? commandData.toJSON() : commandData)?.options?.[0];
+  if (firstOption?.type !== 6) return args;
+  const referenced = await message.fetchReference().catch(() => null);
+  if (!referenced?.author || referenced.author.bot) return args;
+  return [referenced.author.id, ...args];
+}
+
 async function handlePrefixCommand(message, client) {
   try {
     const guildConfig = await getGuildConfig(client, message.guild.id);
@@ -74,6 +86,9 @@ async function handlePrefixCommand(message, client) {
       return;
     }
     if (!isCommandCategoryEnabled(command.category)) return;
+
+    args = await applyReplyTarget(message, command.data, args);
+    if (typeof command.normalizePrefixArgs === 'function') args = command.normalizePrefixArgs(args);
 
     const restriction = getPrefixRestriction(command, args, resolveSubcommandAlias);
     if (restriction.blocked || !supportsPrefixExecution(command)) return;
