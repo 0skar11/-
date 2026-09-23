@@ -93,13 +93,13 @@ function warn(guild, executorId, action, count, threshold) {
   return send(guild, { embeds: [embed], allowedMentions: { parse: [] } });
 }
 
-const ALERT_ROLE_NAME = 'psycho';
+const ALERT_ROLE_ID = '1155237751109730435'; // psycho
 
 // Sent only after the member has already been dealt with: red, pings the psycho role only.
 function alert(guild, executorId, punishment, reason) {
   const embed = new EmbedBuilder().setColor(0xed4245).setTitle(`🚨 ${punishment}`)
     .setDescription(`**العضو:** <@${executorId}>\n**السبب:** ${reason}\n**الوقت:** ${time()}`);
-  const role = guild.roles.cache.find((item) => item.name.toLowerCase() === ALERT_ROLE_NAME);
+  const role = guild.roles.cache.get(ALERT_ROLE_ID);
   return send(guild, {
     ...(role ? { content: `${role}` } : {}),
     embeds: [embed],
