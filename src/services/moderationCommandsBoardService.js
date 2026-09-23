@@ -44,7 +44,7 @@ function buildEmbed() {
         value: [
           '`قفل` — Lock channel',
           '`فتح` — Unlock channel',
-          '`مسح 10` — Purge messages',
+          '`مسح 10` / `م 10` — Delete messages',
           '`حالات` — Moderation cases',
           '`ملاحظات @العضو` — User notes',
           '`قل @العضو النص` — Say as the bot',
