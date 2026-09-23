@@ -16,6 +16,7 @@ import { handleArabicRoleShortcut, handleClearWarningsShortcut } from '../utils/
 import { handlePurgeMessage } from '../services/moderation/channelPurgeService.js';
 import { handleReportChannelMessage } from '../services/reportChannelService.js';
 import { handleProtectedChannelMessage } from '../services/protectedChannelsService.js';
+import { handleEveryoneMention } from '../services/everyoneMentionGuardService.js';
 
 export default {
   name: Events.MessageCreate,
@@ -26,6 +27,7 @@ export default {
       if (message.author.bot || !message.guild) return;
       logger.debug(`Message received from ${message.author.tag}: ${message.content}`);
 
+      if (await handleEveryoneMention(message)) return;
       if (await handleReportChannelMessage(message)) return;
       if (await handleArabicUtilityShortcuts(message)) return;
       if (await handleMessageDeleteShortcut(message)) return;
