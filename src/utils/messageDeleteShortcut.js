@@ -1,6 +1,6 @@
 import { PermissionFlagsBits } from 'discord.js';
 
-const SHORTCUT_PATTERN = /^م\s+([0-9٠-٩]+)$/u;
+const SHORTCUT_PATTERN = /^م(?:\s+(.*))?$/u;
 const MIN_AMOUNT = 1;
 const MAX_AMOUNT = 100;
 const CONFIRMATION_DELETE_DELAY_MS = 4_000;
@@ -16,9 +16,12 @@ async function reply(message, content) {
 export async function handleMessageDeleteShortcut(message) {
   const match = String(message?.content || '').trim().match(SHORTCUT_PATTERN);
   if (!match) return false;
-  if (!message.member?.permissions?.has(PermissionFlagsBits.ManageMessages)) return true;
+  if (!message.member?.permissions?.has(PermissionFlagsBits.ManageMessages)) {
+    await reply(message, '❌ ليس لديك صلاحية لاستخدام هذا الأمر.');
+    return true;
+  }
 
-  const amount = Number(toWesternDigits(match[1]));
+  const amount = /^[0-9٠-٩]+$/u.test(match[1] || '') ? Number(toWesternDigits(match[1])) : NaN;
   if (!Number.isInteger(amount) || amount < MIN_AMOUNT || amount > MAX_AMOUNT) {
     await reply(message, '❌ استخدم الأمر هكذا: `م 10` — العدد يجب أن يكون بين 1 و100.');
     return true;

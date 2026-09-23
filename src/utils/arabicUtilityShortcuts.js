@@ -1,6 +1,7 @@
 import { PermissionFlagsBits } from 'discord.js';
 
 const COMMANDS = new Set(['ق', 'ف', 'نك', 'font']);
+const NO_PERMISSION = '❌ ليس لديك صلاحية لاستخدام هذا الأمر.';
 const BOLD_UPPER_START = 0x1d400;
 const BOLD_LOWER_START = 0x1d41a;
 const BOLD_DIGIT_START = 0x1d7ce;
@@ -33,7 +34,7 @@ function toBoldFont(value) {
 }
 
 async function lockChannel(message, locked) {
-  if (!hasPermission(message.member, PermissionFlagsBits.ManageChannels)) return true;
+  if (!hasPermission(message.member, PermissionFlagsBits.ManageChannels)) return reply(message, NO_PERMISSION);
   const channel = message.channel;
   if (!channel?.isTextBased?.() || !channel.permissionOverwrites?.edit) return reply(message, '❌ هذا الأمر يعمل داخل روم نصية فقط.');
   try {
@@ -56,7 +57,7 @@ async function getReplyMember(message) {
 }
 
 async function changeNickname(message, tail) {
-  if (!message.member?.permissions?.has(PermissionFlagsBits.ManageNicknames)) return true;
+  if (!hasPermission(message.member, PermissionFlagsBits.ManageNicknames)) return reply(message, NO_PERMISSION);
 
   const mention = tail.match(/^<@!?(\d+)>\s*/u);
   const targetId = mention?.[1] || null;
