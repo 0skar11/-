@@ -1,10 +1,10 @@
-import { Events, PermissionFlagsBits } from 'discord.js';
+import { Events } from 'discord.js';
 import { logger } from '../utils/logger.js';
 import { handleArabicUtilityShortcuts } from '../utils/arabicUtilityShortcuts.js';
 import { handleMessageDeleteShortcut } from '../utils/messageDeleteShortcut.js';
 import { parsePrefixCommand, parseMessageCommand, mapArgumentsToOptions } from '../utils/prefixParser.js';
 import { supportsPrefixExecution, executePrefixCommand, resolvePrefixAccessKey } from '../utils/messageAdapter.js';
-import { COMMON_WORD_ALIASES, resolveCommandAlias, resolveSubcommandAlias, twoWordCommandAliases } from '../config/commands/commandAliases.js';
+import { resolveCommandAlias, resolveSubcommandAlias, twoWordCommandAliases } from '../config/commands/commandAliases.js';
 import { getPrefixRestriction } from '../config/commands/prefixRestrictions.js';
 import { getGuildConfig } from '../services/config/guildConfig.js';
 import { getCommandPrefix, isBotOwner, isCommandCategoryEnabled, isMaintenanceMode } from '../config/bot.js';
@@ -72,10 +72,8 @@ async function handlePrefixCommand(message, client) {
       return;
     }
 
-    const usedPrefix = message.content.trim().startsWith(prefix);
     const typedCommand = commandName.toLowerCase();
     if (typedCommand === 'مسح' && args[0] === 'تحذيرات') {
-      if (!usedPrefix && !message.member?.permissions?.has(PermissionFlagsBits.ModerateMembers)) return;
       await handleClearWarningsShortcut(message, args.slice(1));
       return;
     }
@@ -94,10 +92,6 @@ async function handlePrefixCommand(message, client) {
     const resolvedCommandName = resolveCommandAlias(commandName);
     const command = client.commands.get(resolvedCommandName);
     if (!command) return;
-    if (!usedPrefix && COMMON_WORD_ALIASES.has(typedCommand)) {
-      const required = (command.data?.toJSON ? command.data.toJSON() : command.data)?.default_member_permissions;
-      if (required && !message.member?.permissions?.has(BigInt(required))) return;
-    }
     if (isMaintenanceMode() && !isBotOwner(message.author.id)) {
       await message.channel.send('🛠️ Maintenance Mode').catch(() => {});
       return;

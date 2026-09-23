@@ -29,12 +29,6 @@ export const twoWordCommandAliases = {
   'ماس طرد': 'masskick',
 };
 
-/**
- * Arabic aliases that are also everyday words. Without the prefix they only run for
- * members who have the command's permissions, so normal chat never gets an error reply.
- */
-export const COMMON_WORD_ALIASES = new Set(['مسح', 'قفل', 'فتح', 'حالات', 'ملاحظات', 'قل', 'خاص', 'تحذير', 'تحذيرات', 'طرد']);
-
 export function resolveCommandAlias(commandName) {
   const normalized = String(commandName || '').toLowerCase();
   return commandAliases[normalized] || normalized;
