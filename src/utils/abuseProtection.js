@@ -1,6 +1,6 @@
 // abuseProtection.js
 
-import { checkRateLimit, getRateLimitStatus, clearAllRateLimits } from './rateLimiter.js';
+import { checkRateLimit, getRateLimitStatus, clearAllRateLimits, refundRateLimit } from './rateLimiter.js';
 import { logger } from './logger.js';
 
 const DEFAULT_PROTECTION_POLICY = Object.freeze({
@@ -191,6 +191,11 @@ export async function enforceAbuseProtection(interaction, command, commandName) 
     remainingMs,
     policy
   };
+}
+
+/** A rejected command (usage, permission, hierarchy, not found...) must not use up the cooldown. */
+export function refundAbuseProtection(interaction, commandName) {
+  refundRateLimit(getProtectionKey(interaction, commandName));
 }
 
 export function resetAbuseProtectionState() {

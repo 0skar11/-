@@ -29,6 +29,7 @@ export default {
     normalizePrefixArgs(args) {
         return groupLeadingUsers(args);
     },
+    prefixUsage: "@user1 @user2 ... [reason]",
     abuseProtection: { maxAttempts: 3, windowMs: 60_000 },
 
     async execute(interaction, config, client) {

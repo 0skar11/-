@@ -8,7 +8,7 @@ import { resolveCommandAlias, resolveSubcommandAlias, twoWordCommandAliases } fr
 import { getPrefixRestriction } from '../config/commands/prefixRestrictions.js';
 import { getGuildConfig } from '../services/config/guildConfig.js';
 import { getCommandPrefix, isBotOwner, isCommandCategoryEnabled, isMaintenanceMode } from '../config/bot.js';
-import { enforceAbuseProtection, formatCooldownDuration } from '../utils/abuseProtection.js';
+import { enforceAbuseProtection, formatCooldownDuration, refundAbuseProtection } from '../utils/abuseProtection.js';
 import { isCommandEnabled } from '../services/commandAccessService.js';
 import { getCountingGameConfig, saveCountingGameConfig, isValidCountingMessage, recordCorrectCount } from '../services/countingGameService.js';
 import { handleTrustedListCommand } from '../utils/trustedCommand.js';
@@ -117,7 +117,8 @@ async function handlePrefixCommand(message, client) {
       await replyToMessage(message, `⏱️ Wait ${formatCooldownDuration(abuseProtection.remainingMs)}`).catch(() => {});
       return;
     }
-    await executePrefixCommand(command, message, args, client, prefix, guildConfig);
+    const result = await executePrefixCommand(command, message, args, client, prefix, guildConfig);
+    if (result?.failed) refundAbuseProtection({ guildId: message.guild.id, user: message.author }, resolvedCommandName);
   } catch (error) {
     logger.error('Error handling prefix command:', error);
     await replyToMessage(message, { content: `❌ ${error.userMessage || error.message || 'Something went wrong'}`, allowedMentions: { parse: [] } }).catch(() => {});

@@ -11,6 +11,11 @@ import { ResponseCoordinator, buildPrefixUsage } from './responseCoordinator.js'
 import { enforceDefaultCommandPermissions } from './permissionGuard.js';
 import { scheduleNoPermissionDelete } from './noPermissionReply.js';
 
+/** Rejections are one-line replies starting with ❌ (error/usage) or 🚫 (permission). */
+function isRejectionReply(content) {
+  return typeof content === 'string' && /^(?:❌|🚫)/u.test(content);
+}
+
 export { buildPrefixUsage };
 
 function getCommandJson(commandData) {
@@ -230,6 +235,7 @@ export async function executePrefixCommand(command, message, args, client, prefi
   const mockInteraction = createMockInteraction(message, command.data, args);
   const coordinator = mockInteraction._responseCoordinator;
   const prefix = prefixOverride || getCommandPrefix();
+  let failed = true;
 
   try {
     const permissionAllowed = await enforceDefaultCommandPermissions(mockInteraction, command, {
@@ -237,13 +243,13 @@ export async function executePrefixCommand(command, message, args, client, prefi
       guildConfig,
     });
     if (!permissionAllowed) {
-      return;
+      return { failed };
     }
 
     const validation = mockInteraction.options.validateRequired();
     if (!validation.valid) {
-      await coordinator.respondUsageFromCommand(prefix, command.data, validation);
-      return;
+      await coordinator.respondUsageFromCommand(prefix, command.data, validation, command.prefixUsage);
+      return { failed };
     }
 
     if (command.prefixExecute) {
@@ -258,6 +264,9 @@ export async function executePrefixCommand(command, message, args, client, prefi
       source: 'messageAdapter.executePrefixCommand',
     });
   } finally {
-    scheduleNoPermissionDelete(coordinator.getReplyMessage());
+    const reply = coordinator.getReplyMessage();
+    scheduleNoPermissionDelete(reply);
+    failed = isRejectionReply(reply?.content);
   }
+  return { failed };
 }

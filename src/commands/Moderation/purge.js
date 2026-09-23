@@ -19,6 +19,7 @@ export default {
     )
 .setDefaultMemberPermissions(PermissionFlagsBits.ManageMessages),
   category: "moderation",
+  prefixUsage: "<1-100>",
   abuseProtection: { maxAttempts: 5, windowMs: 60_000 },
 
   async execute(interaction, config, client) {

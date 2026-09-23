@@ -2,6 +2,7 @@
 
 import { logger } from './logger.js';
 import { replyToMessage } from './replyToMessage.js';
+import { twoWordCommandAliases } from '../config/commands/commandAliases.js';
 
 function getCommandJson(commandData) {
   return commandData?.toJSON ? commandData.toJSON() : commandData;
@@ -195,9 +196,14 @@ export class ResponseCoordinator {
     return result;
   }
 
-  async respondUsageFromCommand(prefix, commandData, validation) {
-    const typedCommand = String(this.message?.content || '').trim().split(/\s+/u)[0] || null;
-    const usageLine = buildPrefixUsage(prefix, commandData, validation, typedCommand);
+  async respondUsageFromCommand(prefix, commandData, validation, prefixUsage = null) {
+    const words = String(this.message?.content || '').trim().split(/\s+/u);
+    const firstWord = words[0]?.startsWith(prefix) ? words[0].slice(prefix.length) : words[0];
+    // Two-word commands (`هارد بان`) keep both words in the usage line.
+    const typedCommand = twoWordCommandAliases[`${firstWord} ${words[1] || ''}`] ? `${words[0]} ${words[1]}` : words[0] || null;
+    const usageLine = prefixUsage
+      ? `${typedCommand || `${prefix}${getCommandJson(commandData).name}`} ${prefixUsage}`
+      : buildPrefixUsage(prefix, commandData, validation, typedCommand);
     return this.respondUsage(usageLine);
   }
 }

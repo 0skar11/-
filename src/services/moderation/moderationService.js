@@ -58,6 +58,8 @@ export class ModerationService {
   }
 
   static assertModerationHierarchy(moderator, target, action) {
+    if (target?.id && target.id === moderator?.id) throw new TitanBotError('Cannot target self', ErrorTypes.VALIDATION, "❌ You Can't Do This To Yourself");
+    if (target?.id && target.id === target.guild?.members?.me?.id) throw new TitanBotError('Cannot target bot', ErrorTypes.VALIDATION, "❌ You Can't Do This To Me");
     const botCheck = this.validateBotHierarchy(target, action);
     if (!botCheck.valid) throw new TitanBotError(botCheck.error, ErrorTypes.PERMISSION, botCheck.error);
     const modCheck = this.validateHierarchy(moderator, target, action);

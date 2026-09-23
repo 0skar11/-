@@ -46,6 +46,12 @@ export function getRateLimitStatus(key, windowMs = 60000) {
   };
 }
 
+/** Gives back one attempt, e.g. when the command was rejected and did nothing. */
+export function refundRateLimit(key) {
+  const entry = rateLimitStore.get(key);
+  if (entry && entry.count > 0) entry.count--;
+}
+
 export function clearRateLimit(key) {
   rateLimitStore.delete(key);
 }
