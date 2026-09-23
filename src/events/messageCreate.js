@@ -2,7 +2,7 @@ import { Events } from 'discord.js';
 import { logger } from '../utils/logger.js';
 import { handleArabicUtilityShortcuts } from '../utils/arabicUtilityShortcuts.js';
 import { handleMessageDeleteShortcut } from '../utils/messageDeleteShortcut.js';
-import { parsePrefixCommand } from '../utils/prefixParser.js';
+import { parsePrefixCommand, parseMessageCommand, mapArgumentsToOptions } from '../utils/prefixParser.js';
 import { supportsPrefixExecution, executePrefixCommand, resolvePrefixAccessKey } from '../utils/messageAdapter.js';
 import { resolveCommandAlias, resolveSubcommandAlias } from '../config/commands/commandAliases.js';
 import { getPrefixRestriction } from '../config/commands/prefixRestrictions.js';
@@ -32,12 +32,23 @@ export default {
   },
 };
 
+// Commands also work without the prefix, but only as the first word of the message
+// (`تايم @member 5m`). A command word in the middle of a sentence is ignored.
+function toWesternDigits(value) {
+  return value.replace(/[٠-٩]/gu, (digit) => String('٠١٢٣٤٥٦٧٨٩'.indexOf(digit)));
+}
+
+function parseCommandMessage(content, prefix) {
+  const parsed = parsePrefixCommand(content, prefix) || parseMessageCommand(content, prefix);
+  return parsed && { commandName: parsed.commandName, args: parsed.args.map(toWesternDigits) };
+}
+
 async function handlePrefixCommand(message, client) {
   try {
     const guildConfig = await getGuildConfig(client, message.guild.id);
     const prefix = guildConfig?.prefix || getCommandPrefix();
     if (await handleArabicRoleShortcut(message, [prefix, getCommandPrefix()])) return;
-    const parsed = parsePrefixCommand(message.content, prefix);
+    const parsed = parseCommandMessage(message.content, prefix);
     if (!parsed) return;
 
     let { commandName, args } = parsed;
@@ -68,6 +79,12 @@ async function handlePrefixCommand(message, client) {
     const restriction = getPrefixRestriction(command, args, resolveSubcommandAlias);
     if (restriction.blocked || !supportsPrefixExecution(command)) return;
     if (!(await isCommandEnabled(client, message.guild.id, resolvePrefixAccessKey(command.data, args), command.category))) return;
+
+    // Wrong usage (e.g. `تايم الغداء`) only shows the permission/usage reply and must not start a cooldown.
+    if (!mapArgumentsToOptions(args, command.data).validateRequired().valid) {
+      await executePrefixCommand(command, message, args, client, prefix, guildConfig);
+      return;
+    }
 
     const abuseProtection = await enforceAbuseProtection({ guildId: message.guild.id, user: message.author }, command, resolvedCommandName);
     if (!abuseProtection.allowed) {

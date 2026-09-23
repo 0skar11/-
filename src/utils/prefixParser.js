@@ -95,6 +95,16 @@ function parseArguments(input) {
   return args;
 }
 
+const SNOWFLAKE = String.raw`\d{17,20}`;
+const OPTION_VALUE_PATTERNS = {
+  4: /^-?\d+/u, // integer (a trailing unit such as `10m` is accepted, parseInt reads the number)
+  6: new RegExp(`^(?:<@!?${SNOWFLAKE}>|${SNOWFLAKE})$`, 'u'), // user
+  7: new RegExp(`^(?:<#${SNOWFLAKE}>|${SNOWFLAKE})$`, 'u'), // channel
+  8: new RegExp(`^(?:<@&${SNOWFLAKE}>|${SNOWFLAKE})$`, 'u'), // role
+  9: new RegExp(`^(?:<@[!&]?${SNOWFLAKE}>|${SNOWFLAKE})$`, 'u'), // mentionable
+  10: /^-?\d/u, // number
+};
+
 export function mapArgumentsToOptions(args, commandData) {
   const options = {};
   let subcommandName = null;
@@ -182,6 +192,16 @@ export function mapArgumentsToOptions(args, commandData) {
   }
 
   const missing = [];
+  // A value that cannot be what the option expects (e.g. `تايم الغداء` instead of a member)
+  // is reported like a missing option so the usage line is shown instead of running the command.
+  for (const optionDef of optionDefs) {
+    const value = options[optionDef.name];
+    const pattern = OPTION_VALUE_PATTERNS[optionDef.type];
+    if (value !== undefined && pattern && !pattern.test(value)) {
+      missing.push({ name: optionDef.name, description: optionDef.description, type: optionDef.type, invalid: true });
+      delete options[optionDef.name];
+    }
+  }
   if (subcommandName || (!hasSubcommands && !subcommandGroup)) {
     for (const opt of optionDefs) {
       if (opt.required && !options[opt.name]) {

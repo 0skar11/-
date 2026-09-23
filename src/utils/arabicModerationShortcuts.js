@@ -129,7 +129,7 @@ async function lockChannel(message) {
 }
 
 async function changeRole(message, targetMember, roleName, add) {
-  if (!hasPermission(message.member, PermissionFlagsBits.ManageRoles)) return reply(message, '> You cannot moderate this person');
+  if (!hasPermission(message.member, PermissionFlagsBits.ManageRoles)) return reply(message, '❌ ليس لديك صلاحية لاستخدام هذا الأمر.');
   if (!targetMember || !roleName) return true;
   const role = roleFor(message.guild, roleName);
   const botRole = message.guild.members.me?.roles.highest;
@@ -151,7 +151,7 @@ function warningMessage(targetMember, reason, totalWarnings, moderator) {
 }
 
 async function listWarnings(message, targetMember, guildId) {
-  if (!hasPermission(message.member, PermissionFlagsBits.ModerateMembers)) return reply(message, '> You cannot moderate this person');
+  if (!hasPermission(message.member, PermissionFlagsBits.ModerateMembers)) return reply(message, '❌ ليس لديك صلاحية لاستخدام هذا الأمر.');
   if (!targetMember) return true;
   const warnings = (await WarningService.getWarnings(guildId, targetMember.id))
     .sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0));
@@ -194,8 +194,16 @@ export async function handleArabicRoleShortcut(message, prefixes = []) {
   const id = body.match(/(?:^|\s)(\d{17,20})(?:\s|$)/u);
   const targetId = mention?.[1] || id?.[1] || await getReplyTargetId(message);
   const roleName = body.replace(/<@!?\d+>/u, '').replace(/(?:^|\s)\d{17,20}(?=\s|$)/u, '').trim();
-  if (!targetId) return true;
-  if (!roleName) return reply(message, `❌ اكتب اسم الرتبة، مثال: \`${command} @member اسم_الرتبة\``);
+  // `ان` is also a very common Arabic word ("ان شاء الله"), so it only reacts when a member is given.
+  if (!targetId && command === 'ان') return false;
+  if (!hasPermission(message.member, PermissionFlagsBits.ManageRoles)) {
+    await reply(message, '❌ ليس لديك صلاحية لاستخدام هذا الأمر.');
+    return true;
+  }
+  if (!targetId || !roleName) {
+    await reply(message, `❌ طريقة الاستخدام: \`${command} @member اسم_الرتبة\``);
+    return true;
+  }
 
   const targetMember = await message.guild.members.fetch(targetId).catch(() => null);
   if (!targetMember) return reply(message, '❌ العضو غير موجود في السيرفر.');
@@ -227,7 +235,7 @@ export async function handleArabicModerationShortcut(message) {
     if (ADD_ROLE_COMMANDS.has(command) || REMOVE_ROLE_COMMANDS.has(command)) return changeRole(message, targetMember, tail, ADD_ROLE_COMMANDS.has(command));
 
     if (command === 'وارن' || command === 'warn') {
-      if (!hasPermission(message.member, PermissionFlagsBits.ModerateMembers)) return reply(message, '> You cannot moderate this person');
+      if (!hasPermission(message.member, PermissionFlagsBits.ModerateMembers)) return reply(message, '❌ ليس لديك صلاحية لاستخدام هذا الأمر.');
       if (!targetMember) return true;
       ModerationService.assertModerationHierarchy(message.member, targetMember, 'warn');
       const reason = tail || 'لم يتم تحديد سبب';
@@ -236,7 +244,7 @@ export async function handleArabicModerationShortcut(message) {
     }
 
     if (command === 'تايم' || command === 'timeout') {
-      if (!hasPermission(message.member, PermissionFlagsBits.ModerateMembers)) return reply(message, '> You cannot moderate this person');
+      if (!hasPermission(message.member, PermissionFlagsBits.ModerateMembers)) return reply(message, '❌ ليس لديك صلاحية لاستخدام هذا الأمر.');
       if (!targetMember) return true;
       const [durationText, ...reasonParts] = tail.split(/\s+/u);
       const durationMs = parseDuration(durationText);
@@ -248,28 +256,28 @@ export async function handleArabicModerationShortcut(message) {
     }
 
     if (command === 'انتايم' || command === 'untimeout') {
-      if (!hasPermission(message.member, PermissionFlagsBits.ModerateMembers)) return reply(message, '> You cannot moderate this person');
+      if (!hasPermission(message.member, PermissionFlagsBits.ModerateMembers)) return reply(message, '❌ ليس لديك صلاحية لاستخدام هذا الأمر.');
       if (!targetMember) return true;
       await ModerationService.removeTimeoutUser({ guild, member: targetMember, moderator: message.member, reason: tail || 'لم يتم تحديد سبب' });
       return reply(message, `🔓 تم إلغاء التايم عن ${targetMember}, Reason: ${tail || 'لم يتم تحديد سبب'}`);
     }
 
     if (command === 'بان' || command === 'ban') {
-      if (!hasPermission(message.member, PermissionFlagsBits.BanMembers)) return reply(message, '> You cannot moderate this person');
+      if (!hasPermission(message.member, PermissionFlagsBits.BanMembers)) return reply(message, '❌ ليس لديك صلاحية لاستخدام هذا الأمر.');
       if (!targetUser) return true;
       await ModerationService.banUser({ guild, user: targetUser, moderator: message.member, reason: tail || 'لم يتم تحديد سبب' });
       return reply(message, `🚫 ${targetUser} Has Been Banned, Reason: ${tail || 'لم يتم تحديد سبب'}`);
     }
 
     if (command === 'انبان' || command === 'unban') {
-      if (!hasPermission(message.member, PermissionFlagsBits.BanMembers)) return reply(message, '> You cannot moderate this person');
+      if (!hasPermission(message.member, PermissionFlagsBits.BanMembers)) return reply(message, '❌ ليس لديك صلاحية لاستخدام هذا الأمر.');
       if (!targetUser) return true;
       await ModerationService.unbanUser({ guild, user: targetUser, moderator: message.member, reason: tail || 'لم يتم تحديد سبب' });
       return reply(message, `✅ تم إلغاء البان عن ${targetUser}, Reason: ${tail || 'لم يتم تحديد سبب'}`);
     }
 
     if (command === 'كلير' || command === 'clear') {
-      if (!hasPermission(message.member, PermissionFlagsBits.ModerateMembers)) return reply(message, '> You cannot moderate this person');
+      if (!hasPermission(message.member, PermissionFlagsBits.ModerateMembers)) return reply(message, '❌ ليس لديك صلاحية لاستخدام هذا الأمر.');
       if (!targetMember) return true;
       const result = await WarningService.clearWarnings(guild.id, targetId);
       return reply(message, `🧹 تم مسح كل تحذيرات ${targetMember}. Reason: ${tail || 'لم يتم تحديد سبب'}\nعدد التحذيرات المحذوفة: ${result.count}`);
