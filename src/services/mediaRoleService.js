@@ -1,6 +1,7 @@
 import { PermissionFlagsBits } from 'discord.js';
 import { isServerOwner } from '../config/serverOwners.js';
 import { canLiftHardBan } from './moderation/hardBanService.js';
+import { getGuildConfig, updateGuildConfig } from './config/guildConfig.js';
 import { logger } from '../utils/logger.js';
 
 // Images/files, links and GIFs are locked for everyone except members of the `media` role.
@@ -12,6 +13,8 @@ const MEDIA_ROLE_COLOR = '#9b59b6';
 const CHAOS_ROLE_ID = '1155238281861156955';
 const MEDIA_PERMISSIONS = [PermissionFlagsBits.AttachFiles, PermissionFlagsBits.EmbedLinks];
 const BLOCKED_NOTICE_DELETE_MS = 1_000;
+// Guild config flag set once every member who was in the server got the media role.
+const GRANTED_TO_ALL_KEY = 'mediaRoleGrantedToAll';
 
 const LINK = /(?:https?:\/\/|www\.)\S+|(?:discord(?:app)?\.com\/invite|discord\.gg)\/[\w-]+/iu;
 
@@ -57,6 +60,45 @@ export async function ensureMediaRole(guild) {
     if (await stripMediaPermissions(role)) locked += 1;
   }
   return { created, positioned, locked };
+}
+
+/**
+ * Gives the media role once to every member (bots aside) in the server at that moment.
+ * A flag in the guild config stops it from running again, so members who join later don't get it.
+ */
+export async function grantMediaRoleToAllMembers(guild) {
+  const db = guild.client?.db;
+  if (typeof db?.get !== 'function' || (typeof db.isAvailable === 'function' && !db.isAvailable())) {
+    // Without the database the flag can't be read or saved, so it would repeat on every restart.
+    logger.warn(`Media role grant skipped for ${guild.name}: database unavailable.`);
+    return { skipped: true, granted: 0, failed: 0 };
+  }
+
+  const config = await getGuildConfig(guild.client, guild.id);
+  if (config?.[GRANTED_TO_ALL_KEY]) return { skipped: true, granted: 0, failed: 0 };
+
+  const media = guild.roles.cache.find((role) => role.name === MEDIA_ROLE_NAME && !role.managed);
+  if (!media?.editable) {
+    logger.warn(`Media role grant skipped for ${guild.name}: the role is missing or above the bot's highest role.`);
+    return { skipped: true, granted: 0, failed: 0 };
+  }
+
+  const members = await guild.members.fetch();
+  let granted = 0;
+  let failed = 0;
+  for (const member of members.values()) {
+    if (member.user.bot || member.roles.cache.has(media.id)) continue;
+    try {
+      await member.roles.add(media, 'Media role for everyone in the server');
+      granted += 1;
+    } catch (error) {
+      failed += 1;
+      logger.warn(`Could not give the media role to ${member.user.tag} in ${guild.name}: ${error.message}`);
+    }
+  }
+
+  await updateGuildConfig(guild.client, guild.id, { [GRANTED_TO_ALL_KEY]: true });
+  return { skipped: false, granted, failed };
 }
 
 /** A message counts as media when it has an attachment or a link (GIFs from the picker are Tenor links). */
