@@ -1,9 +1,9 @@
 import { SlashCommandBuilder, PermissionFlagsBits } from 'discord.js';
-import { successEmbed } from '../../utils/embeds.js';
 import { logger } from '../../utils/logger.js';
 import { TitanBotError, ErrorTypes } from '../../utils/errorHandler.js';
 import { InteractionHelper } from '../../utils/interactionHelper.js';
 import { ModerationService } from '../../services/moderation/moderationService.js';
+import { oneLine, withReason } from '../../utils/oneLine.js';
 
 const durationChoices = [
     { name: "5 minutes", value: 5 },
@@ -24,6 +24,13 @@ function resolveDurationMinutes(interaction) {
     const raw = String(interaction.options.getString("duration") || "").trim().toLowerCase();
     const match = raw.match(/^(\d+)\s*([smhdwثدسي])?$/u);
     return match ? Math.ceil(Number(match[1]) * UNIT_MINUTES[match[2] || "m"]) : null;
+}
+
+function formatDuration(minutes) {
+    if (minutes % 10080 === 0) return `${minutes / 10080}w`;
+    if (minutes % 1440 === 0) return `${minutes / 1440}d`;
+    if (minutes % 60 === 0) return `${minutes / 60}h`;
+    return `${minutes}m`;
 }
 
 export default {
@@ -101,7 +108,7 @@ export default {
             throw new TitanBotError(
                 "Invalid duration",
                 ErrorTypes.USER_INPUT,
-                "❌ اكتب المدة صح، مثال: `10m` أو `2h` أو `1d` (أقصى مدة 28 يوم).",
+                "❌ Duration: `10m` `2h` `1d` (Max 28d)",
             );
         }
 
@@ -114,17 +121,6 @@ export default {
             reason,
         });
 
-        const durationDisplay =
-            durationChoices.find((c) => c.value === durationMinutes)
-                ?.name || `${durationMinutes} minutes`;
-
-        await InteractionHelper.safeEditReply(interaction, {
-            embeds: [
-                successEmbed(
-                    `⏳ **Timed out** ${targetUser.tag} for ${durationDisplay}.`,
-                    `**Reason:** ${reason}\n**Case ID:** #${result.caseId}`,
-                ),
-            ],
-        });
+        await InteractionHelper.safeEditReply(interaction, oneLine('⏳', withReason(`<@${targetUser.id}> Has Been Timed Out ${formatDuration(durationMinutes)}`, reason)));
     },
 };

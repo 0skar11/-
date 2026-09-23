@@ -6,6 +6,7 @@ import { getColor } from '../../config/bot.js';
 
 import { InteractionHelper } from '../../utils/interactionHelper.js';
 import { replyUserError, ErrorTypes } from '../../utils/errorHandler.js';
+import { oneLine } from '../../utils/oneLine.js';
 export default {
     data: new SlashCommandBuilder()
         .setName("unlock")
@@ -63,14 +64,7 @@ export default {
                 }
             });
 
-            await InteractionHelper.safeEditReply(interaction, {
-                embeds: [
-                    successEmbed(
-                        `🔓 **Channel Unlocked**`,
-                        `${channel} is now unlocked. You may speak now.`,
-                    ),
-                ],
-            });
+            await InteractionHelper.safeEditReply(interaction, oneLine('🔓', `${channel} Unlocked`));
         } catch (error) {
             logger.error('Unlock command error:', error);
             await replyUserError(interaction, { type: ErrorTypes.PERMISSION, message: 'An unexpected error occurred while trying to unlock the channel. Check my permissions (I need \'Manage Channels\').' });

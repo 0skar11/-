@@ -22,7 +22,7 @@ function parseTrust(content) {
 }
 
 async function send(message, text) {
-  await message.channel.send(`❌ ${text}`).catch(() => {});
+  await message.channel.send({ content: `❌ ${text}`, allowedMentions: { parse: [] } }).catch(() => {});
 }
 
 async function handleTrust(message, client) {
@@ -31,16 +31,16 @@ async function handleTrust(message, client) {
   message.content = TRUST_MARKER;
 
   if (message.author.id !== OWNER_ID) {
-    await send(message, 'أمر Trust متاح لمالك البوت فقط.');
+    await message.channel.send('🚫 Owner Only').catch(() => {});
     return true;
   }
 
   if (!parsed.roleId && !parsed.userId) {
-    await send(message, 'الناقص هو منشن عضو أو رتبة. مثال: `trust @member` أو `trust @role`.');
+    await send(message, 'Usage: `تراست @user` or `تراست @role`');
     return true;
   }
   if (parsed.roleId && parsed.userId) {
-    await send(message, 'استخدم منشن عضو أو رتبة واحدة فقط، وليس الاثنين معًا.');
+    await send(message, 'Mention One User Or Role Only');
     return true;
   }
 
@@ -51,18 +51,18 @@ async function handleTrust(message, client) {
 
   if (parsed.roleId) {
     const role = await message.guild.roles.fetch(id).catch(() => null);
-    if (!role) return send(message, 'الرتبة غير موجودة في هذا السيرفر.');
-    if (role.managed || role.id === message.guild.id) return send(message, 'لا يمكن Trust لرتبة managed أو رتبة Everyone.');
+    if (!role) return send(message, 'Role Not Found');
+    if (role.managed || role.id === message.guild.id) return send(message, 'Can\'t Trust Managed Or @everyone Role');
   } else {
     const member = await message.guild.members.fetch(id).catch(() => null);
-    if (!member) return send(message, 'العضو غير موجود في هذا السيرفر. استخدم منشن أو ID صحيح.');
+    if (!member) return send(message, 'Member Not Found');
   }
 
   const current = new Set(Array.isArray(config?.[key]) ? config[key] : []);
   if (adding) current.add(id);
   else current.delete(id);
   await updateGuildConfig(client, message.guild.id, { [key]: [...current] });
-  await message.channel.send(`${adding ? '🛡️ تمت إضافة' : '✅ تمت إزالة'} ${parsed.roleId ? `<@&${id}>` : `<@${id}>`} ${adding ? 'إلى' : 'من'} قائمة Trust.`).catch(() => {});
+  await message.channel.send({ content: `${adding ? '🛡️' : '➖'} ${parsed.roleId ? `<@&${id}>` : `<@${id}>`} ${adding ? 'Trusted' : 'Untrusted'}`, allowedMentions: { parse: [] } }).catch(() => {});
   return true;
 }
 

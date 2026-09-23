@@ -3,13 +3,13 @@ import { getGuildConfig } from '../services/config/guildConfig.js';
 const OWNER_ID = '1159601661392715906';
 
 async function reply(message, content) {
-  await message.channel.send(content).catch(() => {});
+  await message.channel.send({ content, allowedMentions: { parse: [] } }).catch(() => {});
   return true;
 }
 
 /** Lists the Anti-Nuke trusted members, bots and roles for the current guild. */
 export async function handleTrustedListCommand(message, client) {
-  if (message.author.id !== OWNER_ID) return reply(message, '❌ أمر Trust متاح للمالك فقط.');
+  if (message.author.id !== OWNER_ID) return reply(message, '🚫 Owner Only');
 
   const config = await getGuildConfig(client, message.guild.id);
   const trustedUserIds = Array.isArray(config?.antiNukeTrustedUsers) ? config.antiNukeTrustedUsers : [];
@@ -20,7 +20,7 @@ export async function handleTrustedListCommand(message, client) {
   for (const userId of [...new Set(trustedUserIds)]) {
     const member = await message.guild.members.fetch(userId).catch(() => null);
     const user = member?.user || await client.users.fetch(userId).catch(() => null);
-    const entry = `<@${userId}> (${user?.tag || user?.username || userId})`;
+    const entry = `<@${userId}>`;
     if (user?.bot) bots.push(entry);
     else users.push(entry);
   }
@@ -28,16 +28,12 @@ export async function handleTrustedListCommand(message, client) {
   const roles = [];
   for (const roleId of [...new Set(trustedRoleIds)]) {
     const role = await message.guild.roles.fetch(roleId).catch(() => null);
-    roles.push(role ? `<@&${role.id}> (${role.name})` : `<@&${roleId}> (رتبة غير موجودة)`);
+    roles.push(`<@&${role?.id || roleId}>`);
   }
 
-  return reply(message, [
-    '🛡️ **قائمة Trusted في هذا السيرفر**',
-    '',
-    `**الأعضاء (${users.length}):**`, users.length ? users.join('\n') : 'لا يوجد',
-    '',
-    `**البوتات (${bots.length}):**`, bots.length ? bots.join('\n') : 'لا يوجد',
-    '',
-    `**الرتب (${roles.length}):**`, roles.length ? roles.join('\n') : 'لا يوجد',
-  ].join('\n'));
+  const parts = [];
+  if (users.length) parts.push(`👤 ${users.join(' ')}`);
+  if (bots.length) parts.push(`🤖 ${bots.join(' ')}`);
+  if (roles.length) parts.push(`🎭 ${roles.join(' ')}`);
+  return reply(message, parts.length ? `🛡️ Trusted: ${parts.join(' | ')}` : '🛡️ No Trusted Members');
 }

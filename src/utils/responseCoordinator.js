@@ -1,15 +1,25 @@
 // responseCoordinator.js — single respond-once gate for prefix and slash commands
 
-import { buildUserErrorEmbed } from './embeds.js';
 import { logger } from './logger.js';
 
 function getCommandJson(commandData) {
   return commandData?.toJSON ? commandData.toJSON() : commandData;
 }
 
-export function buildPrefixUsage(prefix, commandData, validation) {
+const OPTION_PLACEHOLDERS = { 6: '@user', 7: '#channel', 8: '@role', 9: '@user' };
+
+function optionPlaceholder(option) {
+  const label = OPTION_PLACEHOLDERS[option.type] || option.name;
+  return option.required ? label : `[${label}]`;
+}
+
+/**
+ * Short usage line, e.g. `بان @user [reason]` or `!todo add|list|remove`.
+ * `commandLabel` is what the member typed (Arabic alias, with or without prefix).
+ */
+export function buildPrefixUsage(prefix, commandData, validation, commandLabel = null) {
   const commandJson = getCommandJson(commandData);
-  const usageParts = [`${prefix}${commandJson.name}`];
+  const usageParts = [commandLabel || `${prefix}${commandJson.name}`];
 
   if (validation.subcommandGroupName) {
     usageParts.push(validation.subcommandGroupName);
@@ -17,13 +27,13 @@ export function buildPrefixUsage(prefix, commandData, validation) {
 
   if (validation.subcommandName) {
     usageParts.push(validation.subcommandName);
-  } else if (!validation.subcommandGroupName && commandJson.options?.some((opt) => opt.type === 1)) {
-    usageParts.push('[subcommand]');
+  } else if (!validation.subcommandGroupName && commandJson.options?.some((opt) => opt.type === 1 || opt.type === 2)) {
+    usageParts.push(commandJson.options.filter((opt) => opt.type === 1 || opt.type === 2).map((opt) => opt.name).join('|'));
   }
 
   const optionDefs = validation.optionDefs || [];
   for (const option of optionDefs) {
-    usageParts.push(`[${option.name}]`);
+    usageParts.push(optionPlaceholder(option));
   }
 
   return usageParts.filter(Boolean).join(' ');
@@ -179,19 +189,14 @@ export class ResponseCoordinator {
   }
 
   async respondUsage(usageLine) {
-    const embed = buildUserErrorEmbed(
-      'validation',
-      `Usage\n\`${usageLine}\``,
-      { titleOverride: 'Wrong Usage' }
-    );
-
-    const result = await this.respond({ embeds: [embed] });
+    const result = await this.respond({ content: `❌ Usage: \`${usageLine}\``, embeds: [], allowedMentions: { parse: [] } });
     this.markFinalized('usage');
     return result;
   }
 
   async respondUsageFromCommand(prefix, commandData, validation) {
-    const usageLine = buildPrefixUsage(prefix, commandData, validation);
+    const typedCommand = String(this.message?.content || '').trim().split(/\s+/u)[0] || null;
+    const usageLine = buildPrefixUsage(prefix, commandData, validation, typedCommand);
     return this.respondUsage(usageLine);
   }
 }

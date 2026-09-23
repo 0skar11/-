@@ -4,7 +4,7 @@ import { TitanBotError, ErrorTypes } from '../../utils/errorHandler.js';
 import { logModerationAction } from '../../utils/moderation.js';
 
 function getTargetLabel(target) {
-  return target?.user?.tag ?? target?.displayName ?? target?.tag ?? 'this user';
+  return target?.id ? `<@${target.id}>` : 'this user';
 }
 function getHighestRole(member) {
   return member?.roles?.highest ?? null;
@@ -13,9 +13,9 @@ function getHighestRole(member) {
 export class ModerationService {
   static buildHierarchyMessage({ actor, actorRole, targetRole, targetLabel, action }) {
     if (actor === 'moderator') {
-      return `❌ لا يمكنك ${action} **${targetLabel}** لأن رتبته مساوية أو أعلى من رتبتك (**${actorRole.name}**).`;
+      return `❌ ${targetLabel} Role Is Higher Than Yours`;
     }
-    return `❌ لا أستطيع ${action} **${targetLabel}** لأن رتبة البوت (**${actorRole.name}**) مساوية أو أقل من رتبته (**${targetRole.name}**). ارفع رتبة البوت.`;
+    return `❌ ${targetLabel} Role Is Higher Than Mine`;
   }
 
   static buildHierarchySkipReason(moderator, target, action, actor = 'moderator') {
@@ -34,11 +34,11 @@ export class ModerationService {
   }
 
   static validateHierarchy(moderator, target, action) {
-    if (!moderator || !target) return { valid: false, error: '❌ لم يتم العثور على العضو أو المشرف.' };
+    if (!moderator || !target) return { valid: false, error: '❌ Member Not Found' };
     if (moderator.guild?.ownerId === moderator.id || moderator.permissions?.has(PermissionFlagsBits.Administrator)) return { valid: true };
     const modRole = getHighestRole(moderator);
     const targetRole = getHighestRole(target);
-    if (!modRole || !targetRole) return { valid: false, error: '❌ تعذر معرفة ترتيب الرتب.' };
+    if (!modRole || !targetRole) return { valid: false, error: '❌ Can\'t Read Role Order' };
     if (modRole.position <= targetRole.position) {
       return { valid: false, error: this.buildHierarchyMessage({ actor: 'moderator', actorRole: modRole, targetRole, targetLabel: getTargetLabel(target), action }) };
     }
@@ -49,7 +49,7 @@ export class ModerationService {
     const botMember = target?.guild?.members?.me;
     const botRole = getHighestRole(botMember);
     const targetRole = getHighestRole(target);
-    if (!botMember || !botRole || !targetRole) return { valid: false, error: '❌ لم أستطع العثور على رتبة البوت.' };
+    if (!botMember || !botRole || !targetRole) return { valid: false, error: '❌ Bot Role Not Found' };
     if (botRole.position <= targetRole.position) {
       return { valid: false, error: this.buildHierarchyMessage({ actor: 'bot', actorRole: botRole, targetRole, targetLabel: getTargetLabel(target), action }) };
     }
@@ -64,13 +64,13 @@ export class ModerationService {
   }
 
   static async banUser({ guild, user, moderator, reason = 'No reason provided', deleteDays = 0 }) {
-    if (!guild || !user || !moderator) throw new TitanBotError('Missing required parameters', ErrorTypes.VALIDATION, '❌ بيانات السيرفر أو العضو ناقصة.');
+    if (!guild || !user || !moderator) throw new TitanBotError('Missing required parameters', ErrorTypes.VALIDATION, '❌ Member Not Found');
     const targetMember = await guild.members.fetch(user.id).catch(() => null);
     if (targetMember) {
       this.assertModerationHierarchy(moderator, targetMember, 'حظر');
-      if (!targetMember.bannable) throw new TitanBotError('Member not bannable', ErrorTypes.PERMISSION, '❌ لا أستطيع حظر هذا العضو. تحقق من صلاحية Ban Members وترتيب الرتب.');
+      if (!targetMember.bannable) throw new TitanBotError('Member not bannable', ErrorTypes.PERMISSION, '❌ Can\'t Ban This Member');
     } else if (guild.ownerId !== moderator.id && !moderator.permissions?.has([PermissionFlagsBits.BanMembers, PermissionFlagsBits.Administrator])) {
-      throw new TitanBotError('Missing ban permission', ErrorTypes.PERMISSION, '❌ تحتاج إلى صلاحية Ban Members لحظر عضو خارج السيرفر.');
+      throw new TitanBotError('Missing ban permission', ErrorTypes.PERMISSION, '🚫 No Permission');
     }
 
     await guild.members.ban(user.id, {
@@ -86,9 +86,9 @@ export class ModerationService {
   }
 
   static async kickUser({ guild, member, moderator, reason = 'No reason provided' }) {
-    if (!guild || !member || !moderator) throw new TitanBotError('Missing required parameters', ErrorTypes.VALIDATION, '❌ بيانات السيرفر أو العضو ناقصة.');
+    if (!guild || !member || !moderator) throw new TitanBotError('Missing required parameters', ErrorTypes.VALIDATION, '❌ Member Not Found');
     this.assertModerationHierarchy(moderator, member, 'طرد');
-    if (!member.kickable) throw new TitanBotError('Member not kickable', ErrorTypes.PERMISSION, '❌ لا أستطيع طرد هذا العضو. تحقق من صلاحية Kick Members وترتيب الرتب.');
+    if (!member.kickable) throw new TitanBotError('Member not kickable', ErrorTypes.PERMISSION, '❌ Can\'t Kick This Member');
 
     await member.kick(reason);
     const caseId = await logModerationAction({ client: guild.client, guild, event: {
@@ -100,9 +100,9 @@ export class ModerationService {
   }
 
   static async timeoutUser({ guild, member, moderator, durationMs, reason = 'No reason provided' }) {
-    if (!guild || !member || !moderator || !durationMs) throw new TitanBotError('Missing required parameters', ErrorTypes.VALIDATION, '❌ بيانات العضو أو المدة ناقصة.');
+    if (!guild || !member || !moderator || !durationMs) throw new TitanBotError('Missing required parameters', ErrorTypes.VALIDATION, '❌ Member Or Duration Missing');
     this.assertModerationHierarchy(moderator, member, 'إعطاء تايم أوت لـ');
-    if (!member.moderatable) throw new TitanBotError('Member not moderatable', ErrorTypes.PERMISSION, '❌ لا أستطيع إعطاء تايم أوت لهذا العضو. تحقق من صلاحية Moderate Members وترتيب الرتب.');
+    if (!member.moderatable) throw new TitanBotError('Member not moderatable', ErrorTypes.PERMISSION, '❌ Can\'t Timeout This Member');
 
     await member.timeout(durationMs, reason);
     const durationMinutes = Math.floor(durationMs / 60000);
@@ -116,10 +116,10 @@ export class ModerationService {
   }
 
   static async removeTimeoutUser({ guild, member, moderator, reason = 'Timeout removed by moderator' }) {
-    if (!guild || !member || !moderator) throw new TitanBotError('Missing required parameters', ErrorTypes.VALIDATION, '❌ بيانات السيرفر أو العضو ناقصة.');
+    if (!guild || !member || !moderator) throw new TitanBotError('Missing required parameters', ErrorTypes.VALIDATION, '❌ Member Not Found');
     this.assertModerationHierarchy(moderator, member, 'إزالة التايم أوت عن');
-    if (!member.moderatable) throw new TitanBotError('Member not moderatable', ErrorTypes.PERMISSION, '❌ لا أستطيع تعديل هذا العضو. تحقق من صلاحية Moderate Members وترتيب الرتب.');
-    if (!member.isCommunicationDisabled()) throw new TitanBotError('User not timed out', ErrorTypes.VALIDATION, `❌ ${member.user.tag} ليس عليه تايم أوت حالياً.`);
+    if (!member.moderatable) throw new TitanBotError('Member not moderatable', ErrorTypes.PERMISSION, '❌ Can\'t Edit This Member');
+    if (!member.isCommunicationDisabled()) throw new TitanBotError('User not timed out', ErrorTypes.VALIDATION, `❌ ${member} Is Not Timed Out`);
 
     await member.timeout(null, reason);
     await logModerationAction({ client: guild.client, guild, event: {
@@ -131,9 +131,9 @@ export class ModerationService {
   }
 
   static async unbanUser({ guild, user, moderator, reason = 'No reason provided' }) {
-    if (!guild || !user || !moderator) throw new TitanBotError('Missing required parameters', ErrorTypes.VALIDATION, '❌ بيانات السيرفر أو العضو ناقصة.');
+    if (!guild || !user || !moderator) throw new TitanBotError('Missing required parameters', ErrorTypes.VALIDATION, '❌ Member Not Found');
     const banInfo = await guild.bans.fetch(user.id).catch(() => null);
-    if (!banInfo) throw new TitanBotError('User not banned', ErrorTypes.VALIDATION, `❌ ${user.tag} غير محظور من هذا السيرفر.`);
+    if (!banInfo) throw new TitanBotError('User not banned', ErrorTypes.VALIDATION, `❌ ${user} Is Not Banned`);
 
     await guild.members.unban(user.id, reason);
     const caseId = await logModerationAction({ client: guild.client, guild, event: {
