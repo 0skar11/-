@@ -54,6 +54,16 @@ function buildEmbed() {
     );
 }
 
+/** What the list shows: title, description and every field. Any difference triggers an edit. */
+function embedSignature(embed) {
+  return JSON.stringify({
+    title: embed?.title || '',
+    description: embed?.description || '',
+    color: embed?.color ?? null,
+    fields: (embed?.fields || []).map(({ name, value }) => ({ name, value })),
+  });
+}
+
 /**
  * Posts the Arabic moderation commands list once in its channel.
  * Returns { status, channelId } where status is 'sent', 'updated' or 'exists'; throws on failure.
@@ -84,9 +94,8 @@ export async function publishArabicModerationCommands(client) {
     // Keep the posted list in sync with the code (new commands, removed legacy marker).
     const embed = buildEmbed();
     const outdated = existing.content?.includes(LEGACY_MARKER)
-      || existing.embeds[0]?.footer?.text
-      || JSON.stringify(existing.embeds[0]?.fields?.map(({ name, value }) => ({ name, value })))
-        !== JSON.stringify(embed.data.fields.map(({ name, value }) => ({ name, value })));
+      || Boolean(existing.embeds[0]?.footer?.text)
+      || embedSignature(existing.embeds[0]) !== embedSignature(embed.data);
     if (outdated) {
       await existing.edit({ content: '', embeds: [embed] });
       return { status: 'updated', channelId: channel.id };
