@@ -5,6 +5,7 @@ import { ModerationService } from '../services/moderation/moderationService.js';
 import { WarningService } from '../services/moderation/warningService.js';
 import { scheduleNoPermissionDelete } from './noPermissionReply.js';
 import { handlePurgeMessage } from '../services/moderation/channelPurgeService.js';
+import { refreshTrustedBoard } from '../services/trustedBoardService.js';
 
 const COMMANDS = new Set([
   'وارن', 'وارنات', 'تايم', 'انتايم', 'بان', 'انبان', 'كلير', 'ان', 'شيل', 'ر', 'رول', 'ب', 'رتبة', 'ازالةرتبة', 'purge', 'تراست', 'انتراست', 'trusted', 'trustedlist', 'warn', 'warnings', 'timeout', 'untimeout', 'ban', 'unban', 'clear', 'remove', 'role', 'roll', 'lock', 'unlock',
@@ -104,6 +105,7 @@ async function handleTrust(message, targetId) {
   const alreadyTrusted = trustedUsers.has(member.id);
   trustedUsers.add(member.id);
   await updateGuildConfig(message.client, message.guild.id, { antiNukeTrustedUsers: [...trustedUsers] });
+  if (!alreadyTrusted) await refreshTrustedBoard(message.client, message.guild.id);
   return reply(message, alreadyTrusted ? `ℹ️ ${member} محمي بالفعل من نظام Anti-Raid.` : `🛡️ تم إعطاء ${member} حماية من نظام Anti-Raid.`);
 }
 
