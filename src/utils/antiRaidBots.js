@@ -3,7 +3,6 @@ import { getGuildConfig } from '../services/config/guildConfig.js';
 import { sendAntiNukeLog } from './antiNukeLogging.js';
 
 const BOT_OWNER_ID = '1159601661392715906';
-const GLOBAL_LOG_CHANNEL_ID = '1550564287129456810';
 
 async function getBotAddExecutor(guild, botId) {
   const logs = await guild.fetchAuditLogs({ type: AuditLogEvent.BotAdd, limit: 10 }).catch(() => null);
@@ -43,16 +42,9 @@ export async function handleUntrustedBotJoin(member) {
   await sendAntiNukeLog(member.guild, {
     action: 'Untrusted bot blocked',
     target: `${member.user.tag} (${member.id})`,
-    executor: inviter?.user || member.guild.client.user,
-    auditLogId: entry?.id,
-    severity: 'HIGH',
-    channelId: GLOBAL_LOG_CHANNEL_ID,
-    details: [
-      ['Bot removed', botRemoved ? 'Yes' : 'No'],
-      ['Inviter', inviter ? `${inviter.user.tag} (${inviter.id})` : 'Unknown'],
-      ['Inviter removed', inviterRemoved ? 'Yes' : 'No'],
-      ['Reason', 'No explicit trust; role names do not bypass Anti-Raid'],
-    ],
+    executor: inviter?.user || member.user,
+    punishment: inviterRemoved ? 'تم طرده' : 'فشل طرده — يحتاج تدخل يدوي',
+    reason: `أضاف بوت غير موثوق <@${member.id}>${botRemoved ? ' وتم طرد البوت' : ''}`,
   });
 
   return botRemoved || inviterRemoved;

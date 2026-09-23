@@ -49,10 +49,11 @@ export async function inspectAdminRoleGrant(oldMember, newMember) {
   const executorKicked = executor?.kickable ? await executor.kick(reason).then(() => true).catch(() => false) : false;
 
   await sendAntiNukeLog(guild, {
-    action: `Administrator role given — kicked: receiver ${receiverKicked ? 'yes' : 'no'}, executor ${executorKicked ? 'yes' : 'no'}`,
-    target: `${newMember.user.tag} (${newMember.id}) — ${adminRoles.map((role) => role.name).join(', ')}`,
+    action: 'Administrator role given',
+    target: `${newMember.user.tag} (${newMember.id})`,
     executor: entry.executor,
-    auditLogId: entry.id,
+    punishment: executorKicked ? 'تم طرده' : 'فشل طرده — يحتاج تدخل يدوي',
+    reason: `أعطى رتبة Administrator (${adminRoles.map((role) => role.name).join(', ')}) لـ <@${newMember.id}>${receiverKicked ? ' وتم طرده هو كمان' : ''}`,
   });
   return receiverKicked || executorKicked;
 }
