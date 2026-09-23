@@ -35,6 +35,34 @@ const ROLE_DEFINITIONS = [
   { name: '📢 Event Manager', color: '#f39c12', permissions: [PermissionFlagsBits.Administrator] },
 ];
 
+// Baseline for a community server: members can chat, react, use threads and voice,
+// but nothing that moderates, manages the server or pings everyone.
+const EVERYONE_PERMISSIONS = [
+  PermissionFlagsBits.ViewChannel,
+  PermissionFlagsBits.CreateInstantInvite,
+  PermissionFlagsBits.ChangeNickname,
+  PermissionFlagsBits.SendMessages,
+  PermissionFlagsBits.SendMessagesInThreads,
+  PermissionFlagsBits.CreatePublicThreads,
+  PermissionFlagsBits.EmbedLinks,
+  PermissionFlagsBits.AttachFiles,
+  PermissionFlagsBits.AddReactions,
+  PermissionFlagsBits.UseExternalEmojis,
+  PermissionFlagsBits.UseExternalStickers,
+  PermissionFlagsBits.ReadMessageHistory,
+  PermissionFlagsBits.UseApplicationCommands,
+  PermissionFlagsBits.SendVoiceMessages,
+  PermissionFlagsBits.SendPolls,
+  PermissionFlagsBits.Connect,
+  PermissionFlagsBits.Speak,
+  PermissionFlagsBits.Stream,
+  PermissionFlagsBits.UseVAD,
+  PermissionFlagsBits.UseEmbeddedActivities,
+  PermissionFlagsBits.UseSoundboard,
+  PermissionFlagsBits.UseExternalSounds,
+  PermissionFlagsBits.RequestToSpeak,
+];
+
 // role.permissions.toArray() returns flag names ('ViewAuditLog'), while the labels are keyed by bit.
 function permissionNames(permissions) {
   return permissions.map((permission) => `✅ ${PERMISSION_LABELS.get(PermissionFlagsBits[permission] ?? permission) || permission}`);
@@ -71,6 +99,14 @@ export async function synchronizeStaffRoles(guild) {
       updated += 1;
     }
     if (!role.managed && role.position < botMember.roles.highest.position) managedRoles.push(role);
+  }
+
+  const everyoneRole = guild.roles.everyone;
+  const everyoneBits = EVERYONE_PERMISSIONS.reduce((bits, permission) => bits | permission, 0n);
+  if (everyoneRole.permissions.bitfield !== everyoneBits) {
+    await everyoneRole.setPermissions(EVERYONE_PERMISSIONS, 'Apply community member permissions to @everyone')
+      .then(() => { updated += 1; })
+      .catch((error) => logger.warn(`Could not update @everyone permissions in ${guild.name}: ${error.message}`));
   }
 
   const refreshedBotMember = await guild.members.fetchMe();
@@ -117,4 +153,4 @@ export async function publishStaffPermissionBoard(guild) {
   return { sent, edited, guildId: guild.id, channelId: channel.id };
 }
 
-export { ROLE_DEFINITIONS, ROLE_PERMISSIONS_CHANNEL_ID };
+export { EVERYONE_PERMISSIONS, ROLE_DEFINITIONS, ROLE_PERMISSIONS_CHANNEL_ID };
