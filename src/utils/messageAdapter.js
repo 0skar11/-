@@ -153,6 +153,7 @@ export function createMockInteraction(message, commandData, args) {
     createdAt: message.createdAt,
     _commandStartTime: commandStartTime,
     _isPrefixCommand: true,
+    _sourceMessage: message,
 
     client: message.client,
 
