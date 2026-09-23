@@ -115,8 +115,13 @@ export function mapArgumentsToOptions(args, commandData) {
     };
   }
 
-  const subcommandGroup = cmdData.options.find((opt) => opt.type === 2);
   const subcommands = cmdData.options.filter((opt) => opt.type === 1);
+  const subcommandGroups = cmdData.options.filter((opt) => opt.type === 2);
+  // Commands may mix plain subcommands with subcommand groups (e.g. `todo add` and
+  // `todo share create`). Only take the group path when the first argument names a group.
+  const firstArg = args[0]?.toLowerCase();
+  const matchedGroup = subcommandGroups.find((g) => g.name === firstArg);
+  const subcommandGroup = matchedGroup || (subcommands.length === 0 ? subcommandGroups[0] : undefined);
   const hasSubcommands = subcommands.length > 0 && !subcommandGroup;
 
   let currentArgs = args;
@@ -129,9 +134,12 @@ export function mapArgumentsToOptions(args, commandData) {
   if (subcommandGroup) {
     if (args.length > 0) {
       subcommandGroupName = args[0].toLowerCase();
-      const group = subcommandGroup.options?.find((g) => g.name === subcommandGroupName);
+      const group = subcommandGroups.find((g) => g.name === subcommandGroupName);
       if (group && args.length > 1) {
-        subcommandName = resolveSubcommandAlias(args[1]);
+        const literalSubcommand = args[1].toLowerCase();
+        subcommandName = group.options?.some((s) => s.name === literalSubcommand)
+          ? literalSubcommand
+          : resolveSubcommandAlias(args[1]);
         const sub = group.options?.find((s) => s.name === subcommandName);
         if (sub) {
           optionDefs = sub.options?.filter((opt) => opt.type !== 1 && opt.type !== 2) || [];
@@ -145,7 +153,11 @@ export function mapArgumentsToOptions(args, commandData) {
     }
   } else if (hasSubcommands) {
     if (args.length > 0) {
-      const resolvedSubcommand = resolveSubcommandAlias(args[0]);
+      // Prefer an exact subcommand name over an alias (e.g. `music stop` must not become `end`).
+      const literalSubcommand = args[0].toLowerCase();
+      const resolvedSubcommand = subcommands.some((s) => s.name === literalSubcommand)
+        ? literalSubcommand
+        : resolveSubcommandAlias(args[0]);
       logger.debug(
         `Looking for subcommand: ${resolvedSubcommand}, available: ${subcommands.map((s) => s.name).join(', ')}`,
       );
@@ -185,7 +197,7 @@ export function mapArgumentsToOptions(args, commandData) {
   if ((hasSubcommands || subcommandGroup) && !subcommandName && !subcommandGroupName) {
     const availableSubcommands = hasSubcommands
       ? subcommands.map((s) => s.name).join(',') || 'none'
-      : subcommandGroup?.options?.map((g) => g.name).join(',') || 'none';
+      : subcommandGroups.map((g) => g.name).join(',') || 'none';
     missing.push({
       name: subcommandGroup ? 'subcommand group' : 'subcommand',
       description: `Available: ${availableSubcommands}`,
@@ -198,7 +210,7 @@ export function mapArgumentsToOptions(args, commandData) {
       type: 1,
     });
   } else if (subcommandGroup && subcommandGroupName && !subcommandName) {
-    const group = subcommandGroup.options?.find((g) => g.name === subcommandGroupName);
+    const group = subcommandGroups.find((g) => g.name === subcommandGroupName);
     const availableSubcommands = group?.options?.map((s) => s.name).join(',') || 'none';
     missing.push({
       name: 'subcommand',

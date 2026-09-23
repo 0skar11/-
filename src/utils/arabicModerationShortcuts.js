@@ -176,6 +176,37 @@ async function listWarnings(message, targetMember, guildId) {
   return true;
 }
 
+const ARABIC_ADD_ROLE_COMMANDS = new Set(['ر', 'رول', 'ان', 'رتبة']);
+const ARABIC_REMOVE_ROLE_COMMANDS = new Set(['ب', 'شيل', 'ازالةرتبة']);
+
+/**
+ * Arabic role shortcuts (`ر @member role` / `ب @member role`), with or without the prefix.
+ * Only Arabic names are handled here so English words such as `roll` keep their normal commands.
+ */
+export async function handleArabicRoleShortcut(message, prefixes = []) {
+  const parts = stripPrefix(message.content, prefixes).split(/\s+/u).filter(Boolean);
+  const command = parts[0]?.toLowerCase();
+  const add = ARABIC_ADD_ROLE_COMMANDS.has(command);
+  if (!add && !ARABIC_REMOVE_ROLE_COMMANDS.has(command)) return false;
+
+  const body = parts.slice(1).join(' ');
+  const mention = body.match(/<@!?(\d+)>/u);
+  const id = body.match(/(?:^|\s)(\d{17,20})(?:\s|$)/u);
+  const targetId = mention?.[1] || id?.[1] || await getReplyTargetId(message);
+  const roleName = body.replace(/<@!?\d+>/u, '').replace(/(?:^|\s)\d{17,20}(?=\s|$)/u, '').trim();
+  if (!targetId) return true;
+  if (!roleName) return reply(message, `❌ اكتب اسم الرتبة، مثال: \`${command} @member اسم_الرتبة\``);
+
+  const targetMember = await message.guild.members.fetch(targetId).catch(() => null);
+  if (!targetMember) return reply(message, '❌ العضو غير موجود في السيرفر.');
+  try {
+    await changeRole(message, targetMember, roleName, add);
+  } catch (error) {
+    await reply(message, `❌ ${error.userMessage || error.message || 'حدث خطأ أثناء تنفيذ الأمر.'}`);
+  }
+  return true;
+}
+
 export async function handleArabicModerationShortcut(message) {
   const guildConfig = await getGuildConfig(message.client, message.guild.id).catch(() => null);
   const parsed = tokenize(message.content, [guildConfig?.prefix, getCommandPrefix()]);
