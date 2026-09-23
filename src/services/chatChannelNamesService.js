@@ -8,6 +8,9 @@ export const CHAT_CATEGORY_ID = '1547310338133860463';
 // cleaned name so the IDs don't need to be known.
 const TIDY_CATEGORY_NAMES = new Set(['staff', 'important', 'communication', 'voices', 'logs']);
 
+// Channels tidied wherever they are, matched by their cleaned name.
+const EXTRA_CHANNEL_NAMES = new Set(['proof', 'proofs']);
+
 // The log channels are looked up by their exact name, so only their
 // category gets renamed.
 const KEEP_CHANNEL_NAMES_IN = new Set([AUDIT_LOG_CATEGORY_ID]);
@@ -19,6 +22,7 @@ const DEFAULT_EMOJI = '💬';
 // cleaned channel name, so Arabic, English and Franco names all work.
 const EMOJI_RULES = [
   { emoji: '👑', words: ['staff', 'ستاف', 'الادارة', 'ادارة'] },
+  { emoji: '🧾', words: ['proof', 'proofs', 'اثبات', 'اثباتات', 'دليل'] },
   { emoji: '📌', words: ['important', 'مهم'] },
   { emoji: '🔊', words: ['voices', 'voice', 'فويس', 'فويسات'] },
   { emoji: '📁', words: ['logs', 'log', 'لوج', 'لوجات'] },
@@ -128,6 +132,13 @@ export async function tidyChatChannelNames(client) {
       for (const channel of channels.values()) {
         await renameIfNeeded(channel, formatChatChannelName(channel.name), summary);
       }
+    }
+
+    const extraChannels = guild.channels.cache.filter(channel => RENAMABLE_TYPES.has(channel.type)
+      && !categories.has(channel.parentId)
+      && EXTRA_CHANNEL_NAMES.has(cleanChannelName(channel.name)));
+    for (const channel of extraChannels.values()) {
+      await renameIfNeeded(channel, formatChatChannelName(channel.name), summary);
     }
   }
 

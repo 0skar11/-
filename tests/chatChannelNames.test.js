@@ -45,6 +45,7 @@ describe('formatChatChannelName', () => {
     assert.equal(formatChatChannelName('perms'), '🔐・perms');
     assert.equal(formatChatChannelName('commands'), '🤖・commands');
     assert.equal(formatChatChannelName('مشاكل'), '⚠️・مشاكل');
+    assert.equal(formatChatChannelName('proof'), '🧾・proof');
   });
 
   test('names the categories with the rule emoji', () => {
