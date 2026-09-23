@@ -14,6 +14,7 @@ import { getCountingGameConfig, saveCountingGameConfig, isValidCountingMessage, 
 import { handleTrustedListCommand } from '../utils/trustedCommand.js';
 import { handleArabicRoleShortcut, handleClearWarningsShortcut } from '../utils/arabicModerationShortcuts.js';
 import { handlePurgeMessage } from '../services/moderation/channelPurgeService.js';
+import { handleReportMessage } from '../services/issueReportService.js';
 
 export default {
   name: Events.MessageCreate,
@@ -60,6 +61,7 @@ async function handlePrefixCommand(message, client) {
     const guildConfig = await getGuildConfig(client, message.guild.id);
     const prefix = guildConfig?.prefix || getCommandPrefix();
     if (await handleArabicRoleShortcut(message, [prefix, getCommandPrefix()])) return;
+    if (await handleReportMessage(message, [prefix, getCommandPrefix()])) return;
     const parsed = parseCommandMessage(message.content, prefix);
     if (!parsed) return;
 
