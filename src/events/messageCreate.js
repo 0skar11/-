@@ -65,7 +65,7 @@ async function handlePrefixCommand(message, client) {
     let { commandName, args } = parsed;
     if (commandName.toLowerCase() === 'trusted') {
       if (args.length) {
-        await message.channel.send(`❌ Usage: \`${prefix}trusted\``).catch(() => {});
+        await message.channel.send(`⚠️ ${prefix}trusted`).catch(() => {});
       } else {
         await handleTrustedListCommand(message, client);
       }
