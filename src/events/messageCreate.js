@@ -2,7 +2,7 @@ import { Events } from 'discord.js';
 import { logger } from '../utils/logger.js';
 import { handleArabicUtilityShortcuts } from '../utils/arabicUtilityShortcuts.js';
 import { handleMessageDeleteShortcut } from '../utils/messageDeleteShortcut.js';
-import { parsePrefixCommand } from '../utils/prefixParser.js';
+import { parsePrefixCommand, parseMessageCommand } from '../utils/prefixParser.js';
 import { supportsPrefixExecution, executePrefixCommand, resolvePrefixAccessKey } from '../utils/messageAdapter.js';
 import { resolveCommandAlias, resolveSubcommandAlias } from '../config/commands/commandAliases.js';
 import { getPrefixRestriction } from '../config/commands/prefixRestrictions.js';
@@ -32,12 +32,28 @@ export default {
   },
 };
 
+// Arabic moderation commands also work without the prefix (e.g. `بان @member`).
+// To avoid reacting to normal chat, the first argument must look like a real target.
+const TARGET_ARG = /^(?:<@!?\d+>|\d{17,20})$/u;
+const NO_PREFIX_ARABIC_COMMANDS = new Map([
+  ['بان', TARGET_ARG], ['انبان', TARGET_ARG], ['تايم', TARGET_ARG], ['انتايم', TARGET_ARG],
+  ['وارن', TARGET_ARG], ['وارنات', TARGET_ARG], ['كلير', /^[0-9٠-٩]+$/u],
+]);
+
+function parseNoPrefixArabicCommand(content, prefix) {
+  const parsed = parseMessageCommand(content, prefix);
+  const argPattern = parsed && NO_PREFIX_ARABIC_COMMANDS.get(parsed.commandName);
+  if (!argPattern || !argPattern.test(parsed.args[0] || '')) return null;
+  const toWesternDigits = (value) => value.replace(/[٠-٩]/gu, (digit) => String('٠١٢٣٤٥٦٧٨٩'.indexOf(digit)));
+  return { commandName: parsed.commandName, args: parsed.args.map(toWesternDigits) };
+}
+
 async function handlePrefixCommand(message, client) {
   try {
     const guildConfig = await getGuildConfig(client, message.guild.id);
     const prefix = guildConfig?.prefix || getCommandPrefix();
     if (await handleArabicRoleShortcut(message, [prefix, getCommandPrefix()])) return;
-    const parsed = parsePrefixCommand(message.content, prefix);
+    const parsed = parsePrefixCommand(message.content, prefix) || parseNoPrefixArabicCommand(message.content, prefix);
     if (!parsed) return;
 
     let { commandName, args } = parsed;
