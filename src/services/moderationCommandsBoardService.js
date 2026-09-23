@@ -64,11 +64,36 @@ function embedSignature(embed) {
   });
 }
 
+const isBoardMessage = (message, botId) => message.author?.id === botId && (
+  message.embeds[0]?.title === MODERATION_COMMANDS_TITLE || message.content?.includes(LEGACY_MARKER)
+);
+
+/** Scans the whole channel history (not only the last 100 messages), oldest board first. */
+async function findBoardMessages(channel, botId) {
+  const found = [];
+  let before;
+  for (let page = 0; page < 50; page++) {
+    const batch = await channel.messages.fetch({ limit: 100, ...(before ? { before } : {}) });
+    found.push(...batch.filter((message) => isBoardMessage(message, botId)).values());
+    if (batch.size < 100) break;
+    before = batch.lastKey();
+  }
+  return found.sort((a, b) => a.createdTimestamp - b.createdTimestamp);
+}
+
+let inFlight = null;
+
 /**
  * Posts the Arabic moderation commands list once in its channel.
  * Returns { status, channelId } where status is 'sent', 'updated' or 'exists'; throws on failure.
  */
-export async function publishArabicModerationCommands(client) {
+export function publishArabicModerationCommands(client) {
+  // Startup and the slash command can run together; share one run so only one message is sent.
+  inFlight ||= publish(client).finally(() => { inFlight = null; });
+  return inFlight;
+}
+
+async function publish(client) {
   const channel = await client.channels.fetch(MODERATION_COMMANDS_CHANNEL_ID).catch((error) => {
     throw new Error(`Channel ${MODERATION_COMMANDS_CHANNEL_ID} could not be fetched (is the bot in that server?): ${error.message}`);
   });
@@ -83,13 +108,10 @@ export async function publishArabicModerationCommands(client) {
     throw new Error(`Missing permissions in channel ${MODERATION_COMMANDS_CHANNEL_ID}: ${missing.join(', ')}`);
   }
 
-  const recentMessages = await channel.messages.fetch({ limit: 100 });
-  const existing = recentMessages.find((message) =>
-    message.author?.id === client.user.id && (
-      message.embeds[0]?.title === MODERATION_COMMANDS_TITLE ||
-      message.content?.includes(LEGACY_MARKER)
-    )
-  );
+  const boards = await findBoardMessages(channel, client.user.id);
+  const [existing, ...duplicates] = boards;
+  // Earlier restarts may have posted extra copies; keep only the oldest one.
+  for (const duplicate of duplicates) await duplicate.delete().catch(() => {});
   if (existing) {
     // Keep the posted list in sync with the code (new commands, removed legacy marker).
     const embed = buildEmbed();
