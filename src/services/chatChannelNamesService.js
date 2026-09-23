@@ -64,7 +64,8 @@ export function pickChannelEmoji(cleanName) {
 export function formatChatChannelName(name) {
   const clean = cleanChannelName(name);
   if (!clean) return null;
-  return `${pickChannelEmoji(clean)}${SEPARATOR}${clean}`.slice(0, 100);
+  const suffix = `${SEPARATOR}${pickChannelEmoji(clean)}`;
+  return `${clean.slice(0, 100 - suffix.length)}${suffix}`;
 }
 
 export async function tidyChatChannelNames(client) {
