@@ -1,6 +1,6 @@
 import { getGuildConfig } from '../services/config/guildConfig.js';
+import { isServerOwner } from '../config/serverOwners.js';
 
-const OWNER_ID = '1159601661392715906';
 
 async function reply(message, content) {
   await message.channel.send({ content, allowedMentions: { parse: [] } }).catch(() => {});
@@ -9,7 +9,7 @@ async function reply(message, content) {
 
 /** Lists the Anti-Nuke trusted members, bots and roles for the current guild. */
 export async function handleTrustedListCommand(message, client) {
-  if (message.author.id !== OWNER_ID) return reply(message, '🚫 Owner Only');
+  if (!isServerOwner(message.author.id)) return reply(message, '🚫 Owner Only');
 
   const config = await getGuildConfig(client, message.guild.id);
   const trustedUserIds = Array.isArray(config?.antiNukeTrustedUsers) ? config.antiNukeTrustedUsers : [];

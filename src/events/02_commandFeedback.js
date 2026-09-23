@@ -1,10 +1,10 @@
 import { Events, PermissionFlagsBits } from 'discord.js';
 import { getGuildConfig, updateGuildConfig } from '../services/config/guildConfig.js';
 import { getCommandPrefix } from '../config/bot.js';
+import { isServerOwner } from '../config/serverOwners.js';
 import { refreshTrustedBoard, TRUSTED_BOARD_CHANNEL_ID } from '../services/trustedBoardService.js';
 
 const TRUST_COMMANDS = new Set(['trust', 'untrust', 'تراست', 'انتراست']);
-const OWNER_ID = '1159601661392715906';
 const TRUST_MARKER = '__titanbot_trust_handled__';
 const BOARD_REPLY_DELETE_MS = 3_000;
 
@@ -39,7 +39,7 @@ async function handleTrust(message, client) {
   if (!parsed) return false;
   message.content = TRUST_MARKER;
 
-  if (message.author.id !== OWNER_ID) {
+  if (!isServerOwner(message.author.id)) {
     // The protected channel guard already deletes the message and warns the author there.
     if (message.channelId !== TRUSTED_BOARD_CHANNEL_ID) await message.channel.send('🚫 Owner Only').catch(() => {});
     return true;
