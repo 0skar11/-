@@ -1,13 +1,13 @@
 import { ActionRowBuilder, ButtonBuilder, ButtonStyle } from 'discord.js';
 import { logger } from '../../utils/logger.js';
+import { isServerOwner } from '../../config/serverOwners.js';
 
-// `purge` wipes the whole channel. Only this user can run it, and only after pressing Confirm.
-export const PURGE_OWNER_ID = '1159601661392715906';
+// `purge` wipes the whole channel. Only the server owners can run it, and only after pressing Confirm.
 const CONFIRM_WINDOW_MS = 60_000;
 const RESULT_DELETE_DELAY_MS = 5_000;
 
 export function isPurgeOwner(userId) {
-  return String(userId) === PURGE_OWNER_ID;
+  return isServerOwner(userId);
 }
 
 export function canPurgeChannel(channel) {

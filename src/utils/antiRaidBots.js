@@ -1,8 +1,8 @@
 import { AuditLogEvent, Events } from 'discord.js';
 import { getGuildConfig } from '../services/config/guildConfig.js';
 import { sendAntiNukeLog } from './antiNukeLogging.js';
+import { isServerOwner } from '../config/serverOwners.js';
 
-const BOT_OWNER_ID = '1159601661392715906';
 
 async function getBotAddExecutor(guild, botId) {
   const logs = await guild.fetchAuditLogs({ type: AuditLogEvent.BotAdd, limit: 10 }).catch(() => null);
@@ -13,7 +13,7 @@ async function getBotAddExecutor(guild, botId) {
 
 function isExplicitlyTrusted(config, member) {
   if (!member) return false;
-  return member.id === BOT_OWNER_ID
+  return isServerOwner(member.id)
     || config?.antiNukeTrustedUsers?.includes(member.id) === true;
 }
 

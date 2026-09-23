@@ -1,5 +1,6 @@
 import { PermissionFlagsBits } from 'discord.js';
 import { getCommandPrefix } from '../config/bot.js';
+import { isServerOwner } from '../config/serverOwners.js';
 import { getGuildConfig, updateGuildConfig } from '../services/config/guildConfig.js';
 import { ModerationService } from '../services/moderation/moderationService.js';
 import { WarningService } from '../services/moderation/warningService.js';
@@ -14,7 +15,6 @@ const COMMANDS = new Set([
 ].map((value) => value.toLowerCase()));
 const ADD_ROLE_COMMANDS = new Set(['ر', 'رول', 'ان', 'رتبة', 'role', 'roll', 'addrole']);
 const REMOVE_ROLE_COMMANDS = new Set(['ب', 'شيل', 'ازالةرتبة', 'remove', 'unrole', 'removerole']);
-const OWNER_ID = '1159601661392715906';
 const MAX_TIMEOUT_MS = 28 * 24 * 60 * 60 * 1000;
 
 function parseDuration(value) {
@@ -80,7 +80,7 @@ async function getReplyTargetId(message) {
 }
 
 async function handleTrustedList(message) {
-  if (message.author.id !== OWNER_ID) return reply(message, '❌ أمر Trust متاح للمالك فقط.');
+  if (!isServerOwner(message.author.id)) return reply(message, '❌ أمر Trust متاح للمالك فقط.');
   const config = await getGuildConfig(message.client, message.guild.id);
   const trustedUserIds = Array.isArray(config?.antiNukeTrustedUsers) ? config.antiNukeTrustedUsers : [];
   const trustedRoleIds = Array.isArray(config?.antiNukeTrustedRoles) ? config.antiNukeTrustedRoles : [];
@@ -102,7 +102,7 @@ async function handleTrustedList(message) {
 }
 
 async function handleTrust(message, targetId) {
-  if (message.author.id !== OWNER_ID) return reply(message, '❌ أمر Trust متاح للمالك فقط.');
+  if (!isServerOwner(message.author.id)) return reply(message, '❌ أمر Trust متاح للمالك فقط.');
   const resolvedTargetId = targetId || await getReplyTargetId(message);
   if (!resolvedTargetId) return true;
   const member = await message.guild.members.fetch(resolvedTargetId).catch(() => null);
