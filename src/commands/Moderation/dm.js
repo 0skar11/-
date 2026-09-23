@@ -1,12 +1,14 @@
-import { SlashCommandBuilder, PermissionFlagsBits, PermissionsBitField, ChannelType, MessageFlags } from 'discord.js';
-import { createEmbed, successEmbed, infoEmbed, warningEmbed } from '../../utils/embeds.js';
+import { SlashCommandBuilder, PermissionFlagsBits, MessageFlags } from 'discord.js';
+import { successEmbed } from '../../utils/embeds.js';
 import { logEvent } from '../../utils/moderation.js';
 import { logger } from '../../utils/logger.js';
 import { sanitizeMarkdown } from '../../utils/validation.js';
 
 import { InteractionHelper } from '../../utils/interactionHelper.js';
-import { replyUserError, ErrorTypes } from '../../utils/errorHandler.js';
+import { ErrorTypes } from '../../utils/errorHandler.js';
 import { isUserArg } from '../../utils/prefixArgs.js';
+import { deleteSourceMessage, replyAnonymousError, sendAnonymousLog } from '../../utils/anonymousCommand.js';
+
 export default {
     data: new SlashCommandBuilder()
         .setName("dm")
@@ -23,12 +25,6 @@ export default {
                 .setDescription("The message to send")
                 .setRequired(true)
         )
-        .addBooleanOption(option =>
-            option
-                .setName("anonymous")
-                .setDescription("Send the message anonymously (default: false)")
-                .setRequired(false)
-        )
         .setDefaultMemberPermissions(PermissionFlagsBits.ModerateMembers)
         .setDMPermission(false),
     category: "moderation",
@@ -40,7 +36,12 @@ export default {
     },
 
     async execute(interaction, config, client) {
-        const deferSuccess = await InteractionHelper.safeDefer(interaction);
+        // Prefix form: remove the command message right away so nobody sees who sent it.
+        const sourceMessage = await deleteSourceMessage(interaction);
+
+        const deferSuccess = await InteractionHelper.safeDefer(interaction, {
+            flags: MessageFlags.Ephemeral,
+        });
         if (!deferSuccess) {
             logger.warn(`DM interaction defer failed`, {
                 userId: interaction.user.id,
@@ -50,28 +51,27 @@ export default {
             return;
         }
 
-    const targetUser = interaction.options.getUser("user");
+        const targetUser = interaction.options.getUser("user");
         const message = interaction.options.getString("message");
-        const anonymous = interaction.options.getBoolean("anonymous") || false;
 
         try {
             
             if (message.length > 2000) {
-                return await replyUserError(interaction, { type: ErrorTypes.UNKNOWN, message: 'Messages must be under 2000 characters.' });
+                return await replyAnonymousError(interaction, { type: ErrorTypes.UNKNOWN, message: 'Messages must be under 2000 characters.' });
             }
 
             if (targetUser.bot) {
-                return await replyUserError(interaction, { type: ErrorTypes.UNKNOWN, message: 'You cannot send DMs to bot accounts.' });
+                return await replyAnonymousError(interaction, { type: ErrorTypes.UNKNOWN, message: 'You cannot send DMs to bot accounts.' });
             }
 
             const sanitized = sanitizeMarkdown(message);
 
             const dmChannel = await targetUser.createDM();
             
-            await dmChannel.send({
+            const sentMessage = await dmChannel.send({
                 embeds: [
                     successEmbed(
-                        anonymous ? "Message from the Staff Team" : `Message from ${interaction.user.tag}`,
+                        "Message from the Staff Team",
                         sanitized
                     ).setFooter({
                         text: `You cannot reply to this message. | Logger ID: ${interaction.id}`
@@ -86,15 +86,28 @@ export default {
                     action: "DM Sent",
                     target: `${targetUser.tag} (${targetUser.id})`,
                     executor: `${interaction.user.tag} (${interaction.user.id})`,
-                    reason: `Anonymous: ${anonymous ? 'Yes' : 'No'}`,
+                    reason: sanitized.length > 200 ? `${sanitized.slice(0, 197)}...` : sanitized,
                     metadata: {
                         userId: targetUser.id,
                         moderatorId: interaction.user.id,
-                        anonymous,
+                        messageId: sentMessage.id,
                         messageLength: sanitized.length
                     }
                 }
             });
+
+            await sendAnonymousLog(client, {
+                guild: interaction.guild,
+                title: '✉️ DM Command',
+                user: interaction.user,
+                lines: [`**To:** ${targetUser} (${targetUser.tag} - ${targetUser.id})`],
+                content: sanitized,
+            });
+
+            // Prefix form stays silent in chat; the slash reply is ephemeral so only the sender sees it.
+            if (sourceMessage) {
+                return;
+            }
 
             return await InteractionHelper.safeEditReply(interaction, {
                 embeds: [
@@ -103,15 +116,16 @@ export default {
                         `Successfully sent a message to ${targetUser.tag}`
                     ),
                 ],
+                flags: MessageFlags.Ephemeral,
             });
         } catch (error) {
             logger.error('DM command error:', error);
-            
-if (error.code === 50007) {
-                return await replyUserError(interaction, { type: ErrorTypes.UNKNOWN, message: `Could not send a DM to ${targetUser.tag}. They may have DMs disabled.` });
+
+            if (error.code === 50007) {
+                return await replyAnonymousError(interaction, { type: ErrorTypes.UNKNOWN, message: `Could not send a DM to ${targetUser.tag}. They may have DMs disabled.` });
             }
             
-            return await replyUserError(interaction, { type: ErrorTypes.UNKNOWN, message: `Failed to send DM: ${error.message}` });
+            return await replyAnonymousError(interaction, { type: ErrorTypes.UNKNOWN, message: `Failed to send DM: ${error.message}` });
         }
     }
 };

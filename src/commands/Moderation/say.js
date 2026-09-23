@@ -8,14 +8,12 @@ import { successEmbed } from '../../utils/embeds.js';
 import { logEvent } from '../../utils/moderation.js';
 import { logger } from '../../utils/logger.js';
 import { InteractionHelper } from '../../utils/interactionHelper.js';
-import { replyUserError, ErrorTypes } from '../../utils/errorHandler.js';
+import { ErrorTypes } from '../../utils/errorHandler.js';
 import { sanitizeInput } from '../../utils/validation.js';
 import { isChannelArg } from '../../utils/prefixArgs.js';
+import { deleteSourceMessage, replyAnonymousError, sendAnonymousLog } from '../../utils/anonymousCommand.js';
 
-// Who used `say` is only shown in the audit log and this channel, never in the target channel.
-const SAY_LOG_CHANNEL_ID = '1550596180940034079';
 const CHANNEL_ID_ARG = /^\d{17,20}$/u;
-const PREFIX_ERROR_DELETE_MS = 5_000;
 
 const TEXT_CHANNEL_TYPES = [
     ChannelType.GuildText,
@@ -38,38 +36,6 @@ function resolveTargetChannel(interaction) {
     }
 
     return interaction.channel;
-}
-
-async function sendSayLog(client, { guild, user, channel, sentMessage, content }) {
-    try {
-        const logChannel = guild.channels.cache.get(SAY_LOG_CHANNEL_ID)
-            || await client.channels.fetch(SAY_LOG_CHANNEL_ID).catch(() => null);
-        if (!logChannel?.isTextBased?.()) {
-            logger.warn(`Say log channel ${SAY_LOG_CHANNEL_ID} was not found.`);
-            return;
-        }
-
-        await logChannel.send({
-            embeds: [{
-                title: '🗣️ Say Command',
-                description: [
-                    `**By:** ${user} (${user.tag} - ${user.id})`,
-                    `**Channel:** ${channel} (${channel.id})`,
-                    `**Message:** [Jump](${sentMessage.url})`,
-                    `**Time:** <t:${Math.floor(Date.now() / 1000)}:F>`,
-                ].join('\n'),
-                fields: [{
-                    name: 'Content',
-                    value: content.length > 1024 ? `${content.slice(0, 1021)}...` : content,
-                }],
-                color: 0x5865F2,
-                timestamp: new Date().toISOString(),
-            }],
-            allowedMentions: { parse: [] },
-        });
-    } catch (error) {
-        logger.error('Error sending say log:', error);
-    }
 }
 
 export default {
@@ -107,10 +73,7 @@ export default {
 
     async execute(interaction, _config, client) {
         // Prefix form: remove the command message right away so nobody sees who sent it.
-        const sourceMessage = interaction._sourceMessage;
-        if (sourceMessage?.deletable) {
-            await sourceMessage.delete().catch(() => {});
-        }
+        const sourceMessage = await deleteSourceMessage(interaction);
 
         const deferSuccess = await InteractionHelper.safeDefer(interaction, {
             flags: MessageFlags.Ephemeral,
@@ -124,22 +87,11 @@ export default {
             return;
         }
 
-        const replyError = async (options) => {
-            const result = await replyUserError(interaction, options);
-            if (sourceMessage) {
-                const errorReply = interaction._responseCoordinator?.getReplyMessage();
-                if (errorReply) {
-                    setTimeout(() => errorReply.delete().catch(() => {}), PREFIX_ERROR_DELETE_MS);
-                }
-            }
-            return result;
-        };
-
         const rawMessage = interaction.options.getString('message');
         const message = sanitizeInput(rawMessage, 2000);
 
         if (!message) {
-            return replyError({
+            return replyAnonymousError(interaction, {
                 type: ErrorTypes.VALIDATION,
                 message: 'Message cannot be empty.',
             });
@@ -147,7 +99,7 @@ export default {
 
         const channel = resolveTargetChannel(interaction);
         if (!channel) {
-            return replyError({
+            return replyAnonymousError(interaction, {
                 type: ErrorTypes.VALIDATION,
                 message: 'Channel not found. Use `قول الرسالة #channel` or `قول الرسالة CHANNEL_ID`.',
             });
@@ -157,14 +109,14 @@ export default {
         const botPermissions = channel.permissionsFor(interaction.guild.members.me);
 
         if (!memberPermissions?.has(PermissionFlagsBits.SendMessages)) {
-            return replyError({
+            return replyAnonymousError(interaction, {
                 type: ErrorTypes.PERMISSION,
                 message: `You do not have permission to send messages in ${channel}.`,
             });
         }
 
         if (!botPermissions?.has(PermissionFlagsBits.SendMessages)) {
-            return replyError({
+            return replyAnonymousError(interaction, {
                 type: ErrorTypes.PERMISSION,
                 message: `I do not have permission to send messages in ${channel}.`,
             });
@@ -191,11 +143,14 @@ export default {
             },
         });
 
-        await sendSayLog(client, {
+        await sendAnonymousLog(client, {
             guild: interaction.guild,
+            title: '🗣️ Say Command',
             user: interaction.user,
-            channel,
-            sentMessage,
+            lines: [
+                `**Channel:** ${channel} (${channel.id})`,
+                `**Message:** [Jump](${sentMessage.url})`,
+            ],
             content: message,
         });
 
