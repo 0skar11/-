@@ -1,4 +1,5 @@
 import { PermissionFlagsBits } from 'discord.js';
+import { scheduleNoPermissionDelete } from './noPermissionReply.js';
 
 const SHORTCUT_PATTERN = /^م(?:\s+(.*))?$/u;
 const MIN_AMOUNT = 1;
@@ -10,7 +11,7 @@ function toWesternDigits(value) {
 }
 
 async function reply(message, content) {
-  return message.channel.send({ content, allowedMentions: { parse: [] } }).catch(() => null);
+  return message.channel.send({ content, allowedMentions: { parse: [] } }).then(scheduleNoPermissionDelete).catch(() => null);
 }
 
 export async function handleMessageDeleteShortcut(message) {

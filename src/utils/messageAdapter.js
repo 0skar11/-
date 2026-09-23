@@ -9,6 +9,7 @@ import { SLASH_ONLY_COMMANDS } from '../config/commands/prefixRestrictions.js';
 import { getCommandPrefix } from '../config/bot.js';
 import { ResponseCoordinator, buildPrefixUsage } from './responseCoordinator.js';
 import { enforceDefaultCommandPermissions } from './permissionGuard.js';
+import { scheduleNoPermissionDelete } from './noPermissionReply.js';
 
 export { buildPrefixUsage };
 
@@ -256,5 +257,7 @@ export async function executePrefixCommand(command, message, args, client, prefi
       command: command.data?.name,
       source: 'messageAdapter.executePrefixCommand',
     });
+  } finally {
+    scheduleNoPermissionDelete(coordinator.getReplyMessage());
   }
 }
