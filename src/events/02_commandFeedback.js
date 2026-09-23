@@ -36,7 +36,7 @@ async function handleTrust(message, client) {
   }
 
   if (!parsed.roleId && !parsed.userId) {
-    await send(message, 'Usage: `تراست @user` or `تراست @role`');
+    await send(message, '⚠️ **الاستخدام:** `تراست @user` أو `تراست @role`');
     return true;
   }
   if (parsed.roleId && parsed.userId) {

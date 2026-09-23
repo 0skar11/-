@@ -96,7 +96,7 @@ export async function handleArabicUtilityShortcuts(message) {
   if (parsed.command === 'ق') return lockChannel(message, true);
   if (parsed.command === 'ف') return lockChannel(message, false);
   if (parsed.command === 'نك') return changeNickname(message, parsed.tail);
-  if (!parsed.tail) return reply(message, '❌ Usage: `font text`');
+  if (!parsed.tail) return reply(message, '⚠️ **الاستخدام:** `font text`');
   return reply(message, toBoldFont(parsed.tail));
 }
 

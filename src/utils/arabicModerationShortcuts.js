@@ -202,7 +202,7 @@ export async function handleArabicRoleShortcut(message, prefixes = []) {
     return true;
   }
   if (!targetId || !roleName) {
-    await reply(message, `❌ Usage: \`${command} @user role\``);
+    await reply(message, `⚠️ **الاستخدام:** \`${command} @user role\``);
     return true;
   }
 
@@ -223,7 +223,7 @@ export async function handleClearWarningsShortcut(message, args) {
   const mention = body.match(/<@!?(\d+)>/u);
   const id = body.match(/(?:^|\s)(\d{17,20})(?:\s|$)/u);
   const targetId = mention?.[1] || id?.[1] || await getReplyTargetId(message);
-  if (!targetId) return reply(message, '❌ Usage: `مسح تحذيرات @user`');
+  if (!targetId) return reply(message, '⚠️ **الاستخدام:** `مسح تحذيرات @user`');
   const targetMember = await message.guild.members.fetch(targetId).catch(() => null);
   if (!targetMember) return reply(message, '❌ Member Not Found');
   try {
