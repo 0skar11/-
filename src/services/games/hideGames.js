@@ -12,18 +12,21 @@ import { pick, shuffle } from './text.js';
 
 const HIDE_MS = 30_000;
 const TURN_MS = 20_000;
-const MAX_SPOTS = 25; // 5 rows × 5 buttons
+// A message holds at most 5 rows × 5 buttons, so bigger grids continue in a second message.
+const SPOTS_PER_MESSAGE = 25;
+// Empty squares (hide & seek) and fake sheep (hunt) per real hider: 3 players → 9 empty squares.
+export const EMPTY_PER_HIDER = 3;
 export const HIDE_LIMITS = { min: 3, max: 12 };
 export const HUNT_LIMITS = { min: 3, max: 12 };
 
-/** Squares for hide & seek: twice the players (at least 9), so there are as many empty squares as hiders. */
+/** Squares for hide & seek: one per player plus 3 empty squares for each of them. */
 export function hideSpotCount(playerCount) {
-    return Math.min(MAX_SPOTS, Math.max(9, playerCount * 2));
+    return playerCount * (EMPTY_PER_HIDER + 1);
 }
 
-/** Squares for the hunt: one per sheep plus as many fake sheep as real ones (+1). */
+/** Squares for the hunt: one per sheep plus 3 fake sheep for each of them. */
 export function huntSpotCount(sheepCount) {
-    return Math.min(MAX_SPOTS, sheepCount * 2 + 1);
+    return sheepCount * (EMPTY_PER_HIDER + 1);
 }
 
 export function createSpots(count) {
@@ -75,6 +78,55 @@ function gridRows(spots, mode, disabled = false) {
     return rows;
 }
 
+/** The grid split into one chunk of squares per message (25 each). */
+export function boardChunks(spots) {
+    const chunks = [];
+    for (let i = 0; i < spots.length; i += SPOTS_PER_MESSAGE) chunks.push(spots.slice(i, i + SPOTS_PER_MESSAGE));
+    return chunks;
+}
+
+const extraBoardContent = (chunk) => `⬇️ المربعات **${chunk[0].index + 1}–${chunk[chunk.length - 1].index + 1}**`;
+
+/** Posts the grid: the first message carries `payload` (embed...) and squares 1–25, the next ones the rest. */
+async function sendBoard(session, channel, spots, mode, payload) {
+    const messages = [];
+    for (const [index, chunk] of boardChunks(spots).entries()) {
+        const extra = index === 0 ? payload : { content: extraBoardContent(chunk) };
+        messages.push(await sendGameMessage(session, channel, { ...extra, components: gridRows(chunk, mode) }));
+    }
+    return messages;
+}
+
+/** Redraws every message of the grid; `payload` (content, embeds...) goes on the first one. */
+async function editBoard(messages, spots, mode, payload = {}, disabled = false) {
+    const chunks = boardChunks(spots);
+    await Promise.all(messages.map((message, index) => message.edit(index === 0
+        ? { ...payload, components: gridRows(chunks[index], mode, disabled) }
+        : { components: gridRows(chunks[index], mode, disabled) }).catch(() => {})));
+}
+
+/**
+ * Button clicks on every message of the grid, handled as one collector: `onCollect(button, stop)`.
+ * Resolves once all of them ended (time up, `stop(reason)` or the game was stopped).
+ */
+function collectBoard(messages, session, time, onCollect) {
+    return new Promise((resolve) => {
+        const collectors = messages.map((message) => message.createMessageComponentCollector({ componentType: ComponentType.Button, time }));
+        const stop = (reason) => collectors.forEach((collector) => collector.stop(reason));
+        let ended = false;
+        for (const collector of collectors) {
+            stopOnAbort(collector, session.signal);
+            collector.on('collect', (button) => onCollect(button, stop));
+            collector.once('end', (_collected, reason) => {
+                if (ended) return;
+                ended = true;
+                stop(reason);
+                resolve(reason);
+            });
+        }
+    });
+}
+
 /** Hiding phase: players (not `excludedId`) click a square to hide there; they can move until time runs out. */
 async function hidingPhase(channel, session, { mode, title, spots, hiders, excludedId, intro }) {
     const hiderIds = new Set(hiders.map((user) => user.id));
@@ -82,47 +134,38 @@ async function hidingPhase(channel, session, { mode, title, spots, hiders, exclu
     const hiddenCount = () => spots.filter((spot) => spot.occupant).length;
     const render = () => gameEmbed(title, `${intro}\n\n🙈 دوس على أي مربع عشان تستخبى فيه (محدش هيشوف انت اخترت إيه). تقدر تغير مكانك لحد ما الوقت يخلص.\n⏳ الاستخباية بتخلص <t:${endsAt}:R> — اللي ما يستخباش البوت بيخبيه في مكان عشوائي.\n\n✅ استخبوا: **${hiddenCount()}/${hiders.length}**`);
 
-    const message = await sendGameMessage(session, channel, { embeds: [render()], components: gridRows(spots, mode) });
-    await new Promise((resolve) => {
-        const collector = message.createMessageComponentCollector({ componentType: ComponentType.Button, time: HIDE_MS });
-        stopOnAbort(collector, session.signal);
-        collector.on('collect', async (button) => {
-            const ephemeral = (content) => button.reply({ content, flags: MessageFlags.Ephemeral }).catch(() => {});
-            if (button.user.id === excludedId) return ephemeral('🏹 انت الصياد، استنى لما الخرفان تستخبى.');
-            if (!hiderIds.has(button.user.id)) return ephemeral('انت مش داخل اللعبة دي.');
-            const spot = spots[Number(button.customId.split('_').pop())];
-            if (spot.occupant && spot.occupant !== button.user.id) return ephemeral('المكان ده محجوز، اختار مربع تاني.');
-            for (const other of spots) if (other.occupant === button.user.id) other.occupant = null;
-            spot.occupant = button.user.id;
-            await ephemeral(`🙈 استخبيت في المربع رقم **${spot.index + 1}**.`);
-            await message.edit({ embeds: [render()] }).catch(() => {});
-            if (hiddenCount() === hiders.length) collector.stop('all');
-        });
-        collector.on('end', resolve);
+    const messages = await sendBoard(session, channel, spots, mode, { embeds: [render()] });
+    await collectBoard(messages, session, HIDE_MS, async (button, stop) => {
+        const ephemeral = (content) => button.reply({ content, flags: MessageFlags.Ephemeral }).catch(() => {});
+        if (button.user.id === excludedId) return ephemeral('🏹 انت الصياد، استنى لما الخرفان تستخبى.');
+        if (!hiderIds.has(button.user.id)) return ephemeral('انت مش داخل اللعبة دي.');
+        const spot = spots[Number(button.customId.split('_').pop())];
+        if (spot.occupant && spot.occupant !== button.user.id) return ephemeral('المكان ده محجوز، اختار مربع تاني.');
+        for (const other of spots) if (other.occupant === button.user.id) other.occupant = null;
+        spot.occupant = button.user.id;
+        await ephemeral(`🙈 استخبيت في المربع رقم **${spot.index + 1}**.`);
+        await messages[0].edit({ embeds: [render()] }).catch(() => {});
+        if (hiddenCount() === hiders.length) stop('all');
     });
     placeLeftovers(spots, hiders.map((user) => user.id));
-    return message;
+    return messages;
 }
 
-/** Waits for `picker` to open a square on `message`. Resolves to the square index, or null on AFK / stop. */
-function waitForPick(message, session, picker, spots, { ownSpotBlocked }) {
-    return new Promise((resolve) => {
-        const collector = message.createMessageComponentCollector({ componentType: ComponentType.Button, time: TURN_MS });
-        stopOnAbort(collector, session.signal);
-        collector.on('collect', async (button) => {
-            const ephemeral = (content) => button.reply({ content, flags: MessageFlags.Ephemeral }).catch(() => {});
-            if (button.user.id !== picker.id) return ephemeral('مش دورك.');
-            const index = Number(button.customId.split('_').pop());
-            if (spots[index].revealed) return ephemeral('المربع ده اتفتح قبل كده.');
-            if (ownSpotBlocked && spots[index].occupant === picker.id) return ephemeral('ده مكانك انت 😅 اختار مربع تاني.');
-            await button.deferUpdate().catch(() => {});
-            collector.stop('picked');
-            resolve(index);
-        });
-        collector.on('end', (_collected, reason) => {
-            if (reason !== 'picked') resolve(null);
-        });
+/** Waits for `picker` to open a square on the grid. Resolves to the square index, or null on AFK / stop. */
+async function waitForPick(messages, session, picker, spots, { ownSpotBlocked }) {
+    let picked = null;
+    await collectBoard(messages, session, TURN_MS, async (button, stop) => {
+        const ephemeral = (content) => button.reply({ content, flags: MessageFlags.Ephemeral }).catch(() => {});
+        if (picked !== null) return button.deferUpdate().catch(() => {});
+        if (button.user.id !== picker.id) return ephemeral('مش دورك.');
+        const index = Number(button.customId.split('_').pop());
+        if (spots[index].revealed) return ephemeral('المربع ده اتفتح قبل كده.');
+        if (ownSpotBlocked && spots[index].occupant === picker.id) return ephemeral('ده مكانك انت 😅 اختار مربع تاني.');
+        picked = index;
+        stop('picked');
+        await button.deferUpdate().catch(() => {});
     });
+    return picked;
 }
 
 const mentionList = (users) => users.map((user) => `${user}`).join('، ') || '—';
@@ -139,7 +182,7 @@ export async function runHideAndSeek(interaction, client, session) {
 
     const channel = interaction.channel;
     const spots = createSpots(hideSpotCount(players.length));
-    const message = await hidingPhase(channel, session, { mode: 'hide', title, spots, hiders: players, intro: `👥 ${players.length} لاعبين و **${spots.length}** مربع.` });
+    const messages = await hidingPhase(channel, session, { mode: 'hide', title, spots, hiders: players, intro: `👥 ${players.length} لاعبين و **${spots.length}** مربع (**${spots.length - players.length}** منهم فاضيين).` });
     if (session.signal.aborted) return;
 
     let alive = [...players];
@@ -147,14 +190,13 @@ export async function runHideAndSeek(interaction, client, session) {
     let log = '🔎 الكل استخبى، يلا ندوّر!';
     while (alive.length > 1 && !session.signal.aborted) {
         const seeker = pick(alive);
-        await message.edit({
+        await editBoard(messages, spots, 'hide', {
             content: `${seeker}`,
             embeds: [gameEmbed(title, `${log}\n\n🔦 الدور على ${seeker}: افتح مربع (مش مربعك).\n⏱️ عندك ${TURN_MS / 1000} ثانية، ولو ما اخترتش هتطلع AFK.\n\n👥 الباقيين (${alive.length}): ${mentionList(alive)}`)],
-            components: gridRows(spots, 'hide'),
             allowedMentions: { users: [seeker.id] },
-        }).catch(() => {});
+        });
 
-        const index = await waitForPick(message, session, seeker, spots, { ownSpotBlocked: true });
+        const index = await waitForPick(messages, session, seeker, spots, { ownSpotBlocked: true });
         if (session.signal.aborted) break;
         if (index === null) {
             // AFK: the seeker is out and their square is left empty.
@@ -177,12 +219,11 @@ export async function runHideAndSeek(interaction, client, session) {
     }
     if (session.signal.aborted) return;
 
-    await message.edit({
+    await editBoard(messages, spots, 'hide', {
         content: null,
         embeds: [gameEmbed(title, `${log}\n\n👑 ${alive[0]} آخر واحد فضل مستخبي!`)],
-        components: gridRows(spots, 'hide', true),
         allowedMentions: { parse: [] },
-    }).catch(() => {});
+    }, true);
     await finishGroupGame(client, channel, {
         game: 'hide',
         title,
@@ -208,7 +249,7 @@ export async function runHunt(interaction, client, session) {
     const spots = createSpots(huntSpotCount(sheep.length));
     const fakeCount = spots.length - sheep.length;
     const intro = `🏹 الصياد هو ${hunter}!\n🐑 ${sheep.length} خرفان حقيقية مستخبية وسط **${fakeCount}** خروف وهمي.`;
-    const message = await hidingPhase(channel, session, { mode: 'hunt', title, spots, hiders: sheep, excludedId: hunter.id, intro });
+    const messages = await hidingPhase(channel, session, { mode: 'hunt', title, spots, hiders: sheep, excludedId: hunter.id, intro });
     if (session.signal.aborted) return;
 
     let alive = [...sheep];
@@ -217,14 +258,13 @@ export async function runHunt(interaction, client, session) {
     let log = '🐑 الخرفان استخبت، يلا يا صياد!';
     let outcome = null;
     while (!outcome && !session.signal.aborted) {
-        await message.edit({
+        await editBoard(messages, spots, 'hunt', {
             content: `${hunter}`,
             embeds: [gameEmbed(title, `${log}\n\n🏹 ${hunter} اختار خروف تصطاده.\n⏱️ عندك ${TURN_MS / 1000} ثانية، ولو ما اخترتش الطلقة بتروح عليك.\n\n🐑 خرفان حقيقية فاضلة: **${alive.length}** • ☁️ وهمية فاضلة: **${fakeCount - misses}**`)],
-            components: gridRows(spots, 'hunt'),
             allowedMentions: { users: [hunter.id] },
-        }).catch(() => {});
+        });
 
-        const index = await waitForPick(message, session, hunter, spots, { ownSpotBlocked: false });
+        const index = await waitForPick(messages, session, hunter, spots, { ownSpotBlocked: false });
         if (session.signal.aborted) break;
         if (index === null) {
             misses += 1;
@@ -250,7 +290,7 @@ export async function runHunt(interaction, client, session) {
     const summary = hunterWon
         ? `🏹 ${hunter} صاد كل الخرفان وكسب!`
         : `🐑 الخرفان الوهمية خلصت والخرفان كسبت! الناجيين: ${mentionList(alive)}`;
-    await message.edit({ content: null, embeds: [gameEmbed(title, `${log}\n\n${summary}`)], components: gridRows(spots, 'hunt', true), allowedMentions: { parse: [] } }).catch(() => {});
+    await editBoard(messages, spots, 'hunt', { content: null, embeds: [gameEmbed(title, `${log}\n\n${summary}`)], allowedMentions: { parse: [] } }, true);
 
     const caughtLastFirst = [...caught].reverse().map((user) => user.id);
     const ranking = hunterWon

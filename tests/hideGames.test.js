@@ -1,13 +1,20 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
-import { hideSpotCount, huntSpotCount, createSpots, placeLeftovers, openSpot, huntOutcome } from '../src/services/games/hideGames.js';
+import { hideSpotCount, huntSpotCount, createSpots, placeLeftovers, openSpot, huntOutcome, boardChunks, HIDE_LIMITS, HUNT_LIMITS } from '../src/services/games/hideGames.js';
 
 describe('hide games', () => {
-  test('grid sizes fit in 25 buttons and leave empty squares', () => {
-    assert.equal(hideSpotCount(3), 9);
-    assert.equal(hideSpotCount(12), 24);
-    assert.equal(huntSpotCount(2), 5);
-    assert.equal(huntSpotCount(11), 23);
+  test('there are 3 empty squares / fake sheep for every real hider', () => {
+    assert.equal(hideSpotCount(3), 12);
+    assert.equal(hideSpotCount(12), 48);
+    assert.equal(huntSpotCount(2), 8);
+    assert.equal(huntSpotCount(11), 44);
+  });
+
+  test('big grids are split into messages of 25 squares', () => {
+    assert.deepEqual(boardChunks(createSpots(12)).map((chunk) => chunk.length), [12]);
+    assert.deepEqual(boardChunks(createSpots(48)).map((chunk) => chunk.length), [25, 23]);
+    assert.equal(boardChunks(createSpots(48))[1][0].index, 25);
+    assert.ok(Math.max(hideSpotCount(HIDE_LIMITS.max), huntSpotCount(HUNT_LIMITS.max - 1)) <= 50);
   });
 
   test('players who did not hide get a free square', () => {
