@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { findUsedInvite, countInvitesBy } from '../src/services/inviteTrackerService.js';
 import { findWinner } from '../src/commands/Fun/xo.js';
 import { decide } from '../src/commands/Fun/rps.js';
+import { inviteAnswer, INVITE_MS } from '../src/services/games/challenge.js';
 
 const invites = (entries) => new Map(Object.entries(entries));
 
@@ -44,5 +45,14 @@ describe('games', () => {
     assert.equal(decide('rock', 'scissors'), 'win');
     assert.equal(decide('rock', 'paper'), 'lose');
     assert.equal(decide('paper', 'paper'), 'draw');
+  });
+
+  test('only the invited member can accept, and the challenger can take the invite back', () => {
+    assert.equal(INVITE_MS, 20_000);
+    assert.equal(inviteAnswer('invite_accept', 'o', 'c', 'o'), 'accept');
+    assert.equal(inviteAnswer('invite_decline', 'o', 'c', 'o'), 'decline');
+    assert.equal(inviteAnswer('invite_decline', 'c', 'c', 'o'), 'cancel');
+    assert.equal(inviteAnswer('invite_accept', 'c', 'c', 'o'), null, 'the challenger cannot accept for them');
+    assert.equal(inviteAnswer('invite_accept', 'x', 'c', 'o'), null, 'someone else cannot accept');
   });
 });
