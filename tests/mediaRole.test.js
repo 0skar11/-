@@ -1,7 +1,7 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import { PermissionsBitField } from 'discord.js';
-import { hasMediaContent, ensureMediaRole, grantMediaRoleToAllMembers, CHAOS_ROLE_ID, MEDIA_PERMISSIONS } from '../src/services/mediaRoleService.js';
+import { hasMediaContent, isPlayCommand, ensureMediaRole, grantMediaRoleToAllMembers, CHAOS_ROLE_ID, MEDIA_PERMISSIONS } from '../src/services/mediaRoleService.js';
 
 const message = (content, attachments = 0) => ({ content, attachments: { size: attachments } });
 
@@ -12,6 +12,13 @@ describe('media lock', () => {
     assert.equal(hasMediaContent(message('www.example.com')), true);
     assert.equal(hasMediaContent(message('https://tenor.com/view/cat-gif-123')), true);
     assert.equal(hasMediaContent(message('discord.gg/abc')), true);
+  });
+
+  test('a play command with a link is a music request, not media', () => {
+    assert.equal(isPlayCommand(message('شغل https://www.youtube.com/playlist?list=PL1')), true);
+    assert.equal(isPlayCommand(message('=play https://open.spotify.com/playlist/abc')), true);
+    assert.equal(isPlayCommand(message('شوف https://example.com شغل')), false);
+    assert.equal(isPlayCommand(message('شغل https://example.com', 1)), false);
   });
 
   test('plain text is not media', () => {
