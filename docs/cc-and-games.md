@@ -41,7 +41,7 @@ Game words typed without the prefix only start a game when the message is just t
 | `العاب` | `/game list` | The games panel (see below) |
 | `روليت` | `/game roulette` | Roulette (3–20 players, join with buttons) |
 | `كراسي` | `/game chairs` | Musical chairs (3–25 players) |
-| `مافيا` | `/game mafia` | Mafia with doctor and detective (5–20 players) |
+| `مافيا` | `/game mafia` | Mafia with doctor and detective (5–20 players), 20 second phases |
 | `اسئلة [جولات]` | `/game trivia` | General knowledge questions, anyone can answer |
 | `خمن [جولات]` | `/game guess` | Guess the number 1–100 with ⬆️/⬇️ hints |
 | `اسرع [جولات]` | `/game fast` | First to type the word |
@@ -53,7 +53,14 @@ Game words typed without the prefix only start a game when the message is just t
 | `رقم` | `/solo number` | Guess 1–50 in 6 tries |
 | `سلوت` | `/solo slots` | Slot machine, three of a kind wins |
 
-Only one group game can run per channel. A game that is cancelled (lobby cancelled or not
+Only one group game can run per channel.
+
+**20 seconds, then AFK.** Every choice in a game has 20 seconds: the roulette turn, sitting in
+chairs, rock-paper-scissors, an XO move and each mafia phase. Whoever doesn't choose in time is
+kicked for AFK: in roulette and chairs they are out, in XO the other player wins, and in mafia
+they leave the game with their role shown and get no CC even if their team wins. Mafia starts
+with everyone pressing 🎭 to see their own role privately; not pressing is AFK too. The answer
+time of the chat games (trivia 10s, guess 60s, ...) is separate. A game that is cancelled (lobby cancelled or not
 enough players) or stopped with `وقف` deletes all its messages and the command that started it;
 the stop notice disappears after 5 seconds. Finished games keep their messages and results.
 

@@ -44,7 +44,7 @@ export async function deleteGameMessages(session, channel) {
     // One bulk delete when the bot can manage messages; otherwise one by one (a bot can always delete its own).
     const bulk = ids.length > 1 ? await channel.bulkDelete?.(ids, true).catch(() => null) : null;
     const deleted = new Set(bulk ? [...bulk.keys()] : []);
-    await Promise.all(messages.filter((message) => !deleted.has(message.id)).map((message) => message.delete().catch(() => {})));
+    await Promise.all(messages.filter((message) => !deleted.has(message.id)).map((message) => Promise.resolve().then(() => message.delete()).catch(() => {})));
 }
 
 export function releaseChannel(session) {

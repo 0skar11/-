@@ -11,7 +11,7 @@ import { triviaQuestions } from '../src/services/games/data/trivia.js';
 import { rankScores, judgeGuess, makeMathQuestion, ROUND_GAMES } from '../src/services/games/roundGames.js';
 import { resolveRouletteChoice } from '../src/services/games/roulette.js';
 import { rankChairs } from '../src/services/games/chairs.js';
-import { assignRoles, checkWinner, tallyVotes } from '../src/services/games/mafia.js';
+import { assignRoles, checkWinner, tallyVotes, kickAfk, PHASE_MS } from '../src/services/games/mafia.js';
 import { isSlotsWin } from '../src/services/games/solo.js';
 import { claimChannel, releaseChannel, getActiveGame } from '../src/services/games/session.js';
 import { commandArgAliases, standaloneOnlyAliases, isStandaloneInvocation, twoWordCommandAliases } from '../src/config/commands/commandAliases.js';
@@ -211,6 +211,19 @@ describe('game helpers', () => {
         assert.equal(tallyVotes(new Map([[A, B], [C, A]])), null);
         assert.equal(tallyVotes(new Map([[A, 'skip'], [C, 'skip'], [D, A]])), null);
         assert.equal(tallyVotes(new Map([[A, B], [C, A]]), { allowTie: true, random: (list) => list[0] }), B);
+    });
+
+    test('mafia kicks AFK players, shows their role and never pays them', () => {
+        assert.equal(PHASE_MS, 20_000);
+        const roles = new Map([[A, 'mafia'], [B, 'doctor'], [C, 'citizen'], [D, 'citizen']]);
+        const state = { roles, alive: [A, B, C, D], dead: [], afk: new Set() };
+        const line = kickAfk(state, [B, D]);
+        assert.deepEqual(state.alive, [A, C]);
+        assert.deepEqual([...state.afk], [B, D]);
+        assert.deepEqual(state.dead, []);
+        assert.ok(line.includes('AFK') && line.includes('دكتور'));
+        assert.equal(kickAfk(state, []), '');
+        assert.equal(checkWinner(roles, state.alive), 'mafia');
     });
 
     test('slots win on three of a kind', () => {

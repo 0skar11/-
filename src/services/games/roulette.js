@@ -6,7 +6,7 @@ import { gameEmbed, runLobby, stopOnAbort, wait, finishGroupGame, sendGameMessag
 import { pick } from './text.js';
 
 const TITLE = '🎡 روليت';
-const TURN_MS = 30_000;
+const TURN_MS = 20_000;
 export const ROULETTE_LIMITS = { min: 3, max: 20 };
 
 function turnRows(alive, chosen, disabled = false) {
@@ -55,7 +55,7 @@ export async function runRoulette(interaction, client, session) {
         if (session.signal.aborted) break;
         await message.edit({
             content: `${chosen}`,
-            embeds: [gameEmbed(TITLE, `🎯 العجلة وقفت على ${chosen}!\nاختار حد يطلع من اللعبة، أو 🎲 عشوائي، أو 🏳️ انسحب.\n⏱️ عندك ${TURN_MS / 1000} ثانية، ولو ما اخترتش هتطلع انت.`)],
+            embeds: [gameEmbed(TITLE, `🎯 العجلة وقفت على ${chosen}!\nاختار حد يطلع من اللعبة، أو 🎲 عشوائي، أو 🏳️ انسحب.\n⏱️ عندك ${TURN_MS / 1000} ثانية، ولو ما اخترتش هتتطرد AFK.`)],
             components: turnRows(alive, chosen),
             allowedMentions: { users: [chosen.id] },
         });
@@ -81,7 +81,7 @@ export async function runRoulette(interaction, client, session) {
         const loser = resolveRouletteChoice(choice, alive, chosen);
         alive = alive.filter((user) => user.id !== loser.id);
         out.push(loser);
-        const reason = !choice ? `⏱️ ${chosen} ما اختارش في الوقت وطلع.`
+        const reason = !choice ? `🚫 ${chosen} اتطرد بسبب AFK.`
             : loser.id === chosen.id ? `🏳️ ${chosen} انسحب.`
                 : `💥 ${chosen} طلّع ${loser}${choice === 'roulette_random' ? ' (عشوائي)' : ''}!`;
         await message.edit({
