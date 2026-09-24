@@ -53,7 +53,9 @@ Game words typed without the prefix only start a game when the message is just t
 | `رقم` | `/solo number` | Guess 1–50 in 6 tries |
 | `سلوت` | `/solo slots` | Slot machine, three of a kind wins |
 
-Only one group game can run per channel.
+Only one group game can run per channel. A game that is cancelled (lobby cancelled or not
+enough players) or stopped with `وقف` deletes all its messages and the command that started it;
+the stop notice disappears after 5 seconds. Finished games keep their messages and results.
 
 The CC commands (`daily`, `cc`, `cctop`) are in the Games category with the games, so turning
 off the Economy category in the command access dashboard doesn't hide them.

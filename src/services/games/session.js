@@ -16,9 +16,35 @@ export function claimChannel(channelId, game, hostId) {
     const controller = new AbortController();
     // chatOpen: anyone may chat in the channel during the game (chat round games); players: only these
     // members may (lobby games, set when the lobby starts). Used by the games-only channel guard.
-    const session = { channelId, game, hostId, signal: controller.signal, stop: () => controller.abort(), startedAt: Date.now(), chatOpen: false, players: null };
+    const session = {
+        channelId, game, hostId, signal: controller.signal, stop: () => controller.abort(), startedAt: Date.now(), chatOpen: false, players: null,
+        // Every message the game posts, so a cancelled or stopped game can be cleaned up.
+        messages: new Map(),
+        cancelled: false,
+        track(message) {
+            if (message?.id) session.messages.set(message.id, message);
+            return message;
+        },
+    };
     activeGames.set(channelId, session);
     return session;
+}
+
+/** Posts a game message in `channel` and remembers it for cleanup. */
+export async function sendGameMessage(session, channel, payload) {
+    return session.track(await channel.send(payload));
+}
+
+/** Deletes every message a cancelled or stopped game posted, plus the command that started it. */
+export async function deleteGameMessages(session, channel) {
+    const messages = [...session.messages.values()];
+    session.messages.clear();
+    if (!messages.length) return;
+    const ids = messages.map((message) => message.id);
+    // One bulk delete when the bot can manage messages; otherwise one by one (a bot can always delete its own).
+    const bulk = ids.length > 1 ? await channel.bulkDelete?.(ids, true).catch(() => null) : null;
+    const deleted = new Set(bulk ? [...bulk.keys()] : []);
+    await Promise.all(messages.filter((message) => !deleted.has(message.id)).map((message) => message.delete().catch(() => {})));
 }
 
 export function releaseChannel(session) {
@@ -99,7 +125,7 @@ export async function runLobby(interaction, session, { title, description, minPl
     ].filter((line) => line !== null).join('\n'));
 
     await InteractionHelper.safeReply(interaction, { embeds: [render()], components: lobbyRows(), allowedMentions: { parse: [] } });
-    const message = await interaction.fetchReply();
+    const message = session.track(await interaction.fetchReply());
 
     const result = await new Promise((resolve) => {
         const collector = message.createMessageComponentCollector({ componentType: ComponentType.Button, time: waitMs });
@@ -141,12 +167,14 @@ export async function runLobby(interaction, session, { title, description, minPl
     });
 
     const started = result !== 'cancel' && result !== 'stopped' && players.size >= minPlayers;
-    if (started) session.players = new Set(players.keys());
-    const note = started
-        ? '\n🎮 **اللعبة بدأت!**'
-        : result === 'cancel' || result === 'stopped' ? '\n✖️ **اللعبة اتلغت.**' : `\n⌛ **اللعبة اتلغت:** محتاجين ${minPlayers} لاعبين على الأقل.`;
-    await message.edit({ embeds: [render(note)], components: lobbyRows(true), allowedMentions: { parse: [] } }).catch(() => {});
-    return started ? [...players.values()] : null;
+    if (!started) {
+        // Cancelled, stopped or not enough players: withChannelGame deletes the lobby message.
+        session.cancelled = true;
+        return null;
+    }
+    session.players = new Set(players.keys());
+    await message.edit({ embeds: [render('\n🎮 **اللعبة بدأت!**')], components: lobbyRows(true), allowedMentions: { parse: [] } }).catch(() => {});
+    return [...players.values()];
 }
 
 /** Pays the top places of a finished group game and posts the results. */
@@ -174,7 +202,11 @@ export async function finishGroupGame(client, channel, { game, title, ranking, p
     return paid;
 }
 
-/** Runs `play(session)` with the channel reserved for `game`, and always frees the channel afterwards. */
+/**
+ * Runs `play(session)` with the channel reserved for `game`, and always frees the channel afterwards.
+ * A game that ends cancelled (lobby cancelled or too few players) or stopped with `وقف` leaves nothing
+ * behind: its messages and the command that started it are deleted.
+ */
 export async function withChannelGame(interaction, game, play) {
     const session = claimChannel(interaction.channel.id, game, interaction.user.id);
     if (!session) {
@@ -185,6 +217,7 @@ export async function withChannelGame(interaction, game, play) {
         });
         return;
     }
+    if (interaction._sourceMessage) session.track(interaction._sourceMessage);
     try {
         await play(session);
     } catch (error) {
@@ -192,5 +225,6 @@ export async function withChannelGame(interaction, game, play) {
         await interaction.channel.send('❌ حصلت مشكلة واللعبة وقفت.').catch(() => {});
     } finally {
         releaseChannel(session);
+        if (session.cancelled || session.signal.aborted) await deleteGameMessages(session, interaction.channel);
     }
 }

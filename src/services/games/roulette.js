@@ -2,7 +2,7 @@
 // withdraws). Whoever the wheel lands on and doesn't pick in time is out. Last one standing wins.
 
 import { ActionRowBuilder, ButtonBuilder, ButtonStyle, ComponentType, MessageFlags } from 'discord.js';
-import { gameEmbed, runLobby, stopOnAbort, wait, finishGroupGame } from './session.js';
+import { gameEmbed, runLobby, stopOnAbort, wait, finishGroupGame, sendGameMessage } from './session.js';
 import { pick } from './text.js';
 
 const TITLE = '🎡 روليت';
@@ -50,7 +50,7 @@ export async function runRoulette(interaction, client, session) {
 
     while (alive.length > 1 && !session.signal.aborted) {
         const chosen = pick(alive);
-        const message = await channel.send({ embeds: [gameEmbed(TITLE, `🎡 العجلة بتلف... (${alive.length} لاعبين)`)] });
+        const message = await sendGameMessage(session, channel, { embeds: [gameEmbed(TITLE, `🎡 العجلة بتلف... (${alive.length} لاعبين)`)] });
         await wait(2500, session.signal);
         if (session.signal.aborted) break;
         await message.edit({
@@ -93,10 +93,8 @@ export async function runRoulette(interaction, client, session) {
         if (alive.length > 1) await wait(2000, session.signal);
     }
 
-    if (session.signal.aborted) {
-        await channel.send(`🛑 ${TITLE} اتوقفت.`).catch(() => {});
-        return;
-    }
+    // Stopped with `وقف`: withChannelGame deletes the game's messages.
+    if (session.signal.aborted) return;
 
     const ranking = [alive[0].id, ...out.reverse().map((user) => user.id)];
     await finishGroupGame(client, channel, {

@@ -8,7 +8,7 @@
 import {
     ActionRowBuilder, ButtonBuilder, ButtonStyle, ComponentType, MessageFlags, StringSelectMenuBuilder,
 } from 'discord.js';
-import { gameEmbed, runLobby, stopOnAbort, wait, finishGroupGame } from './session.js';
+import { gameEmbed, runLobby, stopOnAbort, wait, finishGroupGame, sendGameMessage } from './session.js';
 import { shuffle, pick } from './text.js';
 
 const TITLE = '🕵️ مافيا';
@@ -97,7 +97,7 @@ async function runNight(channel, session, state, night) {
     const acted = new Set();
     const actors = alive.filter((id) => roles.get(id) !== 'citizen');
 
-    const message = await channel.send({
+    const message = await sendGameMessage(session, channel, {
         embeds: [gameEmbed(`${TITLE} — الليلة ${night} 🌙`, `السيرفر نام... 😴\nالمافيا والدكتور والمحقق: دوسوا **تصرف** واختاروا.\n⏱️ ${NIGHT_MS / 1000} ثانية`)],
         components: [phaseRow([new ButtonBuilder().setCustomId('mafia_act').setLabel('تصرف').setEmoji('🌙').setStyle(ButtonStyle.Primary)])],
     });
@@ -153,7 +153,7 @@ async function runDay(channel, session, state, day, morning) {
     const { roles, names } = state;
     const alive = state.alive;
     const votes = new Map();
-    const message = await channel.send({
+    const message = await sendGameMessage(session, channel, {
         content: alive.map(mention).join(' '),
         embeds: [gameEmbed(`${TITLE} — اليوم ${day} ☀️`, `${morning}\n\n🗳️ ناقشوا وصوتوا مين المافيا! التعادل أو التخطي = محدش يطلع.\n⏱️ ${DAY_MS / 1000} ثانية\n\n👥 الأحياء (${alive.length}): ${alive.map(mention).join('، ')}`)],
         components: [targetMenu(`mafia_vote_${day}`, '🗳️ صوت على...', alive, names, { skip: true }), phaseRow()],
@@ -173,7 +173,7 @@ async function runDay(channel, session, state, day, morning) {
             const firstVote = !votes.has(interaction.user.id);
             votes.set(interaction.user.id, choice);
             await interaction.reply({ content: `🗳️ صوتك: ${choice === 'skip' ? 'تخطي' : names.get(choice)} (تقدر تغيره)`, flags: MessageFlags.Ephemeral }).catch(() => {});
-            if (firstVote) await channel.send({ content: `🗳️ ${names.get(interaction.user.id)} صوّت (${votes.size}/${alive.length})`, allowedMentions: { parse: [] } }).catch(() => {});
+            if (firstVote) await sendGameMessage(session, channel, { content: `🗳️ ${names.get(interaction.user.id)} صوّت (${votes.size}/${alive.length})`, allowedMentions: { parse: [] } }).catch(() => {});
             if (votes.size === alive.length) collector.stop('done');
         });
         collector.on('end', resolve);
@@ -183,12 +183,12 @@ async function runDay(channel, session, state, day, morning) {
 
     const outId = tallyVotes(votes);
     if (!outId) {
-        await channel.send('⚖️ مفيش اتفاق — محدش طلع النهارده.');
+        await sendGameMessage(session, channel, '⚖️ مفيش اتفاق — محدش طلع النهارده.');
         return;
     }
     state.alive = alive.filter((id) => id !== outId);
     state.dead.push(outId);
-    await channel.send({ content: `🪓 السيرفر طلّع ${mention(outId)} — كان ${describeRole(outId, roles)}`, allowedMentions: { parse: [] } });
+    await sendGameMessage(session, channel, { content: `🪓 السيرفر طلّع ${mention(outId)} — كان ${describeRole(outId, roles)}`, allowedMentions: { parse: [] } });
 }
 
 export async function runMafia(interaction, client, session) {
@@ -211,7 +211,7 @@ export async function runMafia(interaction, client, session) {
     };
     const mafiaCount = [...state.roles.values()].filter((role) => role === 'mafia').length;
 
-    const intro = await channel.send({
+    const intro = await sendGameMessage(session, channel, {
         embeds: [gameEmbed(TITLE, `🎭 الأدوار اتوزعت! كل واحد يدوس **دوري** عشان يشوف دوره (محدش غيرك هيشوفه).\n\n🔪 عدد المافيا: **${mafiaCount}**\n👥 اللاعبين: ${ids.map(mention).join('، ')}\n\nالليل هيبدأ بعد 20 ثانية...`)],
         components: [phaseRow()],
         allowedMentions: { parse: [] },
@@ -228,7 +228,7 @@ export async function runMafia(interaction, client, session) {
         if (!night) break;
         winner = checkWinner(state.roles, state.alive);
         if (winner) {
-            await channel.send({ content: night.text, allowedMentions: { parse: [] } });
+            await sendGameMessage(session, channel, { content: night.text, allowedMentions: { parse: [] } });
             break;
         }
         await runDay(channel, session, state, round, night.text);
@@ -236,10 +236,8 @@ export async function runMafia(interaction, client, session) {
         if (!winner) await wait(3000, session.signal);
     }
 
-    if (session.signal.aborted) {
-        await channel.send(`🛑 ${TITLE} اتوقفت.`).catch(() => {});
-        return;
-    }
+    // Stopped with `وقف`: withChannelGame deletes the game's messages.
+    if (session.signal.aborted) return;
 
     const reveal = ids.map((id) => `${describeRole(id, state.roles)} — ${mention(id)}${state.alive.includes(id) ? '' : ' 💀'}`).join('\n');
     if (!winner) {

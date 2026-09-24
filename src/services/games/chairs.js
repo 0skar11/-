@@ -2,7 +2,7 @@
 // one chair less than players. Whoever doesn't get a chair is out. Last one sitting wins.
 
 import { ActionRowBuilder, ButtonBuilder, ButtonStyle, ComponentType, MessageFlags } from 'discord.js';
-import { gameEmbed, runLobby, stopOnAbort, wait, finishGroupGame } from './session.js';
+import { gameEmbed, runLobby, stopOnAbort, wait, finishGroupGame, sendGameMessage } from './session.js';
 import { randomInt, shuffle } from './text.js';
 
 const TITLE = '🪑 الكراسي الموسيقية';
@@ -46,7 +46,7 @@ export async function runChairs(interaction, client, session) {
     while (alive.length > 1 && !session.signal.aborted) {
         round += 1;
         const chairs = alive.length - 1;
-        const message = await channel.send({ embeds: [gameEmbed(`${TITLE} — الجولة ${round}`, `🎶 الموسيقى شغالة... لفوا حوالين ${chairs} ${chairs === 1 ? 'كرسي' : 'كراسي'}!\n\n👥 ${alive.map((user) => `${user}`).join('، ')}`)] });
+        const message = await sendGameMessage(session, channel, { embeds: [gameEmbed(`${TITLE} — الجولة ${round}`, `🎶 الموسيقى شغالة... لفوا حوالين ${chairs} ${chairs === 1 ? 'كرسي' : 'كراسي'}!\n\n👥 ${alive.map((user) => `${user}`).join('، ')}`)] });
         await wait(randomInt(3000, 9000), session.signal);
         if (session.signal.aborted) break;
 
@@ -87,10 +87,8 @@ export async function runChairs(interaction, client, session) {
         if (alive.length > 1) await wait(2500, session.signal);
     }
 
-    if (session.signal.aborted) {
-        await channel.send(`🛑 ${TITLE} اتوقفت.`).catch(() => {});
-        return;
-    }
+    // Stopped with `وقف`: withChannelGame deletes the game's messages.
+    if (session.signal.aborted) return;
 
     const ranking = rankChairs(alive.map((user) => user.id), roundsOut);
     await finishGroupGame(client, channel, {
