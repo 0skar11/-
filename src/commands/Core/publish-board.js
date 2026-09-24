@@ -1,7 +1,8 @@
-import { PermissionFlagsBits, SlashCommandBuilder } from 'discord.js';
+import { ChannelType, PermissionFlagsBits, SlashCommandBuilder } from 'discord.js';
 import { publishStaffPermissionBoard } from '../../services/staffRoleHierarchyService.js';
 import { publishArabicModerationCommands } from '../../services/moderationCommandsBoardService.js';
 import { publishTrustedBoard } from '../../services/trustedBoardService.js';
+import { publishRulesBoard } from '../../services/rulesBoardService.js';
 
 // One command with subcommands keeps the bot under Discord's 100 global command limit.
 export default {
@@ -10,7 +11,14 @@ export default {
     .setDescription('Post a bot info board once (skipped if it already exists)')
     .addSubcommand((sub) => sub.setName('moderation-commands').setDescription('Post the Arabic moderation commands list'))
     .addSubcommand((sub) => sub.setName('admin-permissions').setDescription('Post or refresh the staff permission board'))
-    .addSubcommand((sub) => sub.setName('trusted').setDescription('Post or refresh the Anti-Nuke trusted list')),
+    .addSubcommand((sub) => sub.setName('trusted').setDescription('Post or refresh the Anti-Nuke trusted list'))
+    .addSubcommand((sub) => sub
+      .setName('rules')
+      .setDescription('Post or refresh the server rules')
+      .addChannelOption((option) => option
+        .setName('channel')
+        .setDescription('Where to post the rules (defaults to this channel)')
+        .addChannelTypes(ChannelType.GuildText, ChannelType.GuildAnnouncement))),
 
   async execute(interaction) {
     if (!interaction.inGuild()) return interaction.reply({ content: '❌ هذا الأمر يعمل داخل السيرفر فقط.', ephemeral: true });
@@ -28,6 +36,14 @@ export default {
         const result = await publishTrustedBoard(interaction.client, { allowSend: true });
         const verb = result.status === 'sent' ? 'إرسال' : 'تحديث';
         return interaction.reply({ content: `✅ تم ${verb} قائمة الـ Trusted في الروم <#${result.channelId}>.`, ephemeral: true });
+      } else if (interaction.options.getSubcommand() === 'rules') {
+        const channel = interaction.options.getChannel('channel') || interaction.channel;
+        const result = await publishRulesBoard(channel);
+        const content = {
+          sent: `✅ تم إرسال القوانين في الروم <#${result.channelId}>.`,
+          updated: `✅ تم تحديث القوانين في الروم <#${result.channelId}>.`,
+        }[result.status] || `ℹ️ القوانين موجودة ومحدّثة بالفعل في الروم <#${result.channelId}>.`;
+        return interaction.reply({ content, ephemeral: true });
       }
       const result = await publishArabicModerationCommands(interaction.client, { allowSend: true });
       const content = {
