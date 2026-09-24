@@ -1,6 +1,7 @@
-import { EmbedBuilder, PermissionFlagsBits } from 'discord.js';
+import { PermissionFlagsBits } from 'discord.js';
 import { logger } from '../utils/logger.js';
 import { findBoardMessage, rememberBoardMessage } from '../utils/boardMessage.js';
+import { getGuildConfig, updateGuildConfig } from './config/guildConfig.js';
 
 const ROLE_PERMISSIONS_CHANNEL_ID = '1550598605382099044';
 const PERMISSION_BOARD_FOOTER = 'Staff permissions • Anti-Raid / Anti-Nuke administration';
@@ -43,13 +44,16 @@ function permissionNames(permissions) {
   return permissions.map((permission) => `✅ ${PERMISSION_LABELS.get(PermissionFlagsBits[permission] ?? permission) || permission}`);
 }
 
+// A plain embed object rather than an EmbedBuilder: src/utils/embeds.js drops builder footers (and strips emojis),
+// and the footer is how the bot recognizes its board message to edit it instead of posting a new one.
 function buildBoardEmbed(role, definition) {
   const permissionLines = permissionNames(role.permissions.toArray());
-  return new EmbedBuilder()
-    .setColor(role.color || definition.color)
-    .setTitle(`${role.name} — الصلاحيات`)
-    .setDescription(`الرتبة: ${role}\n\n${permissionLines.join('\n') || 'لا توجد صلاحيات إضافية'}`)
-    .setFooter({ text: PERMISSION_BOARD_FOOTER });
+  return {
+    color: role.color || parseInt(definition.color.slice(1), 16),
+    title: `${role.name} — الصلاحيات`,
+    description: `الرتبة: ${role}\n\n${permissionLines.join('\n') || 'لا توجد صلاحيات إضافية'}`,
+    footer: { text: PERMISSION_BOARD_FOOTER },
+  };
 }
 
 export async function deleteRetiredRoles(guild) {
@@ -94,52 +98,92 @@ export async function synchronizeStaffRoles(guild) {
   return { created, updated, positioned: positionUpdates.length };
 }
 
-// Embed titles lose their emojis (src/utils/embeds.js strips them), so "📢 Event Manager — …" is posted as
-// "Event Manager — …". Titles are compared without emojis on both sides.
-const withoutEmoji = (text = '') => text.replace(/[\p{Extended_Pictographic}\uFE0F]/gu, '').replace(/\s+/g, ' ').trim();
-const isBoardFor = (message, definition) => withoutEmoji(message.embeds[0]?.title).startsWith(`${withoutEmoji(definition.name)} — `);
+const BOARD_KEY = 'staffPermissions';
+// Bump this to wipe the permission channel once more and post a fresh board on the next startup.
+// Otherwise the bot never posts in that channel; it only edits its board message.
+const BOARD_RESET_VERSION = 1;
+const BOARD_RESET_CONFIG_KEY = 'staffPermissionBoardResetVersion';
+const BULK_DELETE_MAX_AGE_MS = 14 * 24 * 60 * 60 * 1000 - 60_000;
 
-// One board message per staff role. Each message ID is saved in the guild config (like the other boards),
-// so a restart edits the same posts, re-posts a role's message only when it's really gone, and removes duplicates.
-// `editOnly`: only edit messages that already exist, never post.
-export async function publishStaffPermissionBoard(guild, { editOnly = false } = {}) {
+async function fetchBoardChannel(guild, { reset = false } = {}) {
   const channel = await guild.channels.fetch(ROLE_PERMISSIONS_CHANNEL_ID).catch(() => null);
   if (!channel?.isTextBased?.()) throw new Error(`Permission channel ${ROLE_PERMISSIONS_CHANNEL_ID} was not found in guild ${guild.id}`);
 
   const me = guild.members.me || await guild.members.fetchMe().catch(() => null);
   const permissions = me ? channel.permissionsFor(me) : null;
   const required = [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.EmbedLinks, PermissionFlagsBits.ReadMessageHistory];
-  if (!permissions?.has(required)) throw new Error(`Missing permissions in channel ${ROLE_PERMISSIONS_CHANNEL_ID}: ViewChannel, SendMessages, EmbedLinks and ReadMessageHistory are required`);
-
-  // If the history can't be read we can't tell whether the board exists, so don't post.
-  const recentMessages = await channel.messages.fetch({ limit: 100 }).catch(() => null);
-  if (!recentMessages) throw new Error(`Could not read message history in channel ${ROLE_PERMISSIONS_CHANNEL_ID}`);
-  const isBoard = (message) => message.author?.id === guild.client.user.id && message.embeds[0]?.footer?.text === PERMISSION_BOARD_FOOTER;
-  // Board entries for roles that are no longer in ROLE_DEFINITIONS (e.g. the retired Developer role) are removed.
-  const staleBoardMessages = recentMessages.filter((message) => isBoard(message)
-    && !ROLE_DEFINITIONS.some((definition) => isBoardFor(message, definition)));
-  for (const message of staleBoardMessages.values()) await message.delete().catch(() => null);
-
-  const roles = await guild.roles.fetch();
-  let sent = 0;
-  let edited = 0;
-  for (const definition of ROLE_DEFINITIONS) {
-    const role = roles.find((candidate) => candidate.name === definition.name && !candidate.managed);
-    if (!role) continue;
-    const embed = buildBoardEmbed(role, definition);
-    const key = `staffPermissions:${definition.name}`;
-    const existing = await findBoardMessage(channel, key, (message) => isBoard(message) && isBoardFor(message, definition));
-    if (existing) {
-      await existing.edit({ embeds: [embed] });
-      edited += 1;
-    } else if (!editOnly) {
-      const posted = await channel.send({ embeds: [embed] });
-      await rememberBoardMessage(channel, key, posted.id);
-      sent += 1;
-    }
-  }
-  logger.info(`Permission board in guild ${guild.id}, channel ${ROLE_PERMISSIONS_CHANNEL_ID}: sent ${sent}, updated ${edited}`);
-  return { sent, edited, guildId: guild.id, channelId: channel.id };
+  if (reset) required.push(PermissionFlagsBits.ManageMessages);
+  if (!permissions?.has(required)) throw new Error(`Missing permissions in channel ${ROLE_PERMISSIONS_CHANNEL_ID}: ViewChannel, SendMessages, EmbedLinks, ReadMessageHistory${reset ? ' and ManageMessages' : ''} are required`);
+  return channel;
 }
 
-export { ROLE_DEFINITIONS, ROLE_PERMISSIONS_CHANNEL_ID, RETIRED_ROLE_IDS };
+// One message holds every staff role's embed (one embed per role, in hierarchy order).
+async function buildBoardEmbeds(guild) {
+  const roles = await guild.roles.fetch();
+  return ROLE_DEFINITIONS.flatMap((definition) => {
+    const role = roles.find((candidate) => candidate.name === definition.name && !candidate.managed);
+    return role ? [buildBoardEmbed(role, definition)] : [];
+  });
+}
+
+/** Deletes every message in the channel, the bot's own included. Messages older than 14 days can't be bulk deleted, so they go one by one. */
+async function wipeChannel(channel) {
+  let deleted = 0;
+  while (true) {
+    const batch = await channel.messages.fetch({ limit: 100 });
+    if (!batch.size) break;
+    const cutoff = Date.now() - BULK_DELETE_MAX_AGE_MS;
+    const recent = [...batch.values()].filter((message) => message.createdTimestamp > cutoff);
+    const old = [...batch.values()].filter((message) => message.createdTimestamp <= cutoff);
+    let removed = 0;
+    if (recent.length > 1) removed += (await channel.bulkDelete(recent.map((message) => message.id), true)).size;
+    else if (recent.length === 1) removed += await recent[0].delete().then(() => 1).catch(() => 0);
+    for (const message of old) removed += await message.delete().then(() => 1).catch(() => 0);
+    deleted += removed;
+    if (!removed) break;
+  }
+  return deleted;
+}
+
+const isBoard = (guild) => (message) => message.author?.id === guild.client.user.id && message.embeds[0]?.footer?.text === PERMISSION_BOARD_FOOTER;
+
+/**
+ * Edits the bot's permission board to match the current roles. It never posts: when the board message
+ * is missing, nothing is sent ({ status: 'missing' }).
+ * With `reset`, every message in the channel is deleted first and one fresh board message is posted.
+ */
+export async function publishStaffPermissionBoard(guild, { reset = false } = {}) {
+  const channel = await fetchBoardChannel(guild, { reset });
+  const embeds = await buildBoardEmbeds(guild);
+  const result = { guildId: guild.id, channelId: channel.id, deleted: 0 };
+
+  if (reset) {
+    result.deleted = await wipeChannel(channel);
+    if (!embeds.length) return { ...result, status: 'no-roles' };
+    const posted = await channel.send({ embeds });
+    await rememberBoardMessage(channel, BOARD_KEY, posted.id);
+    logger.info(`Permission board in guild ${guild.id}: channel ${channel.id} cleared (${result.deleted} messages) and the board was posted`);
+    return { ...result, status: 'sent' };
+  }
+
+  const existing = await findBoardMessage(channel, BOARD_KEY, isBoard(guild));
+  if (!existing) return { ...result, status: 'missing' };
+  if (!embeds.length) return { ...result, status: 'no-roles' };
+  await existing.edit({ embeds });
+  return { ...result, status: 'updated' };
+}
+
+/**
+ * Startup refresh: the first run after BOARD_RESET_VERSION changes clears the channel and posts the board
+ * once; every other run only edits the existing board message.
+ */
+export async function refreshStaffPermissionBoard(guild) {
+  const config = await getGuildConfig(guild.client, guild.id).catch(() => null);
+  // Without the config the reset state is unknown, so play safe and only edit.
+  const reset = Boolean(config) && config[BOARD_RESET_CONFIG_KEY] !== BOARD_RESET_VERSION;
+  const result = await publishStaffPermissionBoard(guild, { reset });
+  if (reset) await updateGuildConfig(guild.client, guild.id, { [BOARD_RESET_CONFIG_KEY]: BOARD_RESET_VERSION });
+  return result;
+}
+
+export { ROLE_DEFINITIONS, ROLE_PERMISSIONS_CHANNEL_ID, RETIRED_ROLE_IDS, BOARD_RESET_VERSION };

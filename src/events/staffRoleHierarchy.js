@@ -1,6 +1,6 @@
 import { Events } from 'discord.js';
 import { logger, startupLog } from '../utils/logger.js';
-import { deleteRetiredRoles, synchronizeStaffRoles, publishStaffPermissionBoard } from '../services/staffRoleHierarchyService.js';
+import { deleteRetiredRoles, synchronizeStaffRoles, refreshStaffPermissionBoard } from '../services/staffRoleHierarchyService.js';
 
 export default {
   name: Events.ClientReady,
@@ -11,12 +11,11 @@ export default {
     let updated = 0;
     let positioned = 0;
     let retired = 0;
-    let boardEdited = 0;
-    let boardSent = 0;
+    const boardResults = [];
 
     for (const guild of client.guilds.cache.values()) {
-      // The permission board is refreshed to match the synced permissions; a role whose message
-      // is missing (e.g. deleted) gets it posted again. Saved message IDs prevent duplicates.
+      // The permission board is edited to match the synced permissions. The bot never posts there on its own,
+      // except once per BOARD_RESET_VERSION, when it clears the channel and posts the board fresh.
       try {
         retired += await deleteRetiredRoles(guild);
       } catch (error) {
@@ -31,14 +30,13 @@ export default {
         logger.error(`Failed to synchronize staff roles in ${guild.name}:`, error);
       }
       try {
-        const board = await publishStaffPermissionBoard(guild);
-        boardEdited += board.edited;
-        boardSent += board.sent;
+        const board = await refreshStaffPermissionBoard(guild);
+        boardResults.push(board.status === 'sent' ? `${board.status} (cleared ${board.deleted})` : board.status);
       } catch (error) {
         logger.warn(`Permission board not refreshed in ${guild.name}: ${error.message}`);
       }
     }
 
-    startupLog(`Staff role hierarchy: created ${created}, updated ${updated}, positioned ${positioned}, retired ${retired}, board messages refreshed ${boardEdited}, posted ${boardSent}`);
+    startupLog(`Staff role hierarchy: created ${created}, updated ${updated}, positioned ${positioned}, retired ${retired}, permission board ${boardResults.join(', ') || 'skipped'}`);
   },
 };
