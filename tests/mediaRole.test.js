@@ -19,7 +19,7 @@ describe('media lock', () => {
     assert.equal(hasMediaContent(message('3.5 ساعة')), false);
   });
 
-  test('creates the media role right above chaos and strips media from @everyone and chaos', async () => {
+  test('creates the media role right below chaos and strips media from @everyone and chaos', async () => {
     const mediaBits = new PermissionsBitField(MEDIA_PERMISSIONS);
     const role = (id, position, permissions) => ({
       id, position, name: id, managed: false, editable: true,
@@ -46,9 +46,33 @@ describe('media lock', () => {
     assert.deepEqual(result, { created: true, positioned: true, locked: 2 });
     assert.equal(media.name, 'media');
     assert.equal(media.permissions.has(MEDIA_PERMISSIONS), true);
-    assert.equal(media.position, chaos.position);
+    assert.equal(media.position, chaos.position - 1);
     assert.equal(everyone.permissions.any(MEDIA_PERMISSIONS), false);
     assert.equal(chaos.permissions.any(MEDIA_PERMISSIONS), false);
+  });
+
+  test('moves a media role that sits above chaos down to right below it', async () => {
+    const role = (id, position) => ({
+      id, position, name: id, managed: false, editable: true,
+      permissions: new PermissionsBitField(MEDIA_PERMISSIONS),
+      async setPermissions(value) { this.permissions = new PermissionsBitField(value); },
+      async setPosition(value) { this.movedTo = value; },
+    });
+    const everyone = role('everyone', 0);
+    const chaos = role(CHAOS_ROLE_ID, 3);
+    const media = role('media', 4);
+    const roles = new Map([[everyone.id, everyone], [chaos.id, chaos], [media.id, media]]);
+    roles.find = (fn) => [...roles.values()].find(fn);
+    const guild = {
+      name: 'test',
+      members: { me: { permissions: new PermissionsBitField(PermissionsBitField.All), roles: { highest: { position: 10 } } } },
+      roles: { everyone, fetch: async () => roles },
+    };
+
+    const result = await ensureMediaRole(guild);
+    assert.equal(result.positioned, true);
+    // Moving down onto chaos's index puts media directly under it (chaos shifts up by one).
+    assert.equal(media.movedTo, chaos.position);
   });
 
   test('gives the media role to every current member once, skipping bots', async () => {

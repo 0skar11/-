@@ -49,6 +49,7 @@ function buildEmbed() {
           '`فتح` — Unlock channel',
           '`مسح 10` / `م 10` — Delete messages',
           '`ملاحظات @العضو` — User notes',
+          '`ملاحظات @العضو الملاحظة` — Add a note',
           '`قل @العضو النص` — Say as the bot',
           '`خاص @العضو النص` — DM user',
         ].join('\n'),
