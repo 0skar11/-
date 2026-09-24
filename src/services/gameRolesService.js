@@ -13,6 +13,12 @@ export const GAME_ROLES = [
   { name: 'Among Us', emoji: 'game_amongus' },
   { name: 'Minecraft', emoji: 'game_minecraft' },
   { name: 'Roblox', emoji: 'game_roblox' },
+  { name: 'Codenames', emoji: 'game_codenames' },
+  { name: 'Fortnite', emoji: 'game_fortnite' },
+  { name: 'PUBG', emoji: 'game_pubg' },
+  { name: 'Brawlhalla', emoji: 'game_brawlhalla' },
+  { name: 'ARK', emoji: 'game_ark' },
+  { name: 'Warframe', emoji: 'game_warframe' },
   { name: 'Other', emoji: 'game_other' },
 ].map((game) => ({ ...game, icon: path.join(EMOJI_DIR, `${game.emoji}.png`) }));
 

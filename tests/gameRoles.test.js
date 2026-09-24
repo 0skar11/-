@@ -52,15 +52,16 @@ describe('game roles', () => {
   test('creates colourless roles with no permissions and their emoji as icon, at the bottom', async () => {
     const { guild, cache } = guildWith({ roles: [makeRole('chaos', 'chaos', 1, { color: 5 })] });
     const result = await ensureGameRoles(guild);
-    assert.equal(result.created, 5);
-    assert.equal(result.icons, 5);
+    assert.equal(result.created, GAME_ROLES.length);
+    assert.equal(result.icons, GAME_ROLES.length);
     for (const game of GAME_ROLES) {
       const role = [...cache.values()].find((r) => r.name === game.name);
       assert.equal(role.createdWith.color, 0);
       assert.deepEqual(role.createdWith.permissions, []);
       assert.equal(role.createdWith.icon, game.icon);
     }
-    assert.deepEqual(bottomNames(cache), ['Valorant', 'Among Us', 'Minecraft', 'Roblox', 'Other']);
+    assert.deepEqual(bottomNames(cache), GAME_ROLES.map((game) => game.name));
+    assert.equal(bottomNames(cache).at(-1), 'Other');
     assert.ok(cache.get('chaos').position > GAME_ROLES.length);
   });
 
