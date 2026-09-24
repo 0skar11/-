@@ -45,3 +45,52 @@ describe('level system', () => {
     assert.equal(rollXp({ xpPerMessage: { min: 10, max: 10 }, xpMultiplier: 2 }, () => 0.5), 20);
   });
 });
+
+import { applyWordAliases, resolveCommandAlias } from '../src/config/commands/commandAliases.js';
+import { mapArgumentsToOptions } from '../src/utils/prefixParser.js';
+import leaderboardCommand from '../src/commands/Leveling/leaderboard.js';
+import rankCommand from '../src/commands/Leveling/rank.js';
+import { countMessage, flushChatCounts, getChatCounts, rankChatCounts, chatCountKey } from '../src/services/leveling/chatCounter.js';
+import { buildTopChatEmbed } from '../src/services/leveling/levelUi.js';
+
+function typed(text) {
+  const [word, ...args] = text.split(' ');
+  const aliased = applyWordAliases(word.toLowerCase(), args, false);
+  if (!aliased) return null;
+  return { command: resolveCommandAlias(aliased.commandName), args: aliased.args };
+}
+
+describe('level words and top chat', () => {
+  test('top chat / top level / توب شات / توب لفل pick the right leaderboard', () => {
+    for (const [text, type] of [['top chat', 'chat'], ['top level', 'level'], ['توب شات', 'chat'], ['توب الشات', 'chat'], ['توب لفل', 'level'], ['توب الليفلات', 'level'], ['توب ليفلات', 'level'], ['توب اللفلات', 'level']]) {
+      const { command, args } = typed(text);
+      assert.equal(command, 'leaderboard');
+      assert.equal(mapArgumentsToOptions(args, leaderboardCommand.data).getString('type'), type);
+    }
+    assert.equal(typed('توب').command, 'leaderboard');
+  });
+
+  test('لفل @member shows that member, and chat like "لفل كام" is ignored', () => {
+    const { command, args } = typed('لفل <@123456789012345678>');
+    assert.equal(command, 'rank');
+    assert.equal(mapArgumentsToOptions(args, rankCommand.data).getUser('user'), '<@123456789012345678>');
+    assert.equal(typed('لفل كام يا جماعة'), null);
+  });
+
+  test('messages are counted, saved in batches and ranked', async () => {
+    const store = new Map();
+    const client = { db: { get: async (key, fallback) => (store.has(key) ? store.get(key) : fallback), set: async (key, value) => store.set(key, value) } };
+    for (let i = 0; i < 3; i += 1) countMessage(client, 'g-test', 'a');
+    countMessage(client, 'g-test', 'b');
+    assert.deepEqual(await getChatCounts(client, 'g-test'), { a: 3, b: 1 });
+    await flushChatCounts(client);
+    assert.deepEqual(store.get(chatCountKey('g-test')), { a: 3, b: 1 });
+    countMessage(client, 'g-test', 'b');
+    assert.deepEqual(await getChatCounts(client, 'g-test'), { a: 3, b: 2 });
+    const ranked = rankChatCounts({ a: 3, b: 2, gone: 9 }, (id) => id !== 'gone');
+    assert.deepEqual(ranked.map((entry) => [entry.userId, entry.rank]), [['a', 1], ['b', 2]]);
+    const embed = buildTopChatEmbed({ name: 'void' }, ranked, { callerId: 'b', callerEntry: ranked[1] });
+    assert.match(embed.description, /🥇 <@a> — \*\*3\*\* رسالة/u);
+    assert.match(embed.description, /ترتيبك:\*\* #2/u);
+  });
+});

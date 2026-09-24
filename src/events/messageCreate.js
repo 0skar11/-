@@ -22,6 +22,7 @@ import { handleMediaMessage } from '../services/mediaRoleService.js';
 import { handleGamesChannelMessage, isGamesOnlyFor, isGameCommandMessage } from '../services/games/gamesChannel.js';
 import { handleGamesBotWin } from '../services/cc/gamesBotWins.js';
 import { handleMessageXp } from '../services/leveling/messageXp.js';
+import { countMessage } from '../services/leveling/chatCounter.js';
 
 export default {
   name: Events.MessageCreate,
@@ -41,6 +42,7 @@ export default {
       if (await handleReportChannelMessage(message)) return;
       // Chat XP (runs in the background; the cooldown keeps it from being farmed with commands or spam).
       handleMessageXp(message, client);
+      countMessage(client, message.guild.id, message.author.id);
       // In the games channel only game commands run (the rest there is game answers).
       const gamesOnly = isGamesOnlyFor(message);
       if (!gamesOnly && await handleArabicUtilityShortcuts(message)) return;

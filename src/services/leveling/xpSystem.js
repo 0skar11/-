@@ -10,10 +10,9 @@ import { buildLevelUpMessage } from './levelUi.js';
 
 /**
  * Award XP to a member. Returns null when XP is skipped (disabled/invalid amount).
- * `channel`: where the member leveled up; the announcement goes there unless a level-up channel is set.
  * Throws on storage or unexpected failures.
  */
-export const addXp = wrapServiceBoundary(async function addXp(client, guild, member, xpToAdd, { channel = null } = {}) {
+export const addXp = wrapServiceBoundary(async function addXp(client, guild, member, xpToAdd) {
   const lockKey = `leveling:${guild.id}:${member.user.id}`;
   return await Mutex.runExclusive(lockKey, async () => {
     if (!xpToAdd || xpToAdd <= 0) {
@@ -54,7 +53,7 @@ export const addXp = wrapServiceBoundary(async function addXp(client, guild, mem
 
     if (didLevelUp) {
       if (config.announceLevelUp) {
-        await sendLevelUpAnnouncement(guild, member, levelData, config, { channel, fromLevel: initialLevel, rewardRoleIds });
+        await sendLevelUpAnnouncement(guild, member, levelData, config, { fromLevel: initialLevel, rewardRoleIds });
       }
 
       try {
@@ -116,15 +115,18 @@ async function awardRoleReward(guild, member, roleId, level) {
   }
 }
 
+// Level-up messages go to this channel only, never to the chat. If it's missing, nothing is posted.
+const LEVEL_UP_CHANNEL_ID = '1552786804451573772';
+
 // One message per level-up (even when several levels are gained at once). It only pings the member
 // every 5 levels (see levelUi.js); the old free-text levelUpMessage is no longer used.
-async function sendLevelUpAnnouncement(guild, member, levelData, config, { channel, fromLevel, rewardRoleIds }) {
+async function sendLevelUpAnnouncement(guild, member, levelData, config, { fromLevel, rewardRoleIds }) {
   try {
-    const levelUpChannel = (config.levelUpChannel && guild.channels.cache.get(config.levelUpChannel))
-      || channel
-      || guild.systemChannel;
+    const levelUpChannel = guild.channels.cache.get(LEVEL_UP_CHANNEL_ID)
+      || await guild.channels.fetch(LEVEL_UP_CHANNEL_ID).catch(() => null);
 
     if (!levelUpChannel || !levelUpChannel.isTextBased()) {
+      logger.warn(`Level-up channel ${LEVEL_UP_CHANNEL_ID} was not found in ${guild.name}; level-up not announced.`);
       return;
     }
 
