@@ -1,85 +1,90 @@
-import { EmbedBuilder, PermissionFlagsBits } from 'discord.js';
+import { PermissionFlagsBits } from 'discord.js';
 import { findBoardMessage, rememberBoardMessage } from '../utils/boardMessage.js';
 
-// No emoji: src/utils/embeds.js strips them from titles, and the title is how the post is found again.
-export const RULES_TITLE = 'قوانين السيرفر';
+export const RULES_CHANNEL_ID = '1547311665458978990';
+export const RULES_TITLE = '📜 ━━━ قوانين السيرفر ━━━ 📜';
 const BOARD_KEY = 'rules';
+const RULES_COLOR = 0xf1c40f;
 
 const PERMISSION_NAMES = [
   [PermissionFlagsBits.ViewChannel, 'ViewChannel'],
   [PermissionFlagsBits.SendMessages, 'SendMessages'],
   [PermissionFlagsBits.EmbedLinks, 'EmbedLinks'],
   [PermissionFlagsBits.ReadMessageHistory, 'ReadMessageHistory'],
+  [PermissionFlagsBits.MentionEveryone, 'MentionEveryone'],
 ];
 
 export const RULES_SECTIONS = [
   {
-    name: '🤝 الاحترام',
+    name: '🤝 ┃ الاحترام',
     rules: [
       'احترم كل الأعضاء والستاف، ممنوع الشتيمة والسب والتنمر.',
-      'ممنوع العنصرية أو الكلام عن الدين أو السياسة أو الأصل بشكل مسيء.',
-      'ممنوع التهديد أو نشر معلومات شخصية لأي حد (صور، أرقام، عناوين).',
-      'الخلافات الشخصية تتحل في الخاص أو عن طريق تكت، مش في الشات العام.',
+      'ممنوع العنصرية أو الكلام المسيء عن الدين أو السياسة أو الأصل.',
+      'ممنوع التهديد أو نشر معلومات شخصية لأي حد.',
+      'الخلافات الشخصية تتحل في الخاص أو في تكت، مش في الشات العام.',
     ],
   },
   {
-    name: '💬 الشات',
+    name: '💬 ┃ الشات',
     rules: [
-      'ممنوع السبام والفلود وتكرار الرسائل أو الإيموجي.',
-      'ممنوع منشن `@everyone` أو `@here` أو منشن الستاف من غير سبب.',
-      'ممنوع أي محتوى +18 أو دموي أو مقزز، في الرسائل أو الصور أو الأسماء أو الصور الشخصية.',
-      'استخدم كل روم في الغرض بتاعه (الأوامر في روم الأوامر، والألعاب في روم الألعاب).',
+      'ممنوع السبام.',
+      'ممنوع أي محتوى +18 أو دموي، سواء في الرسائل أو الصور أو الأسماء.',
+      'استخدم كل روم في الغرض بتاعه.',
     ],
   },
   {
-    name: '🔗 الإعلانات والروابط',
+    name: '🔗 ┃ الإعلانات والروابط',
     rules: [
-      'ممنوع نشر روابط سيرفرات تانية أو أي إعلان، في الشات أو في خاص الأعضاء.',
-      'ممنوع الروابط المشبوهة أو روابط النيترو المزيفة أو أي محاولة نصب.',
+      'ممنوع نشر روابط سيرفرات تانية أو أي إعلان، في الشات أو في الخاص.',
     ],
   },
   {
-    name: '🎙️ الرومات الصوتية',
+    name: '🎙️ ┃ الفويس',
     rules: [
-      'ممنوع الإزعاج في الفويس: صريخ، أصوات عالية، أو تشغيل أصوات من غير إذن.',
-      'ممنوع تسجيل الفويس أو نشر كلام حد من غير موافقته.',
+      'ممنوع الإزعاج في الفويس.',
+      'ممنوع تسجيل الفويس من غير موافقة.',
     ],
   },
   {
-    name: '🎮 الألعاب والـ CC',
+    name: '🛡️ ┃ الستاف والعقوبات',
     rules: [
-      'ممنوع استخدام حسابات تانية (alts) عشان تاخد يومي أو CC زيادة.',
-      'ممنوع الغش أو الاتفاق مع حد عشان تكسب لعبة، أو تخريب لعبة شغالة.',
-      'الـ CC ملوش أي قيمة حقيقية وممنوع بيعه أو شراه بفلوس.',
-    ],
-  },
-  {
-    name: '🛡️ الستاف والعقوبات',
-    rules: [
-      'قرار الستاف نهائي، ولو عندك اعتراض افتح تكت بهدوء.',
-      'ممنوع انتحال شخصية حد من الستاف أو من الأعضاء.',
-      'كل 3 تحذيرات = تايم أوت تلقائي 15 دقيقة، ويتضاعف كل 3 تحذيرات بعدها.',
-      'التحذير بيتمسح تلقائياً بعد 5 أيام، والمخالفات الكبيرة ممكن توصل للبان مباشرة.',
-      'لازم تلتزم بشروط ديسكورد (Discord ToS)، واللي سنه أقل من 13 سنة ممنوع يكون في السيرفر.',
+      'قرار الستاف نهائي، ولو عندك اعتراض افتح تكت.',
+      'ممنوع انتحال شخصية حد.',
+      'كل 3 تحذيرات = تايم أوت 15 دقيقة، والمدة بتتضاعف كل 3 تحذيرات بعد كده.',
+      'التحذير بيتمسح بعد 5 أيام، والمخالفات الكبيرة ممكن توصل لبان على طول.',
+      'الالتزام بشروط ديسكورد.',
     ],
   },
 ];
 
-/** Numbers the rules across sections so members can point to one ("rule 7"). */
-export function buildRulesEmbed() {
+const DIVIDER = '━━━━━━━━━━━━━━━━━━━━';
+
+/**
+ * A plain embed object rather than an EmbedBuilder: src/utils/embeds.js strips emojis from builder
+ * titles, fields and descriptions, and the section icons are part of the look.
+ * Rules are numbered across sections so members can point to one ("rule 7").
+ */
+export function buildRulesEmbed(guild) {
   let number = 0;
   const fields = RULES_SECTIONS.map(({ name, rules }) => ({
     name,
-    value: rules.map((rule) => `**${++number}.** ${rule}`).join('\n'),
+    value: rules.map((rule) => `\`${String(++number).padStart(2, '0')}\` ${rule}`).join('\n'),
   }));
-  return new EmbedBuilder()
-    .setColor(0x5865f2)
-    .setTitle(RULES_TITLE)
-    .setDescription([
-      'وجودك في السيرفر معناه إنك موافق على القوانين دي. عدم معرفتك بالقوانين مش عذر.',
-      'أي مشكلة أو شكوى؟ افتح تكت والستاف هيساعدك.',
-    ].join('\n'))
-    .addFields(fields);
+  fields.push({
+    name: '⚠️ ┃ تنبيه',
+    value: '> وجودك في السيرفر معناه إنك موافق على القوانين دي، وعدم معرفتك بيها مش عذر.\n> أي مشكلة أو شكوى؟ افتح تكت 🎫 والستاف هيساعدك.',
+  });
+
+  const embed = {
+    title: RULES_TITLE,
+    description: `أهلاً بيك في السيرفر 👋\nعشان المكان يفضل محترم وممتع للكل، الالتزام بالقوانين دي **إجباري**.\n${DIVIDER}`,
+    color: RULES_COLOR,
+    fields,
+    footer: { text: `${guild?.name || 'السيرفر'} • القوانين ممكن تتحدث في أي وقت` },
+  };
+  const icon = guild?.iconURL?.({ size: 256 });
+  if (icon) embed.thumbnail = { url: icon };
+  return embed;
 }
 
 function embedSignature(embed) {
@@ -87,17 +92,22 @@ function embedSignature(embed) {
     title: embed?.title || '',
     description: embed?.description || '',
     color: embed?.color ?? null,
+    footer: embed?.footer?.text || '',
     fields: (embed?.fields || []).map(({ name, value }) => ({ name, value })),
   });
 }
 
 /**
- * Posts the rules in the given channel, or edits the bot's existing rules post there so it matches the code.
+ * Posts the rules in the rules channel with an @everyone ping, or edits the bot's existing rules post
+ * there so it matches the code (edits never ping again).
  * Returns { status, channelId } where status is 'sent', 'updated' or 'exists'; throws on failure.
  */
-export async function publishRulesBoard(channel) {
+export async function publishRulesBoard(client) {
+  const channel = await client.channels.fetch(RULES_CHANNEL_ID).catch((error) => {
+    throw new Error(`Channel ${RULES_CHANNEL_ID} could not be fetched (is the bot in that server?): ${error.message}`);
+  });
   if (!channel?.isTextBased?.() || !channel.messages?.fetch || !channel.guild) {
-    throw new Error('The rules can only be posted in a server text channel');
+    throw new Error(`Channel ${RULES_CHANNEL_ID} is not a server text channel`);
   }
 
   const botMember = channel.guild.members.me || await channel.guild.members.fetchMe().catch(() => null);
@@ -107,15 +117,15 @@ export async function publishRulesBoard(channel) {
     throw new Error(`Missing permissions in <#${channel.id}>: ${missing.join(', ')}`);
   }
 
-  const embed = buildRulesEmbed();
+  const embed = buildRulesEmbed(channel.guild);
   const existing = await findBoardMessage(channel, BOARD_KEY, (message) => message.embeds[0]?.title === RULES_TITLE);
   if (existing) {
-    if (embedSignature(existing.embeds[0]) === embedSignature(embed.data)) return { status: 'exists', channelId: channel.id };
-    await existing.edit({ content: '', embeds: [embed] });
+    if (embedSignature(existing.embeds[0]) === embedSignature(embed)) return { status: 'exists', channelId: channel.id };
+    await existing.edit({ content: '@everyone', embeds: [embed], allowedMentions: { parse: [] } });
     return { status: 'updated', channelId: channel.id };
   }
 
-  const sent = await channel.send({ embeds: [embed] });
+  const sent = await channel.send({ content: '@everyone', embeds: [embed], allowedMentions: { parse: ['everyone'] } });
   await rememberBoardMessage(channel, BOARD_KEY, sent.id);
   return { status: 'sent', channelId: channel.id };
 }

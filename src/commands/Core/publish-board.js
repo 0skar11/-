@@ -1,4 +1,4 @@
-import { ChannelType, PermissionFlagsBits, SlashCommandBuilder } from 'discord.js';
+import { PermissionFlagsBits, SlashCommandBuilder } from 'discord.js';
 import { publishStaffPermissionBoard } from '../../services/staffRoleHierarchyService.js';
 import { publishArabicModerationCommands } from '../../services/moderationCommandsBoardService.js';
 import { publishTrustedBoard } from '../../services/trustedBoardService.js';
@@ -12,13 +12,7 @@ export default {
     .addSubcommand((sub) => sub.setName('moderation-commands').setDescription('Post the Arabic moderation commands list'))
     .addSubcommand((sub) => sub.setName('admin-permissions').setDescription('Post or refresh the staff permission board'))
     .addSubcommand((sub) => sub.setName('trusted').setDescription('Post or refresh the Anti-Nuke trusted list'))
-    .addSubcommand((sub) => sub
-      .setName('rules')
-      .setDescription('Post or refresh the server rules')
-      .addChannelOption((option) => option
-        .setName('channel')
-        .setDescription('Where to post the rules (defaults to this channel)')
-        .addChannelTypes(ChannelType.GuildText, ChannelType.GuildAnnouncement))),
+    .addSubcommand((sub) => sub.setName('rules').setDescription('Post (with @everyone) or refresh the server rules')),
 
   async execute(interaction) {
     if (!interaction.inGuild()) return interaction.reply({ content: '❌ هذا الأمر يعمل داخل السيرفر فقط.', ephemeral: true });
@@ -37,8 +31,7 @@ export default {
         const verb = result.status === 'sent' ? 'إرسال' : 'تحديث';
         return interaction.reply({ content: `✅ تم ${verb} قائمة الـ Trusted في الروم <#${result.channelId}>.`, ephemeral: true });
       } else if (interaction.options.getSubcommand() === 'rules') {
-        const channel = interaction.options.getChannel('channel') || interaction.channel;
-        const result = await publishRulesBoard(channel);
+        const result = await publishRulesBoard(interaction.client);
         const content = {
           sent: `✅ تم إرسال القوانين في الروم <#${result.channelId}>.`,
           updated: `✅ تم تحديث القوانين في الروم <#${result.channelId}>.`,
