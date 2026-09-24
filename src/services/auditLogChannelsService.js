@@ -13,6 +13,7 @@ const LOG_CHANNELS = {
   roles: 'roles',
   join: 'join',
   leave: 'leave',
+  invites: 'invites',
 };
 
 export async function ensureAuditLogChannels(client) {
