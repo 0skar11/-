@@ -1,7 +1,10 @@
+import { createHash } from 'crypto';
+import { readFile } from 'fs/promises';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { PermissionFlagsBits } from 'discord.js';
 import { logger } from '../utils/logger.js';
+import { getGuildConfig, updateGuildConfig } from './config/guildConfig.js';
 
 // Game roles for Onboarding: no colour, no permissions, and kept at the very bottom of the role list
 // (Valorant on top, Other right above @everyone). Each role's icon is its game emoji from
@@ -23,6 +26,20 @@ export const GAME_ROLES = [
 ].map((game) => ({ ...game, icon: path.join(EMOJI_DIR, `${game.emoji}.png`) }));
 
 const REASON = 'Game role for Onboarding';
+// Guild config key holding a hash of the icon files last put on the game roles. When the emoji
+// files change, every game role gets the new icon once, even when it already had one.
+const ICONS_VERSION_KEY = 'gameRoleIconsVersion';
+
+async function iconsVersion() {
+  const hash = createHash('sha1');
+  for (const game of GAME_ROLES) hash.update(game.emoji).update(await readFile(game.icon));
+  return hash.digest('hex');
+}
+
+const hasDatabase = (guild) => {
+  const db = guild.client?.db;
+  return typeof db?.get === 'function' && !(typeof db.isAvailable === 'function' && !db.isAvailable());
+};
 
 // Lowest role first. Roles on the same position are ordered like Discord does: the older (smaller id) one is higher.
 const idKey = (role) => String(role.id).padStart(20, '0');
@@ -42,6 +59,10 @@ export async function ensureGameRoles(guild) {
   let created = 0;
   let icons = 0;
 
+  // New icon files: replace the icons already on the roles. Without the database only missing icons are set.
+  const version = canUseIcons && hasDatabase(guild) ? await iconsVersion() : null;
+  const newIcons = Boolean(version) && (await getGuildConfig(guild.client, guild.id))?.[ICONS_VERSION_KEY] !== version;
+
   for (const game of GAME_ROLES) {
     let role = findRole(roles, game.name);
     if (!role) {
@@ -60,7 +81,7 @@ export async function ensureGameRoles(guild) {
       const edit = {};
       if (role.color !== 0) edit.color = 0;
       if (role.permissions.bitfield !== 0n) edit.permissions = [];
-      if (canUseIcons && !role.icon && !role.unicodeEmoji) edit.icon = game.icon;
+      if (canUseIcons && (newIcons || (!role.icon && !role.unicodeEmoji))) edit.icon = game.icon;
       if (Object.keys(edit).length) {
         role = await role.edit({ ...edit, reason: REASON });
         if (edit.icon) icons += 1;
@@ -69,6 +90,8 @@ export async function ensureGameRoles(guild) {
       logger.warn(`Game role ${game.name} in ${guild.name} is above the bot's highest role and can't be edited.`);
     }
   }
+
+  if (newIcons) await updateGuildConfig(guild.client, guild.id, { [ICONS_VERSION_KEY]: version });
 
   // Fetch again: the roles created or edited above are not in `roles`.
   const positioned = await keepGameRolesAtBottom(guild);

@@ -89,6 +89,19 @@ describe('game roles', () => {
     assert.equal(cache.get('chaos').position, 1);
   });
 
+  test('puts the new icons on roles that already have an old one, once', async () => {
+    const store = new Map();
+    const { guild, cache } = guildWith({ roles: [makeRole('v', 'Valorant', 1, { icon: 'old-hash' })] });
+    guild.client = { db: { get: async (key, fallback) => (store.has(key) ? store.get(key) : fallback), set: async (key, value) => { store.set(key, value); return true; } } };
+    const first = await ensureGameRoles(guild);
+    assert.equal(cache.get('v').icon, GAME_ROLES[0].icon);
+    assert.equal(first.icons, GAME_ROLES.length);
+    cache.get('v').icon = 'discord-hash';
+    const again = await ensureGameRoles(guild);
+    assert.equal(again.icons, 0);
+    assert.equal(cache.get('v').icon, 'discord-hash');
+  });
+
   test('skips icons without the ROLE_ICONS feature', async () => {
     const { guild, cache } = guildWith({ features: [] });
     const result = await ensureGameRoles(guild);
