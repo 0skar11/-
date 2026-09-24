@@ -3,7 +3,27 @@ import { getProfile, getLeaderboard } from '../../services/cc/ccService.js';
 import { CC, formatCC, ccEmbed } from '../../config/cc.js';
 import { InteractionHelper } from '../../utils/interactionHelper.js';
 
-// `cc` / `رصيد`: a member's Chaos Credits and game stats.
+/** A member's CC balance, rank and game stats (`cc` / `رصيد` and the games panel). */
+export async function ccProfileEmbed(client, guildId, target) {
+    const [{ cc, stats }, board] = await Promise.all([
+        getProfile(client, guildId, target.id),
+        getLeaderboard(client, guildId),
+    ]);
+    const rank = board.findIndex((row) => row.userId === target.id) + 1;
+
+    return ccEmbed(`${CC.emoji} ${CC.name}`, `${target}\n\n💰 الرصيد: ${formatCC(cc)}\n🏆 الترتيب: ${rank ? `#${rank} من ${board.length}` : '—'}`, {
+        thumbnail: target.displayAvatarURL?.() || null,
+        fields: [
+            { name: '📈 اتجمع', value: `${stats.earned.toLocaleString('en-US')}`, inline: true },
+            { name: '🛒 اتصرف', value: `${stats.spent.toLocaleString('en-US')}`, inline: true },
+            { name: '🎮 ألعاب جماعية', value: `${stats.gamesPlayed}`, inline: true },
+            { name: '🥇 مركز أول', value: `${stats.groupWins}`, inline: true },
+            { name: '🏅 توب 3', value: `${stats.podiums}`, inline: true },
+            { name: '🙋 فوز فردي', value: `${stats.soloWins}`, inline: true },
+        ],
+    });
+}
+
 export default {
     data: new SlashCommandBuilder()
         .setName('cc')
@@ -18,23 +38,7 @@ export default {
             return;
         }
 
-        const [{ cc, stats }, board] = await Promise.all([
-            getProfile(client, interaction.guildId, target.id),
-            getLeaderboard(client, interaction.guildId),
-        ]);
-        const rank = board.findIndex((row) => row.userId === target.id) + 1;
-
-        const embed = ccEmbed(`${CC.emoji} ${CC.name}`, `${target}\n\n💰 الرصيد: ${formatCC(cc)}\n🏆 الترتيب: ${rank ? `#${rank} من ${board.length}` : '—'}`, {
-            thumbnail: target.displayAvatarURL?.() || null,
-            fields: [
-                { name: '📈 اتجمع', value: `${stats.earned.toLocaleString('en-US')}`, inline: true },
-                { name: '🛒 اتصرف', value: `${stats.spent.toLocaleString('en-US')}`, inline: true },
-                { name: '🎮 ألعاب جماعية', value: `${stats.gamesPlayed}`, inline: true },
-                { name: '🥇 مركز أول', value: `${stats.groupWins}`, inline: true },
-                { name: '🏅 توب 3', value: `${stats.podiums}`, inline: true },
-                { name: '🙋 فوز فردي', value: `${stats.soloWins}`, inline: true },
-            ],
-        });
+        const embed = await ccProfileEmbed(client, interaction.guildId, target);
         await InteractionHelper.safeReply(interaction, { embeds: [embed], allowedMentions: { parse: [] } });
     },
 };

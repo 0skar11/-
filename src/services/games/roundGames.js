@@ -156,6 +156,7 @@ export async function runRoundGame(interaction, client, session, gameKey, reques
     const channel = interaction.channel;
     const participants = new Set();
     const scores = new Map();
+    session.chatOpen = true;
 
     await InteractionHelper.safeReply(interaction, {
         embeds: [gameEmbed(game.title, [

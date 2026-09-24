@@ -4,7 +4,8 @@
 import { triviaQuestions } from './data/trivia.js';
 import { isAnswer, pick, randomInt } from './text.js';
 import { judgeGuess } from './roundGames.js';
-import { gameEmbed } from './session.js';
+import { MessageFlags } from 'discord.js';
+import { gameEmbed, getActiveGame } from './session.js';
 import { awardSoloWin } from '../cc/ccService.js';
 import { CC, formatCC } from '../../config/cc.js';
 import { InteractionHelper } from '../../utils/interactionHelper.js';
@@ -97,4 +98,38 @@ export async function playSlots(interaction, client) {
         embeds: [gameEmbed('🎰 سلوت', `${interaction.user}\n\n# ${reels.join(' | ')}\n\n${won ? `🎉 **3 زي بعض! كسبت** ${reward}` : '😅 حظ أوفر المرة الجاية.'}`)],
         allowedMentions: { parse: [] },
     });
+}
+
+export const SOLO_GAMES = { question: playSoloQuestion, number: playSoloNumber, slots: playSlots };
+// Games that read the player's next messages: one at a time per member, and not in a channel with a
+// group game. userId → channelId, also read by the games-only channel guard.
+const CHAT_GAMES = new Set(['question', 'number']);
+const playingIn = new Map();
+
+export function isPlayingSoloIn(channelId, userId) {
+    return playingIn.get(userId) === channelId;
+}
+
+/** Starts solo game `kind` for the interaction's user (from `/solo` or the games panel). */
+export async function startSoloGame(interaction, client, kind) {
+    const play = SOLO_GAMES[kind];
+    if (!play || !interaction.channel?.isTextBased?.()) return;
+
+    const readsChat = CHAT_GAMES.has(kind);
+    if (readsChat) {
+        if (getActiveGame(interaction.channel.id)) {
+            await InteractionHelper.safeReply(interaction, { content: '⚠️ في لعبة جماعية شغالة في الروم ده، استنى لما تخلص.', flags: MessageFlags.Ephemeral });
+            return;
+        }
+        if (playingIn.has(interaction.user.id)) {
+            await InteractionHelper.safeReply(interaction, { content: '⚠️ خلص لعبتك الأول.', flags: MessageFlags.Ephemeral });
+            return;
+        }
+        playingIn.set(interaction.user.id, interaction.channel.id);
+    }
+    try {
+        await play(interaction, client);
+    } finally {
+        if (readsChat) playingIn.delete(interaction.user.id);
+    }
 }

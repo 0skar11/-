@@ -66,6 +66,29 @@ export function isStandaloneInvocation(args) {
   return args.every((arg) => /^(?:\d+|<@!?\d{17,20}>)$/u.test(arg));
 }
 
+/**
+ * Applies the two-word and word-with-arguments aliases to a typed command (`top cc` → `cctop`,
+ * `روليت` → `game roulette`). Returns null when an everyday word was typed without the prefix as
+ * part of a normal sentence, i.e. it is not a command.
+ */
+export function applyWordAliases(typedCommand, args, prefixed) {
+  let commandName = typedCommand;
+  let rest = args;
+  const twoWordCommand = twoWordCommandAliases[`${typedCommand} ${(args[0] || '').toLowerCase()}`];
+  if (twoWordCommand) {
+    commandName = twoWordCommand;
+    rest = args.slice(1);
+  }
+  if (!prefixed && standaloneOnlyAliases.has(typedCommand) && !isStandaloneInvocation(rest)) return null;
+  const argAlias = commandArgAliases[typedCommand];
+  if (argAlias) {
+    const [aliasCommand, ...aliasArgs] = argAlias.split(' ');
+    commandName = aliasCommand;
+    rest = [...aliasArgs, ...rest];
+  }
+  return { commandName, args: rest };
+}
+
 export function resolveCommandAlias(commandName) {
   const normalized = String(commandName || '').toLowerCase();
   return commandAliases[normalized] || normalized;
