@@ -6,7 +6,7 @@
 import { triviaQuestions } from './data/trivia.js';
 import { gameWords, splitLetters, scrambleWord } from './data/words.js';
 import { isAnswer, normalizeAnswer, sample, randomInt } from './text.js';
-import { gameEmbed, stopOnAbort, wait, finishGroupGame, rewardsLine } from './session.js';
+import { gameEmbed, stopOnAbort, wait, finishGroupGame, rewardsLine, sendGameMessage } from './session.js';
 import { InteractionHelper } from '../../utils/interactionHelper.js';
 
 /** Finishing order: most rounds won first; on a tie whoever reached that score first. */
@@ -170,11 +170,12 @@ export async function runRoundGame(interaction, client, session, gameKey, reques
         ].join('\n'))],
         allowedMentions: { parse: [] },
     });
+    session.track(await interaction.fetchReply().catch(() => null));
     await wait(5000, session.signal);
 
     for (let index = 0; index < rounds.length && !session.signal.aborted; index += 1) {
         const round = rounds[index];
-        await channel.send({ embeds: [gameEmbed(`${game.title} — الجولة ${index + 1}/${rounds.length}`, `${round.prompt}\n\n⏱️ عندكم ${game.seconds} ثانية.`)] });
+        await sendGameMessage(session, channel, { embeds: [gameEmbed(`${game.title} — الجولة ${index + 1}/${rounds.length}`, `${round.prompt}\n\n⏱️ عندكم ${game.seconds} ثانية.`)] });
         const winner = await playRound(channel, session, round, { participants, seconds: game.seconds });
         if (session.signal.aborted) break;
         if (winner) {
@@ -182,17 +183,15 @@ export async function runRoundGame(interaction, client, session, gameKey, reques
             score.points += 1;
             score.reachedAt = Date.now();
             scores.set(winner.id, score);
-            await channel.send({ content: `✅ ${winner} جاوب صح! الإجابة: **${round.reveal}** (نقاطه: ${score.points})`, allowedMentions: { parse: [] } });
+            await sendGameMessage(session, channel, { content: `✅ ${winner} جاوب صح! الإجابة: **${round.reveal}** (نقاطه: ${score.points})`, allowedMentions: { parse: [] } });
         } else {
-            await channel.send(`⏱️ الوقت خلص ومحدش جاوب. الإجابة كانت: **${round.reveal}**`);
+            await sendGameMessage(session, channel, `⏱️ الوقت خلص ومحدش جاوب. الإجابة كانت: **${round.reveal}**`);
         }
         if (index < rounds.length - 1) await wait(3000, session.signal);
     }
 
-    if (session.signal.aborted) {
-        await channel.send(`🛑 لعبة ${game.title} اتوقفت.`).catch(() => {});
-        return;
-    }
+    // Stopped with `وقف`: withChannelGame deletes the game's messages.
+    if (session.signal.aborted) return;
 
     const ranking = rankScores(scores);
     const table = ranking.slice(0, 10).map((userId, index) => `**${index + 1}.** <@${userId}> — ${scores.get(userId).points} نقطة`).join('\n');

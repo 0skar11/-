@@ -2,11 +2,11 @@
 // one chair less than players. Whoever doesn't get a chair is out. Last one sitting wins.
 
 import { ActionRowBuilder, ButtonBuilder, ButtonStyle, ComponentType, MessageFlags } from 'discord.js';
-import { gameEmbed, runLobby, stopOnAbort, wait, finishGroupGame } from './session.js';
+import { gameEmbed, runLobby, stopOnAbort, wait, finishGroupGame, sendGameMessage } from './session.js';
 import { randomInt, shuffle } from './text.js';
 
 const TITLE = '🪑 الكراسي الموسيقية';
-const SIT_MS = 10_000;
+const SIT_MS = 20_000;
 export const CHAIRS_LIMITS = { min: 3, max: 25 };
 
 function chairRows(chairs, seats, disabled = false) {
@@ -46,14 +46,15 @@ export async function runChairs(interaction, client, session) {
     while (alive.length > 1 && !session.signal.aborted) {
         round += 1;
         const chairs = alive.length - 1;
-        const message = await channel.send({ embeds: [gameEmbed(`${TITLE} — الجولة ${round}`, `🎶 الموسيقى شغالة... لفوا حوالين ${chairs} ${chairs === 1 ? 'كرسي' : 'كراسي'}!\n\n👥 ${alive.map((user) => `${user}`).join('، ')}`)] });
+        const message = await sendGameMessage(session, channel, { embeds: [gameEmbed(`${TITLE} — الجولة ${round}`, `🎶 الموسيقى شغالة... لفوا حوالين ${chairs} ${chairs === 1 ? 'كرسي' : 'كراسي'}!\n\n👥 ${alive.map((user) => `${user}`).join('، ')}`)] });
         await wait(randomInt(3000, 9000), session.signal);
         if (session.signal.aborted) break;
 
         const seats = new Map();
         const seated = new Set();
+        const tried = new Set();
         await message.edit({
-            embeds: [gameEmbed(`${TITLE} — الجولة ${round}`, `🛑 **الموسيقى وقفت! اقعدوا بسرعة!**\n⏱️ ${SIT_MS / 1000} ثواني`)],
+            embeds: [gameEmbed(`${TITLE} — الجولة ${round}`, `🛑 **الموسيقى وقفت! اقعدوا بسرعة!**\n⏱️ ${SIT_MS / 1000} ثانية — اللي مايدوسش بيطلع AFK`)],
             components: chairRows(chairs, seats),
         });
 
@@ -64,6 +65,7 @@ export async function runChairs(interaction, client, session) {
                 const ephemeral = (content) => button.reply({ content, flags: MessageFlags.Ephemeral }).catch(() => {});
                 const player = alive.find((user) => user.id === button.user.id);
                 if (!player) return ephemeral('انت مش في اللعبة دي.');
+                tried.add(player.id);
                 if (seated.has(player.id)) return ephemeral('انت قاعد خلاص 😄');
                 const index = Number(button.customId.split('_')[1]);
                 if (!Number.isInteger(index) || index < 0 || index >= chairs) return button.deferUpdate().catch(() => {});
@@ -78,19 +80,25 @@ export async function runChairs(interaction, client, session) {
         if (session.signal.aborted) break;
 
         const out = alive.filter((user) => !seated.has(user.id));
+        // Players who never pressed a chair were AFK; the rest just weren't fast enough.
+        const afk = out.filter((user) => !tried.has(user.id));
+        const lost = out.filter((user) => tried.has(user.id));
         alive = alive.filter((user) => seated.has(user.id));
         roundsOut.push(out.map((user) => user.id));
         await message.edit({
-            embeds: [gameEmbed(`${TITLE} — الجولة ${round}`, `❌ طلعوا: ${out.map((user) => `${user}`).join('، ') || 'محدش'}\n✅ فضلوا: ${alive.length}`)],
+            embeds: [gameEmbed(`${TITLE} — الجولة ${round}`, [
+                lost.length ? `❌ مالحقش كرسي: ${lost.map((user) => `${user}`).join('، ')}` : null,
+                afk.length ? `🚫 اتطرد بسبب AFK: ${afk.map((user) => `${user}`).join('، ')}` : null,
+                !out.length ? '❌ محدش طلع' : null,
+                `✅ فضلوا: ${alive.length}`,
+            ].filter(Boolean).join('\n'))],
             components: chairRows(chairs, seats, true),
         }).catch(() => {});
         if (alive.length > 1) await wait(2500, session.signal);
     }
 
-    if (session.signal.aborted) {
-        await channel.send(`🛑 ${TITLE} اتوقفت.`).catch(() => {});
-        return;
-    }
+    // Stopped with `وقف`: withChannelGame deletes the game's messages.
+    if (session.signal.aborted) return;
 
     const ranking = rankChairs(alive.map((user) => user.id), roundsOut);
     await finishGroupGame(client, channel, {

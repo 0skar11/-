@@ -3,7 +3,7 @@ import { InteractionHelper } from '../../utils/interactionHelper.js';
 import { soloRewardText } from '../../services/games/solo.js';
 
 // Rock-paper-scissors against the bot with buttons: `rps` / `حجر`. A win pays solo CC.
-const IDLE_MS = 30_000;
+const IDLE_MS = 20_000;
 const CHOICES = {
     rock: { emoji: '🪨', name: 'حجر', beats: 'scissors' },
     paper: { emoji: '📄', name: 'ورقة', beats: 'rock' },
@@ -61,7 +61,7 @@ export default {
 
         collector.on('end', async (collected) => {
             if (collected.size) return;
-            await message.edit({ content: `${player} ما اختارش في الوقت.`, components: [buildRow(true)], allowedMentions: { parse: [] } }).catch(() => {});
+            await message.edit({ content: `🚫 ${player} اتطرد بسبب AFK (ما اختارش في ${IDLE_MS / 1000} ثانية).`, components: [buildRow(true)], allowedMentions: { parse: [] } }).catch(() => {});
         });
     },
 };

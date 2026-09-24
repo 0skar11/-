@@ -13,6 +13,7 @@ import { runMafia, MAFIA_LIMITS } from './mafia.js';
 import { CC, ccEmbed } from '../../config/cc.js';
 
 export const PANEL_BUTTON_PREFIX = 'gamespanel';
+const STOP_NOTICE_MS = 5_000;
 
 const LOBBY_GAMES = {
     roulette: { run: runRoulette, name: 'روليت' },
@@ -52,6 +53,12 @@ export async function stopGroupGame(interaction) {
     }
     running.stop();
     await InteractionHelper.safeReply(interaction, { content: `🛑 ${interaction.user} وقف اللعبة.`, allowedMentions: { parse: [] } });
+    // The stopped game's messages are deleted by withChannelGame; this notice and the `وقف` go too.
+    const notice = await interaction.fetchReply?.().catch(() => null);
+    setTimeout(() => {
+        notice?.delete().catch(() => {});
+        if (interaction._sourceMessage && interaction._sourceMessage.id !== notice?.id) interaction._sourceMessage.delete().catch(() => {});
+    }, STOP_NOTICE_MS);
 }
 
 // The panel. Each row is one kind of game, with the same colour as its section in the embed:

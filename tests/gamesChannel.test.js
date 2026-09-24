@@ -4,7 +4,7 @@ import {
     GAMES_CHANNEL_ID, typedCommandName, isGameCommandMessage, isBlockedSlashCommand, handleGamesChannelMessage,
 } from '../src/services/games/gamesChannel.js';
 import { buildGamesPanel, PANEL_ACTIONS, isGroupGame } from '../src/services/games/panel.js';
-import { claimChannel, releaseChannel, gameAcceptsChat } from '../src/services/games/session.js';
+import { claimChannel, releaseChannel, gameAcceptsChat, sendGameMessage, deleteGameMessages } from '../src/services/games/session.js';
 import { SOLO_GAMES } from '../src/services/games/solo.js';
 import { applyWordAliases } from '../src/config/commands/commandAliases.js';
 import { SERVER_OWNER_IDS } from '../src/config/serverOwners.js';
@@ -118,6 +118,29 @@ describe('games channel', () => {
         assert.equal(applyWordAliases('خمن', ['ايه', 'ده'], false), null);
         assert.deepEqual(applyWordAliases('خمن', ['ايه'], true), { commandName: 'game', args: ['guess', 'ايه'] });
         assert.deepEqual(applyWordAliases('ban', ['x'], false), { commandName: 'ban', args: ['x'] });
+    });
+});
+
+describe('cancelled games', () => {
+    test('delete every message they posted', async () => {
+        const deleted = [];
+        let nextId = 1;
+        const makeMessage = () => { const id = String(nextId++); return { id, delete: async () => { deleted.push(id); } }; };
+        const channel = { send: async () => makeMessage() };
+        const session = claimChannel('chan-cleanup', 'roulette', MEMBER);
+        await sendGameMessage(session, channel, 'lobby');
+        await sendGameMessage(session, channel, 'round 1');
+        session.track(makeMessage());
+        await deleteGameMessages(session, channel);
+        assert.deepEqual(deleted.sort(), ['1', '2', '3']);
+
+        deleted.length = 0;
+        await sendGameMessage(session, channel, 'a');
+        await sendGameMessage(session, channel, 'b');
+        const bulk = { ...channel, bulkDelete: async (ids) => new Map(ids.map((id) => [id, {}])) };
+        await deleteGameMessages(session, bulk);
+        assert.deepEqual(deleted, [], 'bulk delete used when allowed');
+        releaseChannel(session);
     });
 });
 

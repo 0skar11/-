@@ -2,11 +2,11 @@
 // withdraws). Whoever the wheel lands on and doesn't pick in time is out. Last one standing wins.
 
 import { ActionRowBuilder, ButtonBuilder, ButtonStyle, ComponentType, MessageFlags } from 'discord.js';
-import { gameEmbed, runLobby, stopOnAbort, wait, finishGroupGame } from './session.js';
+import { gameEmbed, runLobby, stopOnAbort, wait, finishGroupGame, sendGameMessage } from './session.js';
 import { pick } from './text.js';
 
 const TITLE = '🎡 روليت';
-const TURN_MS = 30_000;
+const TURN_MS = 20_000;
 export const ROULETTE_LIMITS = { min: 3, max: 20 };
 
 function turnRows(alive, chosen, disabled = false) {
@@ -50,12 +50,12 @@ export async function runRoulette(interaction, client, session) {
 
     while (alive.length > 1 && !session.signal.aborted) {
         const chosen = pick(alive);
-        const message = await channel.send({ embeds: [gameEmbed(TITLE, `🎡 العجلة بتلف... (${alive.length} لاعبين)`)] });
+        const message = await sendGameMessage(session, channel, { embeds: [gameEmbed(TITLE, `🎡 العجلة بتلف... (${alive.length} لاعبين)`)] });
         await wait(2500, session.signal);
         if (session.signal.aborted) break;
         await message.edit({
             content: `${chosen}`,
-            embeds: [gameEmbed(TITLE, `🎯 العجلة وقفت على ${chosen}!\nاختار حد يطلع من اللعبة، أو 🎲 عشوائي، أو 🏳️ انسحب.\n⏱️ عندك ${TURN_MS / 1000} ثانية، ولو ما اخترتش هتطلع انت.`)],
+            embeds: [gameEmbed(TITLE, `🎯 العجلة وقفت على ${chosen}!\nاختار حد يطلع من اللعبة، أو 🎲 عشوائي، أو 🏳️ انسحب.\n⏱️ عندك ${TURN_MS / 1000} ثانية، ولو ما اخترتش هتتطرد AFK.`)],
             components: turnRows(alive, chosen),
             allowedMentions: { users: [chosen.id] },
         });
@@ -81,7 +81,7 @@ export async function runRoulette(interaction, client, session) {
         const loser = resolveRouletteChoice(choice, alive, chosen);
         alive = alive.filter((user) => user.id !== loser.id);
         out.push(loser);
-        const reason = !choice ? `⏱️ ${chosen} ما اختارش في الوقت وطلع.`
+        const reason = !choice ? `🚫 ${chosen} اتطرد بسبب AFK.`
             : loser.id === chosen.id ? `🏳️ ${chosen} انسحب.`
                 : `💥 ${chosen} طلّع ${loser}${choice === 'roulette_random' ? ' (عشوائي)' : ''}!`;
         await message.edit({
@@ -93,10 +93,8 @@ export async function runRoulette(interaction, client, session) {
         if (alive.length > 1) await wait(2000, session.signal);
     }
 
-    if (session.signal.aborted) {
-        await channel.send(`🛑 ${TITLE} اتوقفت.`).catch(() => {});
-        return;
-    }
+    // Stopped with `وقف`: withChannelGame deletes the game's messages.
+    if (session.signal.aborted) return;
 
     const ranking = [alive[0].id, ...out.reverse().map((user) => user.id)];
     await finishGroupGame(client, channel, {

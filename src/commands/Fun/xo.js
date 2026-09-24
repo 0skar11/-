@@ -4,8 +4,9 @@ import { InteractionHelper } from '../../utils/interactionHelper.js';
 import { soloRewardText } from '../../services/games/solo.js';
 
 // Tic-tac-toe between two members with buttons: `xo @member`. The challenger plays ❌ and goes first.
-// The winner gets solo CC (capped per day like the other solo games).
-const IDLE_MS = 60_000;
+// The winner gets solo CC (capped per day like the other solo games). A player who doesn't move
+// within 20 seconds is kicked for AFK and the other player wins.
+const IDLE_MS = 20_000;
 const LINES = [[0, 1, 2], [3, 4, 5], [6, 7, 8], [0, 3, 6], [1, 4, 7], [2, 5, 8], [0, 4, 8], [2, 4, 6]];
 const MARKS = { X: '❌', O: '⭕' };
 
@@ -94,8 +95,10 @@ export default {
 
         collector.on('end', async (_collected, reason) => {
             if (reason === 'finished') return;
+            const winner = players[turn === 'X' ? 'O' : 'X'];
+            const reward = await soloRewardText(client, interaction.guildId, winner.id, 'xo');
             await message.edit({
-                content: `${MARKS.X} ${playerX} ضد ${MARKS.O} ${playerO}\n⏱️ اللعبة خلصت: ${players[turn]} ما لعبش في الوقت.`,
+                content: `${MARKS.X} ${playerX} ضد ${MARKS.O} ${playerO}\n🚫 ${players[turn]} اتطرد بسبب AFK — 🏆 الفايز: ${winner} ${reward}`,
                 components: buildRows(board, true),
                 allowedMentions: { parse: [] },
             }).catch(() => {});
