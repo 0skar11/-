@@ -12,10 +12,11 @@ export default {
     let positioned = 0;
     let retired = 0;
     let boardEdited = 0;
+    let boardSent = 0;
 
     for (const guild of client.guilds.cache.values()) {
-      // The permission board is never posted automatically on startup (first post: /publish-board
-      // admin-permissions); its existing messages are only edited to match the synced permissions.
+      // The permission board is refreshed to match the synced permissions; a role whose message
+      // is missing (e.g. deleted) gets it posted again. Saved message IDs prevent duplicates.
       try {
         retired += await deleteRetiredRoles(guild);
       } catch (error) {
@@ -30,12 +31,14 @@ export default {
         logger.error(`Failed to synchronize staff roles in ${guild.name}:`, error);
       }
       try {
-        boardEdited += (await publishStaffPermissionBoard(guild, { editOnly: true })).edited;
+        const board = await publishStaffPermissionBoard(guild);
+        boardEdited += board.edited;
+        boardSent += board.sent;
       } catch (error) {
         logger.warn(`Permission board not refreshed in ${guild.name}: ${error.message}`);
       }
     }
 
-    startupLog(`Staff role hierarchy: created ${created}, updated ${updated}, positioned ${positioned}, retired ${retired}, board messages refreshed ${boardEdited}`);
+    startupLog(`Staff role hierarchy: created ${created}, updated ${updated}, positioned ${positioned}, retired ${retired}, board messages refreshed ${boardEdited}, posted ${boardSent}`);
   },
 };
