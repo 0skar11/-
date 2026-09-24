@@ -10,7 +10,7 @@ import { splitLetters, scrambleWord, gameWords } from '../src/services/games/dat
 import { triviaQuestions } from '../src/services/games/data/trivia.js';
 import { rankScores, judgeGuess, makeMathQuestion, ROUND_GAMES } from '../src/services/games/roundGames.js';
 import { resolveRouletteChoice } from '../src/services/games/roulette.js';
-import { rankChairs } from '../src/services/games/chairs.js';
+import { rankChairs, planRound, chairButton } from '../src/services/games/chairs.js';
 import { assignRoles, checkWinner, tallyVotes, kickAfk, PHASE_MS } from '../src/services/games/mafia.js';
 import { isSlotsWin } from '../src/services/games/solo.js';
 import { claimChannel, releaseChannel, getActiveGame } from '../src/services/games/session.js';
@@ -196,6 +196,23 @@ describe('game helpers', () => {
 
     test('chairs ranks survivors, then the latest losers', () => {
         assert.deepEqual(rankChairs([A], [[D], [C], [B]]), [A, B, C, D]);
+    });
+
+    test('chairs: grey chairs can not be pressed, red and green can, timing is random', () => {
+        assert.equal(chairButton(0, 'wait').data.disabled, true);
+        assert.equal(chairButton(0, 'done').data.disabled, true);
+        assert.deepEqual([chairButton(0, 'red').data.disabled, chairButton(0, 'red').data.style], [false, 4]);
+        assert.deepEqual([chairButton(0, 'green').data.disabled, chairButton(0, 'green').data.style], [false, 3]);
+        assert.equal(chairButton(0, 'green', { username: 'sam' }).data.disabled, true);
+        assert.equal(chairButton(0, 'green', { username: 'sam' }).data.label, 'sam');
+
+        assert.deepEqual(planRound(() => 0), { flashes: [], greenAfterMs: 2000 });
+        const busy = planRound(() => 0.99999999);
+        assert.equal(busy.flashes.length, 2);
+        assert.deepEqual(busy.flashes[0], { waitMs: 6000, redMs: 3000 });
+        assert.equal(busy.greenAfterMs, 7000);
+        const timings = new Set(Array.from({ length: 30 }, () => planRound().greenAfterMs));
+        assert.ok(timings.size > 1, 'green comes at a different moment each round');
     });
 
     test('mafia roles, winner and votes', () => {
