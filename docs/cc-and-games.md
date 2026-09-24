@@ -48,12 +48,14 @@ Game words typed without the prefix only start a game when the message is just t
 | `فكك [جولات]` | `/game fakkek` | Split the word into letters |
 | `رتب [جولات]` | `/game scramble` | Unscramble the letters |
 | `حساب [جولات]` | `/game math` | Quick math |
-| `وقف` / `وقف اللعبة` / `ايقاف` | `/game stop` | Stop the running game (its host or staff with Manage Messages) |
+| `وقف` / `وقف اللعبة` / `ايقاف` | `/game stop` | Stop the running game (its host or a trusted member) |
 | `سؤال` | `/solo question` | One question, one try |
 | `رقم` | `/solo number` | Guess 1–50 in 6 tries |
 | `سلوت` | `/solo slots` | Slot machine, three of a kind wins |
 
-Only one group game can run per channel.
+Only one group game can run per channel. A game is controlled (start or cancel the lobby, stop
+it) by its host and trusted members: the server owners, bot owners and the anti-nuke trusted
+users/roles (`trusted`), the same people who can lift a hard ban.
 
 **20 seconds, then AFK.** Every choice in a game has 20 seconds: the roulette turn, sitting in
 chairs once they turn green, rock-paper-scissors, an XO move and each mafia phase. Whoever doesn't choose in time is

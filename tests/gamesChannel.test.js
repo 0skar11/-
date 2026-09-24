@@ -4,7 +4,7 @@ import {
     GAMES_CHANNEL_ID, typedCommandName, isGameCommandMessage, isBlockedSlashCommand, handleGamesChannelMessage,
 } from '../src/services/games/gamesChannel.js';
 import { buildGamesPanel, PANEL_ACTIONS, isGroupGame } from '../src/services/games/panel.js';
-import { claimChannel, releaseChannel, gameAcceptsChat, sendGameMessage, deleteGameMessages } from '../src/services/games/session.js';
+import { claimChannel, releaseChannel, gameAcceptsChat, sendGameMessage, deleteGameMessages, canControlGame } from '../src/services/games/session.js';
 import { SOLO_GAMES } from '../src/services/games/solo.js';
 import { applyWordAliases } from '../src/config/commands/commandAliases.js';
 import { SERVER_OWNER_IDS } from '../src/config/serverOwners.js';
@@ -118,6 +118,32 @@ describe('games channel', () => {
         assert.equal(applyWordAliases('خمن', ['ايه', 'ده'], false), null);
         assert.deepEqual(applyWordAliases('خمن', ['ايه'], true), { commandName: 'game', args: ['guess', 'ايه'] });
         assert.deepEqual(applyWordAliases('ban', ['x'], false), { commandName: 'ban', args: ['x'] });
+    });
+});
+
+describe('who controls a game', () => {
+    test('only the host and trusted members', async () => {
+        const GUILD = '100000000000000001';
+        const TRUSTED_USER = '200000000000000011';
+        const TRUSTED_ROLE = '300000000000000011';
+        const ROLE_HOLDER = '200000000000000012';
+        const STAFF = '200000000000000013';
+        const store = new Map([[`guild:${GUILD}:config`, { antiNukeTrustedUsers: [TRUSTED_USER], antiNukeTrustedRoles: [TRUSTED_ROLE] }]]);
+        const client = { user: { id: '999999999999999999' }, db: { get: async (key, fallback) => (store.has(key) ? store.get(key) : fallback), set: async () => true } };
+        const roles = { [ROLE_HOLDER]: [TRUSTED_ROLE], [STAFF]: ['300000000000000099'] };
+        const guild = {
+            id: GUILD,
+            ownerId: '200000000000000099',
+            client,
+            members: { fetch: async (id) => ({ roles: { cache: { some: (fn) => (roles[id] || []).map((roleId) => ({ id: roleId })).some(fn) } } }) },
+        };
+        const session = { hostId: MEMBER };
+        assert.equal(await canControlGame(guild, MEMBER, session), true, 'host');
+        assert.equal(await canControlGame(guild, TRUSTED_USER, session), true, 'trusted user');
+        assert.equal(await canControlGame(guild, ROLE_HOLDER, session), true, 'trusted role');
+        assert.equal(await canControlGame(guild, SERVER_OWNER_IDS[1], session), true, 'server owner');
+        assert.equal(await canControlGame(guild, guild.ownerId, session), true, 'guild owner');
+        assert.equal(await canControlGame(guild, STAFF, session), false, 'other staff');
     });
 });
 

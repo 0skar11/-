@@ -7,6 +7,10 @@ import { awardGroupGame, groupRewards } from '../cc/ccService.js';
 import { CC, formatCC, ccEmbed } from '../../config/cc.js';
 import { MEDALS } from './text.js';
 import { logger } from '../../utils/logger.js';
+import { getGuildConfig } from '../config/guildConfig.js';
+import { isTrusted } from '../../utils/antiNukeLogging.js';
+import { isServerOwner } from '../../config/serverOwners.js';
+import { isBotOwner } from '../../config/bot.js';
 
 const activeGames = new Map();
 
@@ -53,6 +57,16 @@ export function releaseChannel(session) {
 
 export function getActiveGame(channelId) {
     return activeGames.get(channelId) || null;
+}
+
+/**
+ * Who controls a game (start or cancel its lobby, stop it): its host and trusted members — the server
+ * owners, bot owners and the anti-nuke trusted users/roles (the same people who can lift a hard ban).
+ */
+export async function canControlGame(guild, userId, session) {
+    if (userId === session.hostId || isServerOwner(userId) || isBotOwner(userId)) return true;
+    const config = await getGuildConfig(guild.client, guild.id).catch(() => null);
+    return isTrusted(guild, config, userId);
 }
 
 /** Whether `userId` may type in `channelId` because of the game running there (answers, mafia talk). */
@@ -119,7 +133,7 @@ export async function runLobby(interaction, session, { title, description, minPl
         `👥 **اللاعبين (${players.size}/${maxPlayers}):**`,
         [...players.values()].map((user, index) => `${index + 1}. ${user}`).join('\n'),
         '',
-        `⏳ اللعبة بتبدأ <t:${endsAt}:R> — أقل عدد ${minPlayers} لاعبين. صاحب اللعبة يقدر يدوس **ابدأ**.`,
+        `⏳ اللعبة بتبدأ <t:${endsAt}:R> — أقل عدد ${minPlayers} لاعبين. صاحب اللعبة أو التراست يقدروا يدوسوا **ابدأ**.`,
         `🌀 الجوايز دلوقتي: ${rewardsLine(players.size)}`,
         note,
     ].filter((line) => line !== null).join('\n'));
@@ -146,13 +160,13 @@ export async function runLobby(interaction, session, { title, description, minPl
                     players.delete(button.user.id);
                     break;
                 case 'lobby_start':
-                    if (!isHost) return ephemeral('صاحب اللعبة بس اللي يقدر يبدأها.');
+                    if (!await canControlGame(button.guild, button.user.id, session)) return ephemeral('صاحب اللعبة أو التراست بس اللي يقدروا يبدأوها.');
                     if (players.size < minPlayers) return ephemeral(`لسه محتاجين ${minPlayers - players.size} لاعبين كمان.`);
                     await button.deferUpdate().catch(() => {});
                     collector.stop('start');
                     return;
                 case 'lobby_cancel':
-                    if (!isHost) return ephemeral('صاحب اللعبة بس اللي يقدر يلغيها.');
+                    if (!await canControlGame(button.guild, button.user.id, session)) return ephemeral('صاحب اللعبة أو التراست بس اللي يقدروا يلغوها.');
                     await button.deferUpdate().catch(() => {});
                     collector.stop('cancel');
                     return;
