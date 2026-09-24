@@ -35,4 +35,6 @@ export const usageHelp = {
   dm: { emoji: '✉️', title: 'أمر الخاص', description: 'يبعت رسالة خاصة للعضو من البوت.' },
   play: { emoji: '🎵', title: 'أمر التشغيل', description: 'يشغل أغنية أو لينك أو بلاي ليست.', args: 'اسم الأغنية أو اللينك' },
   xo: { emoji: '❌', title: 'لعبة XO', description: 'العب XO ضد عضو تاني.' },
+  game: { emoji: '🎮', title: 'الألعاب الجماعية', description: 'اكتب `العاب` عشان تشوف كل الألعاب وأوامرها.', args: 'اسم اللعبة' },
+  solo: { emoji: '🙋', title: 'الألعاب الفردية', description: 'اكتب `سؤال` أو `رقم` أو `سلوت`.', args: 'اسم اللعبة' },
 };

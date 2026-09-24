@@ -29,10 +29,10 @@ TitanBot offers a complete suite of tools for Discord server management and comm
 - **User Notes** - Keep detailed moderation records
 - **Case Management** - View and track all mod actions
 
-### Economy System
-- **Shop & Inventory** - Buy and manage items
-- **Gambling** - Risk it for rewards
-- **Pay System** - Transfer money between users
+### Chaos Credits (CC) & Games
+- **Daily** - The only way to earn CC outside games
+- **Group Games** - Roulette, musical chairs, mafia, trivia and more; the top 3 win CC
+- **Top CC** - Server leaderboard (see [docs/cc-and-games.md](docs/cc-and-games.md))
 
 ### Fun & Entertainment
 - **Random Facts** - Learn something new

@@ -1,8 +1,10 @@
 import { SlashCommandBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ComponentType, MessageFlags } from 'discord.js';
 import { warningEmbed } from '../../utils/embeds.js';
 import { InteractionHelper } from '../../utils/interactionHelper.js';
+import { soloRewardText } from '../../services/games/solo.js';
 
 // Tic-tac-toe between two members with buttons: `xo @member`. The challenger plays ❌ and goes first.
+// The winner gets solo CC (capped per day like the other solo games).
 const IDLE_MS = 60_000;
 const LINES = [[0, 1, 2], [3, 4, 5], [6, 7, 8], [0, 3, 6], [1, 4, 7], [2, 5, 8], [0, 4, 8], [2, 4, 6]];
 const MARKS = { X: '❌', O: '⭕' };
@@ -35,7 +37,7 @@ export default {
         .addUserOption((option) => option.setName('opponent').setDescription('The member to play against').setRequired(true)),
     category: 'Fun',
 
-    async execute(interaction) {
+    async execute(interaction, config, client) {
         const playerX = interaction.user;
         const playerO = interaction.options.getUser('opponent');
 
@@ -78,9 +80,10 @@ export default {
             const result = findWinner(board);
             if (result) {
                 collector.stop('finished');
+                const reward = result === 'draw' ? '' : ` ${await soloRewardText(client, interaction.guildId, players[result].id, 'xo')}`;
                 const text = result === 'draw'
                     ? `${MARKS.X} ${playerX} ضد ${MARKS.O} ${playerO}\n🤝 تعادل!`
-                    : `${MARKS.X} ${playerX} ضد ${MARKS.O} ${playerO}\n🏆 الفايز: ${MARKS[result]} ${players[result]}`;
+                    : `${MARKS.X} ${playerX} ضد ${MARKS.O} ${playerO}\n🏆 الفايز: ${MARKS[result]} ${players[result]}${reward}`;
                 await button.update({ content: text, components: buildRows(board, true), allowedMentions: { parse: [] } }).catch(() => {});
                 return;
             }

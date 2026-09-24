@@ -1,7 +1,8 @@
 import { SlashCommandBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ComponentType, MessageFlags } from 'discord.js';
 import { InteractionHelper } from '../../utils/interactionHelper.js';
+import { soloRewardText } from '../../services/games/solo.js';
 
-// Rock-paper-scissors against the bot with buttons: `rps` / `حجر`.
+// Rock-paper-scissors against the bot with buttons: `rps` / `حجر`. A win pays solo CC.
 const IDLE_MS = 30_000;
 const CHOICES = {
     rock: { emoji: '🪨', name: 'حجر', beats: 'scissors' },
@@ -31,7 +32,7 @@ export default {
         .setDescription('Play rock-paper-scissors against the bot.'),
     category: 'Fun',
 
-    async execute(interaction) {
+    async execute(interaction, config, client) {
         const player = interaction.user;
         await InteractionHelper.safeReply(interaction, {
             content: `${player} اختار: حجر، ورقة ولا مقص؟`,
@@ -49,7 +50,8 @@ export default {
             const pick = button.customId.split('_')[1];
             const botPick = Object.keys(CHOICES)[Math.floor(Math.random() * 3)];
             const result = decide(pick, botPick);
-            const verdict = result === 'win' ? '🏆 كسبت!' : result === 'lose' ? '😈 البوت كسب!' : '🤝 تعادل!';
+            const reward = result === 'win' ? ` ${await soloRewardText(client, interaction.guildId, player.id, 'rps')}` : '';
+            const verdict = result === 'win' ? `🏆 كسبت!${reward}` : result === 'lose' ? '😈 البوت كسب!' : '🤝 تعادل!';
             await button.update({
                 content: `${player}: ${CHOICES[pick].emoji} ${CHOICES[pick].name}\nالبوت: ${CHOICES[botPick].emoji} ${CHOICES[botPick].name}\n${verdict}`,
                 components: [buildRow(true)],

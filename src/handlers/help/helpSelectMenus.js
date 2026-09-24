@@ -24,6 +24,7 @@ const CATEGORY_ICONS = {
     Economy: "💰",
     Music: "🎵",
     Fun: "🎮",
+    Games: "🕹️",
     Leveling: "📊",
     Utility: "🔧",
     Ticket: "🎫",
