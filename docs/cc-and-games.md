@@ -90,6 +90,15 @@ member every 10 seconds). Still allowed:
 
 Other commands don't run there, and other slash commands get a private "games only" reply.
 
+### Live Top CC board
+
+The bot keeps one Top CC post in the games channel (`src/services/games/ccTopBoard.js`): the top 15
+members, how many members have CC and the server total. It is posted at startup when missing and
+then edited every 5 minutes; its footer says when it was last updated. The post's ID is saved in the
+guild config (`boardMessageIds.cctop`), so a restart keeps editing the same post however far up the
+channel it is, and deleting it makes the bot post a new one on the next refresh. `top cc` replies
+look the same but have no footer, so they are never mistaken for the board.
+
 ## Storage
 
 CC is stored in each member's economy record (`guild:<id>:economy:<user>`):

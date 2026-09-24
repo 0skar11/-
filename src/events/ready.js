@@ -8,6 +8,7 @@ import { initRiffyAfterReady } from "../services/music/riffySetup.js";
 import { ensureAuditLogChannels } from "../services/auditLogChannelsService.js";
 import { publishArabicModerationCommands } from "../services/moderationCommandsBoardService.js";
 import { publishTrustedBoard } from "../services/trustedBoardService.js";
+import { startCCTopBoard } from "../services/games/ccTopBoard.js";
 
 export default {
   name: Events.ClientReady,
@@ -33,6 +34,8 @@ export default {
       } catch (error) {
         logger.error("Failed to publish trusted board:", error);
       }
+      const ccTopBoard = await startCCTopBoard(client);
+      startupLog(`Top CC board: ${ccTopBoard.status} (channel ${ccTopBoard.channelId})`);
       await ensureAuditLogChannels(client);
 
       if (client.config?.features?.music) initRiffyAfterReady(client);
