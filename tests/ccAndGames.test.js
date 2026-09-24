@@ -171,12 +171,12 @@ describe('game helpers', () => {
         assert.equal(judgeGuess('201', 70, 0, 200), null);
     });
 
-    test('guess the number is 0 to 200 with 6 tries per player', () => {
-        assert.deepEqual(GUESS_NUMBER, { min: 0, max: 200, tries: 6 });
+    test('guess the number is 0 to 200 with 7 tries per player', () => {
+        assert.deepEqual(GUESS_NUMBER, { min: 0, max: 200, tries: 7 });
         const [round] = ROUND_GAMES.guess.makeRounds(1);
         const target = Number(round.reveal);
         assert.ok(target >= 0 && target <= 200);
-        assert.equal(round.maxTries, 6);
+        assert.equal(round.maxTries, 7);
         assert.equal(round.judge(round.reveal), true);
     });
 

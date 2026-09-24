@@ -44,7 +44,7 @@ export function judgeGuess(content, target, min, max) {
 const HINT_REACTIONS = { higher: '⬆️', lower: '⬇️' };
 
 /** `خمن` and solo `رقم`: the number is picked from min to max and each player has `tries` guesses. */
-export const GUESS_NUMBER = { min: 0, max: 200, tries: 6 };
+export const GUESS_NUMBER = { min: 0, max: 200, tries: 7 };
 
 /**
  * Each game: title, how it's played, default/max rounds, seconds per round and makeRounds(count) →

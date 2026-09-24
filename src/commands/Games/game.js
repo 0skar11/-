@@ -25,7 +25,7 @@ export default {
         .addSubcommand((sub) => sub.setName('chairs').setDescription('Musical chairs'))
         .addSubcommand((sub) => sub.setName('mafia').setDescription('Mafia with doctor, detective and citizens'))
         .addSubcommand((sub) => addRoundsOption(sub.setName('trivia').setDescription('General knowledge questions')))
-        .addSubcommand((sub) => addRoundsOption(sub.setName('guess').setDescription('Guess the number from 0 to 200, 6 tries each'), ROUND_GAMES.guess.maxRounds))
+        .addSubcommand((sub) => addRoundsOption(sub.setName('guess').setDescription('Guess the number from 0 to 200, 7 tries each'), ROUND_GAMES.guess.maxRounds))
         .addSubcommand((sub) => addRoundsOption(sub.setName('fast').setDescription('First to type the word wins the round')))
         .addSubcommand((sub) => addRoundsOption(sub.setName('fakkek').setDescription('Split the word into its letters')))
         .addSubcommand((sub) => addRoundsOption(sub.setName('scramble').setDescription('Unscramble the letters')))
