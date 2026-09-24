@@ -34,6 +34,15 @@ export const CC = {
         // Most CC a member can earn from solo games per day (UTC).
         dailyCap: 50,
     },
+
+    // A win announced by the games bot (Clover), read from its "👑 | @winner" message
+    // (services/cc/gamesBotWins.js). Its message doesn't say how many played, so a win pays a fixed
+    // amount, with a daily cap so a game with a friend over and over can't be farmed.
+    gamesBot: {
+        win: 20,
+        // Most CC a member can get from games bot wins per day (UTC).
+        dailyCap: 200,
+    },
 };
 
 /**

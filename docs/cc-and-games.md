@@ -1,8 +1,8 @@
 # Chaos Credits (CC) and games
 
-> **The games moved to a separate games bot.** This bot keeps the CC system (`daily`, `cc`,
-> `cctop`, the live Top CC board, the store) and the games bot pays players through the
-> [CC API](#cc-api-for-the-games-bot). This bot's own games are **off** but not deleted: every
+> **The games moved to a separate games bot (Clover).** This bot keeps the CC system (`daily`, `cc`,
+> `cctop`, the live Top CC board, the store) and pays [Clover wins](#clover-wins); a games bot you
+> control can also use the [CC API](#cc-api-for-the-games-bot). This bot's own games are **off** but not deleted: every
 > file below is still in the repo, and `GAMES_ENABLED=true` + a restart brings them all back
 > (`src/config/games.js`). While they are off the game commands (`game`, `solo`, `rps`, `xo`,
 > `fight`) are not loaded, registered or listed in `help`, the games channel no longer deletes
@@ -128,6 +128,18 @@ from 0 CC. Every change goes through `src/services/cc/ccService.js`, which locks
   gives roles (refunding if Discord refuses) and fills `ccInventory` for stackable items.
 - Still to do: a store command that lists `listStoreItems()` and calls `buyItem()`, then set
   `ccStoreSettings.open = true`.
+
+## Clover wins
+
+The games bot is [Clover](https://clovers.gg). When a Clover game ends it posts `👑 | @winner`;
+this bot reads that message (`src/services/cc/gamesBotWins.js`) and pays the winner
+**20 CC**, at most **200 CC a day** (UTC) from Clover wins (`CC.gamesBot` in `src/config/cc.js`).
+Every win also counts as a game, a top 3 and a 1st place in the member's stats, even after the cap.
+A short reply under Clover's message shows the CC and new balance and is deleted after 15 seconds.
+
+Only messages from the Clover bot count (`1006332825571692544`), so typing the same text does
+nothing, and each message pays once. With Clover Premium (a server copy of the bot with its own
+ID) put that ID in `GAMES_BOT_IDS`.
 
 ## CC API for the games bot
 

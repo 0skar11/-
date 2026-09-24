@@ -7,6 +7,7 @@
 //   ccLastDaily timestamp of the last `daily`
 //   ccSolo      { day: 'YYYY-MM-DD', earned } — solo game CC earned today, for the daily cap
 //   ccInventory { itemId: quantity } — reserved for the store (see ccStoreService.js)
+//   ccGamesBot  { day: 'YYYY-MM-DD', earned } — CC from games bot wins today, for its daily cap
 
 import { CC } from '../../config/cc.js';
 import { getEconomyKey, getEconomyPrefix } from '../../utils/database.js';
@@ -144,6 +145,24 @@ export async function awardSoloWin(client, guildId, userId, game, { now = Date.n
         logger.error(`[CC] Failed to pay solo ${game} win for ${userId}`, error);
         return { amount: 0, capped: false, failed: true };
     }
+}
+
+/**
+ * Pays a win announced by the games bot, up to the daily cap (CC.gamesBot). Returns
+ * `{ amount, capped, balance }`; `amount` is 0 once the cap is reached (the win is still counted).
+ */
+export async function awardGamesBotWin(client, guildId, userId, { now = Date.now() } = {}) {
+    return updateRecord(client, guildId, userId, (state, record) => {
+        const today = utcDay(now);
+        const earned = record.ccGamesBot?.day === today ? record.ccGamesBot.earned : 0;
+        const amount = Math.max(0, Math.min(CC.gamesBot.win, CC.gamesBot.dailyCap - earned));
+        if (amount > 0) credit(state, amount);
+        state.stats.gamesPlayed += 1;
+        state.stats.podiums += 1;
+        state.stats.groupWins += 1;
+        record.ccGamesBot = { day: today, earned: earned + amount };
+        return { amount, capped: amount < CC.gamesBot.win };
+    });
 }
 
 /** Gives CC for something outside `daily` and the reward rules above (the games bot, via ccApi.js). */

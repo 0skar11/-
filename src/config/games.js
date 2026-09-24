@@ -26,3 +26,13 @@ export function isDisabledGameCommand(commandName) {
 }
 
 export const GAMES_MOVED_NOTICE = '🎮 الألعاب اتنقلت لبوت الألعاب. الـ CC (`يومي`، `رصيد`، `توب cc`) لسه شغال هنا.';
+
+// The games bot: Clover (https://clovers.gg). Its winner messages pay CC here (services/cc/gamesBotWins.js).
+// With Clover Premium the server gets its own copy of the bot with another ID: put that ID (or several,
+// comma separated) in GAMES_BOT_IDS.
+export const CLOVER_BOT_ID = '1006332825571692544';
+
+export function gamesBotIds() {
+    const ids = String(process.env.GAMES_BOT_IDS || '').split(',').map((id) => id.trim()).filter((id) => /^\d{17,20}$/.test(id));
+    return new Set(ids.length ? ids : [CLOVER_BOT_ID]);
+}

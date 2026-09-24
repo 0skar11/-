@@ -151,3 +151,70 @@ describe('CC API for the games bot', () => {
         assert.equal((await getProfile({ db }, GUILD, A)).cc, 9 + 7);
     });
 });
+
+describe('games bot (Clover) wins', async () => {
+    const { handleGamesBotWin, parseWinner } = await import('../src/services/cc/gamesBotWins.js');
+    const { CLOVER_BOT_ID } = await import('../src/config/games.js');
+    const { CC } = await import('../src/config/cc.js');
+    let nextId = 1;
+
+    function winMessage(content, { authorId = CLOVER_BOT_ID, bot = true, winnerBot = false, id = String(nextId++) } = {}) {
+        const replies = [];
+        const winnerId = parseWinner(content);
+        return {
+            id,
+            content,
+            guild: { id: GUILD },
+            author: { id: authorId, bot },
+            mentions: { users: new Map(winnerId ? [[winnerId, { id: winnerId, bot: winnerBot }]] : []) },
+            reply: async (payload) => { replies.push(payload); return { delete: async () => {} }; },
+            replies,
+        };
+    }
+
+    test('reads the winner from the crown message', () => {
+        assert.equal(parseWinner(`👑 | <@${A}>`), A);
+        assert.equal(parseWinner(`👑 | <@!${A}>`), A);
+        assert.equal(parseWinner(`👑 | <@${A}> <@${B}>`), null);
+        assert.equal(parseWinner(`<@${A}> طلّع <@${B}>`), null);
+        assert.equal(parseWinner('👑 | Zatona'), null);
+    });
+
+    test('pays the winner once, only for the games bot', async () => {
+        const client = { db: memoryDb() };
+        const win = winMessage(`👑 | <@${A}>`);
+        assert.equal(await handleGamesBotWin(win, client), true);
+        assert.equal(await handleGamesBotWin(win, client), true);
+        const profile = await getProfile(client, GUILD, A);
+        assert.equal(profile.cc, CC.gamesBot.win);
+        assert.equal(profile.stats.groupWins, 1);
+        assert.equal(win.replies.length, 1);
+
+        assert.equal(await handleGamesBotWin(winMessage(`👑 | <@${A}>`, { authorId: B, bot: false }), client), false);
+        assert.equal(await handleGamesBotWin(winMessage(`👑 | <@${A}>`, { authorId: '300000000000000001' }), client), false);
+        assert.equal(await handleGamesBotWin(winMessage(`👑 | <@${B}>`, { winnerBot: true }), client), true);
+        assert.equal((await getProfile(client, GUILD, A)).cc, CC.gamesBot.win);
+        assert.equal((await getProfile(client, GUILD, B)).cc, 0);
+    });
+
+    test('GAMES_BOT_IDS switches to a premium copy of the bot', async () => {
+        const client = { db: memoryDb() };
+        process.env.GAMES_BOT_IDS = '300000000000000001';
+        try {
+            assert.equal(await handleGamesBotWin(winMessage(`👑 | <@${A}>`, { authorId: '300000000000000001' }), client), true);
+            assert.equal(await handleGamesBotWin(winMessage(`👑 | <@${A}>`), client), false);
+        } finally {
+            delete process.env.GAMES_BOT_IDS;
+        }
+        assert.equal((await getProfile(client, GUILD, A)).cc, CC.gamesBot.win);
+    });
+
+    test('daily cap', async () => {
+        const client = { db: memoryDb() };
+        const wins = Math.ceil(CC.gamesBot.dailyCap / CC.gamesBot.win) + 2;
+        for (let i = 0; i < wins; i += 1) await handleGamesBotWin(winMessage(`👑 | <@${C}>`), client);
+        const profile = await getProfile(client, GUILD, C);
+        assert.equal(profile.cc, CC.gamesBot.dailyCap);
+        assert.equal(profile.stats.groupWins, wins);
+    });
+});
