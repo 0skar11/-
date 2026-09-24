@@ -5,7 +5,7 @@ import { getGuildConfig, updateGuildConfig } from './config/guildConfig.js';
 import { logger } from '../utils/logger.js';
 
 // Images/files, links and GIFs are locked for everyone except members of the `media` role.
-// The role holds Attach Files + Embed Links and sits right above the chaos (member) role;
+// The role holds Attach Files + Embed Links and sits right below the chaos (member) role;
 // both permissions are taken off @everyone and chaos. Discord permissions can't stop a
 // plain link or a GIF-picker link from being sent, so the message guard below deletes those.
 const MEDIA_ROLE_NAME = 'media';
@@ -24,7 +24,7 @@ async function stripMediaPermissions(role) {
   return true;
 }
 
-/** Creates/updates the media role, places it right above chaos and locks media for everyone else. */
+/** Creates/updates the media role, places it right below chaos and locks media for everyone else. */
 export async function ensureMediaRole(guild) {
   const botMember = guild.members.me || await guild.members.fetchMe().catch(() => null);
   if (!botMember?.permissions.has(PermissionFlagsBits.ManageRoles)) {
@@ -43,13 +43,13 @@ export async function ensureMediaRole(guild) {
   }
 
   let positioned = false;
-  if (chaos && media.editable && media.position !== chaos.position + 1) {
-    if (chaos.position + 1 < botMember.roles.highest.position) {
-      // setPosition works on the sorted index: moving up from below takes chaos's slot, moving down lands one above it.
-      await media.setPosition(media.position < chaos.position ? chaos.position : chaos.position + 1, { reason: `Keep ${MEDIA_ROLE_NAME} right above chaos` });
+  if (chaos && media.editable && media.position !== chaos.position - 1) {
+    if (chaos.position < botMember.roles.highest.position) {
+      // setPosition works on the sorted index: moving down from above takes chaos's slot, moving up lands one below it.
+      await media.setPosition(media.position > chaos.position ? chaos.position : chaos.position - 1, { reason: `Keep ${MEDIA_ROLE_NAME} right below chaos` });
       positioned = true;
     } else {
-      logger.warn(`Media role in ${guild.name} can't go above chaos: the bot's highest role must be higher.`);
+      logger.warn(`Media role in ${guild.name} can't be moved next to chaos: the bot's highest role must be higher.`);
     }
   } else if (!chaos) {
     logger.warn(`Media role in ${guild.name}: chaos role ${CHAOS_ROLE_ID} was not found.`);

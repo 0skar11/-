@@ -84,9 +84,11 @@ export default {
         .setDefaultMemberPermissions(PermissionFlagsBits.ManageMessages),
     category: "moderation",
 
-    // Prefix usage: `ملاحظات @member` shows that member's notes.
+    // Prefix usage: `ملاحظات @member` shows that member's notes, `ملاحظات @member text` adds one.
+    // The note text is joined into one argument, since only the last option would take the rest.
     normalizePrefixArgs(args) {
-        return isUserArg(args[0]) ? ['view', ...args] : args;
+        if (!isUserArg(args[0])) return args;
+        return args.length > 1 ? ['add', args[0], args.slice(1).join(' ')] : ['view', args[0]];
     },
 
     async execute(interaction, config, client) {
