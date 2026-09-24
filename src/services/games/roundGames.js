@@ -53,7 +53,7 @@ export const ROUND_GAMES = {
         title: '❓ أسئلة عامة',
         how: 'أول واحد يكتب الإجابة الصح ياخد الجولة.',
         rounds: 10,
-        seconds: 25,
+        seconds: 10,
         makeRounds: (count) => sample(triviaQuestions, count).map((question) => ({
             prompt: `**${question.q}**`,
             reveal: question.a[0],

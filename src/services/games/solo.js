@@ -44,7 +44,7 @@ function awaitPlayerMessages(interaction, seconds, onMessage) {
 
 export async function playSoloQuestion(interaction, client) {
     const question = pick(triviaQuestions);
-    const seconds = 20;
+    const seconds = 10;
     await InteractionHelper.safeReply(interaction, {
         embeds: [gameEmbed('❓ سؤال', `${interaction.user}\n**${question.q}**\n\n⏱️ عندك ${seconds} ثانية ومحاولة واحدة.`)],
         allowedMentions: { parse: [] },
