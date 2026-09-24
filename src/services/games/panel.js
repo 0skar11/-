@@ -103,7 +103,7 @@ export function buildGamesPanel() {
                 name: '🔵 ألعاب بالانضمام — ادخل بالزرار',
                 value: [
                     `🎡 **روليت** — العجلة بتختار مين يطلّع مين، آخر واحد يكسب \`${ROULETTE_LIMITS.min}-${ROULETTE_LIMITS.max}\``,
-                    `🪑 **كراسي** — اقعد قبل ما الكراسي تخلص \`${CHAIRS_LIMITS.min}-${CHAIRS_LIMITS.max}\``,
+                    `🪑 **كراسي** — اقعد لما تنور 🟢، ولو دوست على 🔴 تخسر \`${CHAIRS_LIMITS.min}-${CHAIRS_LIMITS.max}\``,
                     `🕵️ **مافيا** — مافيا ودكتور ومحقق ومواطنين \`${MAFIA_LIMITS.min}-${MAFIA_LIMITS.max}\``,
                 ].join('\n'),
             },
