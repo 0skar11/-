@@ -10,6 +10,7 @@ import { ROUND_GAMES, runRoundGame } from './roundGames.js';
 import { runRoulette, ROULETTE_LIMITS } from './roulette.js';
 import { runChairs, CHAIRS_LIMITS } from './chairs.js';
 import { runMafia, MAFIA_LIMITS } from './mafia.js';
+import { runHideAndSeek, runHunt, HIDE_LIMITS, HUNT_LIMITS } from './hideGames.js';
 import { CC, ccEmbed } from '../../config/cc.js';
 
 export const PANEL_BUTTON_PREFIX = 'gamespanel';
@@ -19,6 +20,8 @@ const LOBBY_GAMES = {
     roulette: { run: runRoulette, name: 'روليت' },
     chairs: { run: runChairs, name: 'كراسي' },
     mafia: { run: runMafia, name: 'مافيا' },
+    hide: { run: runHideAndSeek, name: 'غميضه' },
+    hunt: { run: runHunt, name: 'صيد' },
 };
 
 export function isGroupGame(key) {
@@ -66,6 +69,8 @@ const PANEL_ROWS = [
         ['roulette', 'روليت', '🎡', ButtonStyle.Primary],
         ['chairs', 'كراسي', '🪑', ButtonStyle.Primary],
         ['mafia', 'مافيا', '🕵️', ButtonStyle.Primary],
+        ['hide', 'غميضه', '🙈', ButtonStyle.Primary],
+        ['hunt', 'صيد', '🏹', ButtonStyle.Primary],
     ],
     [
         ['trivia', 'أسئلة', '❓', ButtonStyle.Success],
@@ -103,6 +108,8 @@ export function buildGamesPanel() {
                     `🎡 **روليت** — العجلة بتختار مين يطلّع مين، آخر واحد يكسب \`${ROULETTE_LIMITS.min}-${ROULETTE_LIMITS.max}\``,
                     `🪑 **كراسي** — اقعد لما تنور 🟢، ولو دوست على 🔴 تخسر \`${CHAIRS_LIMITS.min}-${CHAIRS_LIMITS.max}\``,
                     `🕵️ **مافيا** — مافيا ودكتور ومحقق ومواطنين \`${MAFIA_LIMITS.min}-${MAFIA_LIMITS.max}\``,
+                    `🙈 **غميضه** — استخبى في مربع، ولاعب عشوائي كل دور يفتح مربع \`${HIDE_LIMITS.min}-${HIDE_LIMITS.max}\``,
+                    `🏹 **صيد** — صياد ضد خرفان مستخبية وسط خرفان وهمية \`${HUNT_LIMITS.min}-${HUNT_LIMITS.max}\``,
                 ].join('\n'),
             },
             {
