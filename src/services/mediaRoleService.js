@@ -106,6 +106,13 @@ export function hasMediaContent(message) {
   return Boolean(message.attachments?.size) || LINK.test(message.content || '');
 }
 
+// `شغل <link>` / `play <link>` (with or without a prefix) is a music request, not media, so it isn't blocked.
+const PLAY_COMMAND = /^\s*[^\p{L}\p{N}\s]{0,3}(?:شغل|play)\s+\S/iu;
+
+export function isPlayCommand(message) {
+  return !message.attachments?.size && PLAY_COMMAND.test(message.content || '');
+}
+
 async function canSendMedia(message) {
   if (isServerOwner(message.author.id)) return true;
   const member = message.member || await message.guild.members.fetch(message.author.id).catch(() => null);
@@ -116,7 +123,7 @@ async function canSendMedia(message) {
 
 /** Returns true when the message was deleted for sending media without the media role. */
 export async function handleMediaMessage(message) {
-  if (!hasMediaContent(message)) return false;
+  if (!hasMediaContent(message) || isPlayCommand(message)) return false;
   if (await canSendMedia(message)) return false;
 
   await message.delete().catch(() => {});
