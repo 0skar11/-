@@ -15,7 +15,7 @@ import { gameAcceptsChat } from './session.js';
 import { isPlayingSoloIn } from './solo.js';
 
 export const GAMES_CHANNEL_ID = '1552714038817857556';
-export const GAME_COMMANDS = new Set(['game', 'solo', 'rps', 'xo', 'cc', 'cctop', 'daily']);
+export const GAME_COMMANDS = new Set(['game', 'solo', 'rps', 'xo', 'fight', 'cc', 'cctop', 'daily']);
 export const GAMES_ONLY_NOTICE = '🎮 الروم ده لأوامر الألعاب بس. اكتب `العاب` عشان تشوف الألعاب.';
 
 const NOTICE_DELETE_MS = 4_000;

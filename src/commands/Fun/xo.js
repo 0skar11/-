@@ -2,8 +2,10 @@ import { SlashCommandBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, Comp
 import { warningEmbed } from '../../utils/embeds.js';
 import { InteractionHelper } from '../../utils/interactionHelper.js';
 import { soloRewardText } from '../../services/games/solo.js';
+import { inviteOpponent } from '../../services/games/challenge.js';
 
-// Tic-tac-toe between two members with buttons: `xo @member`. The challenger plays ❌ and goes first.
+// Tic-tac-toe between two members with buttons: `xo @member`. The other member has to accept the
+// invite first; then the challenger plays ❌ and goes first.
 // The winner gets solo CC (capped per day like the other solo games). A player who doesn't move
 // within 20 seconds is kicked for AFK and the other player wins.
 const IDLE_MS = 20_000;
@@ -53,12 +55,10 @@ export default {
         const players = { X: playerX, O: playerO };
         const status = () => `${MARKS.X} ${playerX} ضد ${MARKS.O} ${playerO}\nالدور على: ${MARKS[turn]} ${players[turn]}`;
 
-        await InteractionHelper.safeReply(interaction, {
-            content: status(),
-            components: buildRows(board),
-            allowedMentions: { users: [playerO.id] },
-        });
-        const message = await interaction.fetchReply();
+        // The other member has to accept first; the invite message then becomes the board.
+        const message = await inviteOpponent(interaction, playerO, 'XO ❌⭕');
+        if (!message) return;
+        await message.edit({ content: status(), embeds: [], components: buildRows(board), allowedMentions: { users: [playerX.id] } });
         const collector = message.createMessageComponentCollector({ componentType: ComponentType.Button, idle: IDLE_MS });
 
         collector.on('collect', async (button) => {

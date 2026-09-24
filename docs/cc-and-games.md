@@ -27,6 +27,10 @@ pays the winner.
 
 Solo games (`سؤال`, `رقم`, `سلوت`, `حجر`, `اكس`): 5 CC per win, at most 50 CC a day (UTC).
 
+Games against another member (`اكس @عضو`, `fight @عضو`) start with an invite: the other member has
+20 seconds to press قبول or رفض (the challenger can take it back with رفض). Only after قبول does the
+game start; a refused, cancelled or unanswered invite is deleted after 5 seconds.
+
 ## Commands
 
 Every command works as a slash command and as a word typed in chat (with or without the prefix).
