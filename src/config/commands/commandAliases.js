@@ -8,6 +8,7 @@ export const commandAliases = {
   حالات: 'cases', ملاحظات: 'usernotes', قل: 'say', قول: 'say', خاص: 'dm',
   kick: 'kick', ban: 'ban', warn: 'warn', untimeout: 'untimeout',
   rank: 'rank', lvl: 'rank', xp: 'rank', leaderboard: 'leaderboard', lb: 'leaderboard', top: 'leaderboard',
+  لفل: 'rank', ليفل: 'rank', مستوى: 'rank', مستوايا: 'rank', رانك: 'rank', توب: 'leaderboard',
   user: 'userinfo', avatar: 'avatar', av: 'avatar', pfp: 'avatar', icon: 'avatar', bd: 'birthday', bday: 'birthday', b: 'birthday',
   flip: 'flip', coin: 'flip', roll: 'roll', dice: 'roll', fight: 'fight',
   gstart: 'gcreate', gstop: 'gend', groll: 'greroll', ticket: 'ticket', t: 'ticket', new: 'ticket',
@@ -71,6 +72,8 @@ export const commandArgAliases = {
 export const standaloneOnlyAliases = new Set([
   ...Object.keys(commandArgAliases),
   'رصيد', 'رصيدي', 'رصيدى', 'فلوس', 'كريدت',
+  // Level words are common in chat (`لفل كام؟`), so they only run as the whole message (+ a mention).
+  'لفل', 'ليفل', 'مستوى', 'مستوايا', 'رانك', 'توب',
 ]);
 
 export function isStandaloneInvocation(args) {
