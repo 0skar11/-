@@ -4,9 +4,9 @@
 // wallet/bank fields:
 //   cc          current balance
 //   ccStats     { earned, spent, gamesPlayed, podiums, groupWins, soloWins }
-//   ccLastDaily timestamp of the last `daily`
 //   ccSolo      { day: 'YYYY-MM-DD', earned } — solo game CC earned today, for the daily cap
 //   ccInventory { itemId: quantity } — reserved for the store (see ccStoreService.js)
+//   ccGamesBot  { day: 'YYYY-MM-DD', earned } — CC from games bot wins today, for its daily cap
 
 import { CC } from '../../config/cc.js';
 import { getEconomyKey, getEconomyPrefix } from '../../utils/database.js';
@@ -40,7 +40,6 @@ export function readCC(record = {}) {
     return {
         cc: Number.isSafeInteger(record.cc) && record.cc > 0 ? record.cc : 0,
         stats: { ...EMPTY_STATS, ...(record.ccStats || {}) },
-        lastDaily: record.ccLastDaily || 0,
         inventory: { ...(record.ccInventory || {}) },
     };
 }
@@ -66,7 +65,6 @@ async function updateRecord(client, guildId, userId, change) {
         if (result?.skipSave) return result;
         record.cc = state.cc;
         record.ccStats = state.stats;
-        record.ccLastDaily = state.lastDaily;
         record.ccInventory = state.inventory;
         await saveRecord(client, guildId, userId, record);
         return { ...result, balance: state.cc, stats: state.stats };
@@ -82,19 +80,6 @@ function credit(state, amount) {
 
 export async function getProfile(client, guildId, userId) {
     return readCC(await loadRecord(client, guildId, userId));
-}
-
-/** `daily`: the only way to get CC outside games. */
-export async function claimDaily(client, guildId, userId, { premium = false, now = Date.now() } = {}) {
-    return updateRecord(client, guildId, userId, (state) => {
-        const nextAt = state.lastDaily + CC.daily.cooldownMs;
-        if (now < nextAt) return { ok: false, skipSave: true, remaining: nextAt - now };
-        const bonus = premium ? Math.floor(CC.daily.amount * CC.daily.premiumBonus) : 0;
-        credit(state, CC.daily.amount + bonus);
-        state.lastDaily = now;
-        logger.info('[CC] Daily claimed', { guildId, userId, amount: CC.daily.amount + bonus });
-        return { ok: true, amount: CC.daily.amount, bonus, nextAt: now + CC.daily.cooldownMs };
-    });
 }
 
 /**
@@ -144,6 +129,34 @@ export async function awardSoloWin(client, guildId, userId, game, { now = Date.n
         logger.error(`[CC] Failed to pay solo ${game} win for ${userId}`, error);
         return { amount: 0, capped: false, failed: true };
     }
+}
+
+/**
+ * Pays a win announced by the games bot, up to the daily cap (CC.gamesBot). Returns
+ * `{ amount, capped, balance }`; `amount` is 0 once the cap is reached (the win is still counted).
+ */
+export async function awardGamesBotWin(client, guildId, userId, { now = Date.now() } = {}) {
+    return updateRecord(client, guildId, userId, (state, record) => {
+        const today = utcDay(now);
+        const earned = record.ccGamesBot?.day === today ? record.ccGamesBot.earned : 0;
+        const amount = Math.max(0, Math.min(CC.gamesBot.win, CC.gamesBot.dailyCap - earned));
+        if (amount > 0) credit(state, amount);
+        state.stats.gamesPlayed += 1;
+        state.stats.podiums += 1;
+        state.stats.groupWins += 1;
+        record.ccGamesBot = { day: today, earned: earned + amount };
+        return { amount, capped: amount < CC.gamesBot.win };
+    });
+}
+
+/** Gives CC outside the reward rules above (the games bot, via ccApi.js). */
+export async function grantCC(client, guildId, userId, amount, { source = 'unknown', reason = '' } = {}) {
+    if (!Number.isSafeInteger(amount) || amount <= 0) throw new Error('Invalid CC amount');
+    return updateRecord(client, guildId, userId, (state) => {
+        credit(state, amount);
+        logger.info('[CC] Granted', { guildId, userId, amount, source, reason });
+        return { ok: true, amount };
+    });
 }
 
 /** Takes CC away (store purchases). Returns `{ ok: false, balance }` when the member can't afford it. */

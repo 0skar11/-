@@ -2,6 +2,7 @@
 import { Client, Collection, GatewayIntentBits } from 'discord.js';
 import { REST } from '@discordjs/rest';
 import express from 'express';
+import { createCCApiRouter } from './services/cc/ccApi.js';
 import cron from 'node-cron';
 
 import config from './config/application.js';
@@ -204,6 +205,9 @@ class TitanBot extends Client {
         metrics,
       });
     });
+
+    // The games bot reads and pays CC here (src/services/cc/ccApi.js, needs CC_API_TOKEN).
+    app.use('/api/cc', createCCApiRouter(this));
 
     app.get('/', (req, res) => {
       res.status(200).json({ 

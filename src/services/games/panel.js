@@ -87,7 +87,6 @@ const PANEL_ROWS = [
         ['rps', 'حجر ورقة مقص', '✊', ButtonStyle.Secondary],
     ],
     [
-        ['daily', 'يومي', '📅', ButtonStyle.Primary],
         ['balance', 'رصيدي', '💰', ButtonStyle.Secondary],
         ['top', 'توب CC', '🏆', ButtonStyle.Secondary],
         ['stop', 'وقف اللعبة', '🛑', ButtonStyle.Danger],
@@ -99,7 +98,7 @@ export const PANEL_ACTIONS = PANEL_ROWS.flat().map(([action]) => action);
 export function buildGamesPanel() {
     const embed = ccEmbed(`🎮 ألعاب السيرفر — ${CC.emoji} ${CC.name}`, [
         'دوس على أي زرار تحت عشان تبدأ اللعبة على طول، أو اكتب اسمها في الشات.',
-        `الألعاب هي الطريقة الوحيدة تجمع **${CC.short}** غير اليومي!`,
+        `الألعاب هي الطريقة الوحيدة تجمع بيها **${CC.short}**!`,
     ].join('\n'), {
         fields: [
             {
@@ -146,7 +145,6 @@ export function buildGamesPanel() {
             {
                 name: `${CC.emoji} العملات`,
                 value: [
-                    `📅 **يومي** — ${CC.daily.amount} ${CC.short} كل 24 ساعة`,
                     '💰 **رصيد** — رصيدك وإحصائياتك',
                     '🏆 **top cc** — الترتيب',
                     '🛑 **وقف** — يوقف اللعبة (صاحبها أو التراست)',

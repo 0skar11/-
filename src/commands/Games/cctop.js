@@ -21,7 +21,7 @@ export async function ccTopEmbed(client, guild, userId = null) {
     }
 
     return ccEmbed(`${CC.emoji} Top CC — ${guild.name}`, [
-        lines.join('\n') || 'لسه محدش معاه CC. ابدأوا بـ `يومي` و `العاب`!',
+        lines.join('\n') || 'لسه محدش معاه CC. العبوا واكسبوا!',
         '',
         summary.join(' • '),
     ].join('\n'));

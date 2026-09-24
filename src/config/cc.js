@@ -1,10 +1,8 @@
 // cc.js — Chaos Credits (CC), the server's only currency.
 //
-// CC can only be earned two ways:
-//   1. `daily` once every 24 hours.
-//   2. Games: group games pay the top 3 (more players = bigger rewards), solo games pay a little
-//      and have a daily cap so they can't be farmed.
-// Work, crime, rob, beg, fish, mine, gamble and pay were removed on purpose.
+// CC is earned from games only: wins in the games bot (Clover), and this bot's own games when they
+// are switched back on (config/games.js). There is no `daily` any more; work, crime, rob, beg, fish,
+// mine, gamble and pay were removed on purpose too.
 
 import { getColor } from './bot.js';
 
@@ -12,13 +10,6 @@ export const CC = {
     name: 'Chaos Credits',
     short: 'CC',
     emoji: '🌀',
-
-    daily: {
-        amount: 100,
-        cooldownMs: 24 * 60 * 60 * 1000,
-        // Extra share of the daily for members with the premium role (guild config `premiumRoleId`).
-        premiumBonus: 0.1,
-    },
 
     group: {
         // The pool grows by this much for every player, up to `maxCountedPlayers` players.
@@ -33,6 +24,15 @@ export const CC = {
         win: 5,
         // Most CC a member can earn from solo games per day (UTC).
         dailyCap: 50,
+    },
+
+    // A win announced by the games bot (Clover), read from its "👑 | @winner" message
+    // (services/cc/gamesBotWins.js). Its message doesn't say how many played, so a win pays a fixed
+    // amount, with a daily cap so a game with a friend over and over can't be farmed.
+    gamesBot: {
+        win: 10,
+        // Most CC a member can get from games bot wins per day (UTC).
+        dailyCap: 200,
     },
 };
 

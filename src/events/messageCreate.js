@@ -20,6 +20,7 @@ import { handleEveryoneMention } from '../services/everyoneMentionGuardService.j
 import { handleForeignInviteLink } from '../services/inviteLinkGuardService.js';
 import { handleMediaMessage } from '../services/mediaRoleService.js';
 import { handleGamesChannelMessage, isGamesOnlyFor, isGameCommandMessage } from '../services/games/gamesChannel.js';
+import { handleGamesBotWin } from '../services/cc/gamesBotWins.js';
 
 export default {
   name: Events.MessageCreate,
@@ -28,6 +29,8 @@ export default {
       // Runs before the bot check so other bots cannot post in the protected board channels either.
       if (await handleProtectedChannelMessage(message)) return;
       if (await handleGamesChannelMessage(message, client)) return;
+      // Wins announced by the games bot (Clover) pay CC here.
+      if (await handleGamesBotWin(message, client)) return;
       if (message.author.bot || !message.guild) return;
       logger.debug(`Message received from ${message.author.tag}: ${message.content}`);
 

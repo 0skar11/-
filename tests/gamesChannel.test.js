@@ -1,4 +1,4 @@
-import { test, describe } from 'node:test';
+import { test, describe, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import {
     GAMES_CHANNEL_ID, typedCommandName, isGameCommandMessage, isBlockedSlashCommand, handleGamesChannelMessage,
@@ -30,6 +30,11 @@ function fakeMessage(content, { authorId = MEMBER, bot = false, channelId = GAME
 const client = { db: { get: async (key, fallback) => fallback } };
 
 describe('games channel', () => {
+    // These tests cover the games themselves, which are off by default now (config/games.js).
+    const previous = process.env.GAMES_ENABLED;
+    before(() => { process.env.GAMES_ENABLED = 'true'; });
+    after(() => { if (previous === undefined) delete process.env.GAMES_ENABLED; else process.env.GAMES_ENABLED = previous; });
+
     test('recognises game commands with and without the prefix', () => {
         assert.equal(typedCommandName('روليت', '!'), 'game');
         assert.equal(typedCommandName('!روليت', '!'), 'game');
@@ -94,8 +99,7 @@ describe('games channel', () => {
     });
 
     test('CC words and the natural ways of typing stop', () => {
-        assert.equal(typedCommandName('يومي', '!'), 'daily');
-        assert.equal(typedCommandName('يومى', '!'), 'daily');
+        assert.equal(isGameCommandMessage('يومي', ['!']), false);
         assert.equal(typedCommandName('رصيدى', '!'), 'cc');
         assert.equal(typedCommandName('Top CC', '!'), 'cctop');
         assert.equal(typedCommandName('وقف', '!'), 'game');
@@ -110,7 +114,7 @@ describe('games channel', () => {
         const { loadCommands } = await import('../src/handlers/loaders/commandLoader.js');
         const loaded = {};
         await loadCommands(loaded);
-        for (const name of ['daily', 'cc', 'cctop', 'game', 'solo']) assert.equal(loaded.commands.get(name).category, 'Games', name);
+        for (const name of ['cc', 'cctop', 'game', 'solo']) assert.equal(loaded.commands.get(name).category, 'Games', name);
     });
 
     test('word aliases', () => {

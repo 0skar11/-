@@ -20,7 +20,7 @@ import { adjustCC, getLeaderboard } from '../../../services/cc/ccService.js';
 import { CC, formatCC } from '../../../config/cc.js';
 
 // Staff dashboard for Chaos Credits: server totals plus adding/removing CC by hand (corrections,
-// event prizes). Members themselves only get CC from `daily` and games.
+// event prizes). Members themselves only get CC from games.
 
 async function buildDashboardEmbed(guild, client) {
     let total = 0;
@@ -35,13 +35,13 @@ async function buildDashboardEmbed(guild, client) {
 
     return new EmbedBuilder()
         .setTitle(`${CC.emoji} ${CC.name} Dashboard`)
-        .setDescription(`Manage ${CC.short} for **${guild.name}**.\nMembers earn ${CC.short} only from \`daily\` and games.`)
+        .setDescription(`Manage ${CC.short} for **${guild.name}**.\nMembers earn ${CC.short} only from games.`)
         .setColor(getColor('economy'))
         .addFields(
             { name: `${CC.emoji} Total in circulation`, value: `\`${total.toLocaleString('en-US')} ${CC.short}\``, inline: true },
             { name: '👥 Members with CC', value: `\`${holders.toLocaleString('en-US')}\``, inline: true },
             { name: '📊 Average', value: `\`${(holders ? Math.floor(total / holders) : 0).toLocaleString('en-US')} ${CC.short}\``, inline: true },
-            { name: '📅 Daily', value: `\`${CC.daily.amount} ${CC.short}\``, inline: true },
+            { name: '🍀 Clover win / daily cap', value: `\`${CC.gamesBot.win} / ${CC.gamesBot.dailyCap} ${CC.short}\``, inline: true },
             { name: '🙋 Solo win / daily cap', value: `\`${CC.solo.win} / ${CC.solo.dailyCap} ${CC.short}\``, inline: true },
         );
 }

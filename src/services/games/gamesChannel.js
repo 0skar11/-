@@ -1,13 +1,16 @@
 // gamesChannel.js — the games channel is for game commands only. Anything else posted there is
 // deleted with a short notice that goes away after a few seconds. Still allowed:
-//   • game and CC commands (`روليت`، `العاب`، `يومي`، `/game`...) and the panel buttons
+//   • game and CC commands (`روليت`، `العاب`، `رصيد`، `/game`...) and the panel buttons
 //   • answers while a game runs there: everyone during chat games, only the players during
 //     روليت / كراسي / مافيا (mafia needs its day discussion), and the player of a solo `سؤال` / `رقم`
 //   • the server owners and this bot
 // Other slash commands used there get a private "games only" reply.
+// All of this only applies while this bot's games are on (config/games.js): with the games moved to
+// the games bot the channel is left alone so that bot can run its games there.
 
 import { getGuildConfig } from '../config/guildConfig.js';
 import { getCommandPrefix } from '../../config/bot.js';
+import { gamesEnabled } from '../../config/games.js';
 import { isServerOwner } from '../../config/serverOwners.js';
 import { applyWordAliases, resolveCommandAlias } from '../../config/commands/commandAliases.js';
 import { parseTypedCommand } from '../../utils/prefixParser.js';
@@ -15,7 +18,7 @@ import { gameAcceptsChat } from './session.js';
 import { isPlayingSoloIn } from './solo.js';
 
 export const GAMES_CHANNEL_ID = '1552714038817857556';
-export const GAME_COMMANDS = new Set(['game', 'solo', 'rps', 'xo', 'fight', 'cc', 'cctop', 'daily']);
+export const GAME_COMMANDS = new Set(['game', 'solo', 'rps', 'xo', 'fight', 'cc', 'cctop']);
 export const GAMES_ONLY_NOTICE = '🎮 الروم ده لأوامر الألعاب بس. اكتب `العاب` عشان تشوف الألعاب.';
 
 const NOTICE_DELETE_MS = 4_000;
@@ -36,17 +39,17 @@ export function isGameCommandMessage(content, prefixes) {
 
 /** Whether `message` is in the games channel from someone the games-only rule applies to. */
 export function isGamesOnlyFor(message) {
-    return message.channelId === GAMES_CHANNEL_ID && !isServerOwner(message.author?.id);
+    return gamesEnabled() && message.channelId === GAMES_CHANNEL_ID && !isServerOwner(message.author?.id);
 }
 
 /** Whether a slash command must be refused in `channelId` because it isn't a game command. */
 export function isBlockedSlashCommand(channelId, commandName, userId) {
-    return channelId === GAMES_CHANNEL_ID && !GAME_COMMANDS.has(commandName) && !isServerOwner(userId);
+    return gamesEnabled() && channelId === GAMES_CHANNEL_ID && !GAME_COMMANDS.has(commandName) && !isServerOwner(userId);
 }
 
 /** Deletes a message that doesn't belong in the games channel. Returns true when it was deleted. */
 export async function handleGamesChannelMessage(message, client) {
-    if (message.channelId !== GAMES_CHANNEL_ID || !message.guild) return false;
+    if (!gamesEnabled() || message.channelId !== GAMES_CHANNEL_ID || !message.guild) return false;
     const authorId = message.author?.id;
     if (authorId === message.client.user?.id || isServerOwner(authorId)) return false;
 

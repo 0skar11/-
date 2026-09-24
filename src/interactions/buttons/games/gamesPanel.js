@@ -1,15 +1,16 @@
 import { MessageFlags } from 'discord.js';
 import { PANEL_BUTTON_PREFIX, isGroupGame, startGroupGame, stopGroupGame } from '../../../services/games/panel.js';
 import { startSoloGame } from '../../../services/games/solo.js';
-import { getGuildConfig } from '../../../services/config/guildConfig.js';
-import { dailyEmbed } from '../../../commands/Games/daily.js';
 import { ccProfileEmbed } from '../../../commands/Games/cc.js';
 import { ccTopEmbed } from '../../../commands/Games/cctop.js';
 import rpsCommand from '../../../commands/Fun/rps.js';
+import { gamesEnabled, GAMES_MOVED_NOTICE } from '../../../config/games.js';
 
-// Buttons of the `العاب` panel (`gamespanel:<action>`). Games start in the panel's channel; daily,
-// balance and top answer privately so the games channel stays clean. Game buttons have a short
-// per-member cooldown so they can't be spammed.
+// Buttons of the `العاب` panel (`gamespanel:<action>`). Games start in the panel's channel; balance
+// and top answer privately so the games channel stays clean. Game buttons have a short
+// per-member cooldown so they can't be spammed. While the games are off (config/games.js) the game
+// buttons of an old panel say the games moved; balance and top keep working (the old daily button
+// says it's gone).
 const PRESS_COOLDOWN_MS = 3_000;
 const lastPress = new Map();
 
@@ -23,6 +24,10 @@ function onCooldown(userId) {
 async function execute(interaction, client, [action]) {
     if (!interaction.inGuild()) return;
     const startsGame = isGroupGame(action) || action.startsWith('solo_') || action === 'rps';
+    if ((startsGame || action === 'stop') && !gamesEnabled()) {
+        await interaction.reply({ content: GAMES_MOVED_NOTICE, flags: MessageFlags.Ephemeral }).catch(() => {});
+        return;
+    }
     if (startsGame && onCooldown(interaction.user.id)) {
         await interaction.reply({ content: '⏳ استنى ثانية.', flags: MessageFlags.Ephemeral }).catch(() => {});
         return;
@@ -35,7 +40,6 @@ async function execute(interaction, client, [action]) {
 
     await interaction.deferReply({ flags: MessageFlags.Ephemeral });
     let embed = null;
-    if (action === 'daily') embed = await dailyEmbed(client, interaction.member, await getGuildConfig(client, interaction.guildId));
     if (action === 'balance') embed = await ccProfileEmbed(client, interaction.guildId, interaction.user);
     if (action === 'top') embed = await ccTopEmbed(client, interaction.guild, interaction.user.id);
     await interaction.editReply(embed ? { embeds: [embed], allowedMentions: { parse: [] } } : { content: 'الزرار ده مبقاش شغال، اكتب `العاب` تاني.' });

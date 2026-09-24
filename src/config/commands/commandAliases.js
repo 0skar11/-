@@ -1,7 +1,7 @@
 /** Command aliases configuration. */
 export const commandAliases = {
   bal: 'cc', balance: 'cc', money: 'cc', cash: 'cc', credits: 'cc', h: 'help', info: 'help',
-  رصيد: 'cc', رصيدي: 'cc', رصيدى: 'cc', فلوس: 'cc', كريدت: 'cc', يومي: 'daily', يومى: 'daily', دايلي: 'daily', دايلى: 'daily',
+  رصيد: 'cc', رصيدي: 'cc', رصيدى: 'cc', فلوس: 'cc', كريدت: 'cc',
   بان: 'ban', انبان: 'unban', تايم: 'timeout', انتايم: 'untimeout', mute: 'timeout', unmute: 'untimeout',
   وارن: 'warn', وارنات: 'warnings', كلير: 'clear', clear: 'clear',
   طرد: 'kick', تحذير: 'warn', تحذيرات: 'warnings', مسح: 'clear', قفل: 'lock', فتح: 'unlock',
@@ -70,7 +70,7 @@ export const commandArgAliases = {
  */
 export const standaloneOnlyAliases = new Set([
   ...Object.keys(commandArgAliases),
-  'رصيد', 'رصيدي', 'رصيدى', 'فلوس', 'كريدت', 'يومي', 'يومى', 'دايلي', 'دايلى',
+  'رصيد', 'رصيدي', 'رصيدى', 'فلوس', 'كريدت',
 ]);
 
 export function isStandaloneInvocation(args) {

@@ -30,7 +30,7 @@ TitanBot offers a complete suite of tools for Discord server management and comm
 - **Case Management** - View and track all mod actions
 
 ### Chaos Credits (CC) & Games
-- **Daily** - The only way to earn CC outside games
+- **Clover wins** - Wins in the Clover games bot pay CC
 - **Group Games** - Roulette, musical chairs, mafia, trivia and more; the top 3 win CC
 - **Top CC** - Server leaderboard (see [docs/cc-and-games.md](docs/cc-and-games.md))
 
