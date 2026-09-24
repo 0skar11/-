@@ -1,4 +1,4 @@
-import { test, describe } from 'node:test';
+import { test, describe, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import {
     GAMES_CHANNEL_ID, typedCommandName, isGameCommandMessage, isBlockedSlashCommand, handleGamesChannelMessage,
@@ -30,6 +30,11 @@ function fakeMessage(content, { authorId = MEMBER, bot = false, channelId = GAME
 const client = { db: { get: async (key, fallback) => fallback } };
 
 describe('games channel', () => {
+    // These tests cover the games themselves, which are off by default now (config/games.js).
+    const previous = process.env.GAMES_ENABLED;
+    before(() => { process.env.GAMES_ENABLED = 'true'; });
+    after(() => { if (previous === undefined) delete process.env.GAMES_ENABLED; else process.env.GAMES_ENABLED = previous; });
+
     test('recognises game commands with and without the prefix', () => {
         assert.equal(typedCommandName('روليت', '!'), 'game');
         assert.equal(typedCommandName('!روليت', '!'), 'game');

@@ -1,5 +1,14 @@
 # Chaos Credits (CC) and games
 
+> **The games moved to a separate games bot.** This bot keeps the CC system (`daily`, `cc`,
+> `cctop`, the live Top CC board, the store) and the games bot pays players through the
+> [CC API](#cc-api-for-the-games-bot). This bot's own games are **off** but not deleted: every
+> file below is still in the repo, and `GAMES_ENABLED=true` + a restart brings them all back
+> (`src/config/games.js`). While they are off the game commands (`game`, `solo`, `rps`, `xo`,
+> `fight`) are not loaded, registered or listed in `help`, the games channel no longer deletes
+> other messages, and the buttons of an old games panel say the games moved. The rest of this
+> page describes the games as they work when switched back on.
+
 CC is the server's only currency. Members earn it in exactly two ways:
 
 1. **`daily` / `يومي`**: 100 CC every 24 hours (+10% with the premium role from the guild config).
@@ -119,3 +128,41 @@ from 0 CC. Every change goes through `src/services/cc/ccService.js`, which locks
   gives roles (refunding if Discord refuses) and fills `ccInventory` for stackable items.
 - Still to do: a store command that lists `listStoreItems()` and calls `buyItem()`, then set
   `ccStoreSettings.open = true`.
+
+## CC API for the games bot
+
+The games bot reads and pays CC over HTTP on this bot's web server (same `PORT` as `/health`).
+Code: `src/services/cc/ccApi.js`.
+
+**Setup**
+
+1. Pick a long random secret (16+ characters) and set it as `CC_API_TOKEN` on this bot.
+2. Give the games bot the same secret and this bot's address, e.g. `http://<host>:<PORT>/api/cc`.
+3. Every request sends `Authorization: Bearer <CC_API_TOKEN>`. Without the variable the API
+   answers `503` and changes nothing; a wrong token gets `401`.
+
+Only guilds this bot is in are accepted (`404` otherwise). User IDs are strings.
+
+| Method and path | Body | What it does |
+|---|---|---|
+| `GET /api/cc/:guildId/users/:userId` | – | `{ userId, cc, stats, lastDaily }` |
+| `GET /api/cc/:guildId/top?limit=10` | – | `{ members, total, top: [{ userId, cc, earned }] }` (1–100 rows) |
+| `POST /api/cc/:guildId/group-game` | `{ game, players: [ids], ranking: [ids] }` | Pays a finished group game with the rules above (pool `10 × players`, 50/30/20 for the top 3); `ranking` is the finishing order, 1st first. Returns `{ paid: [{ userId, place, amount, balance }] }` |
+| `POST /api/cc/:guildId/solo-win` | `{ userId, game }` | A solo win: 5 CC, at most 50 CC a day. Returns `{ amount, capped, balance }` |
+| `POST /api/cc/:guildId/add` | `{ userId, amount, reason }` | Custom reward, 1–10,000 CC. Returns `{ ok, amount, balance }` |
+| `POST /api/cc/:guildId/spend` | `{ userId, amount, reason }` | Takes CC (entry fee, bet). Returns `{ ok: false, balance }` when the member can't afford it |
+
+Any POST can carry a `requestId` (letters, numbers, `_.:-`): repeating it within 10 minutes
+returns the first answer without paying again, so the games bot can safely retry after a timeout.
+
+Example (Node.js, from the games bot):
+
+```js
+await fetch(`${CC_API_URL}/${guildId}/group-game`, {
+    method: 'POST',
+    headers: { authorization: `Bearer ${process.env.CC_API_TOKEN}`, 'content-type': 'application/json' },
+    body: JSON.stringify({ game: 'roulette', players, ranking: [winnerId, secondId, thirdId], requestId: gameId }),
+});
+```
+
+Every payment is logged (`[CC] ...`) and shows up in the member's `رصيد` and the Top CC board.

@@ -11,7 +11,7 @@ export async function dailyEmbed(client, member, guildConfig) {
 
     if (!result.ok) {
         const nextAt = Math.floor((Date.now() + result.remaining) / 1000);
-        return ccEmbed(`${CC.emoji} Daily`, `⏳ خدت اليومي بتاعك خلاص.\nتقدر تاخده تاني <t:${nextAt}:R>.\n\n🎮 عايز CC دلوقتي؟ العب \`العاب\`.`, { color: 'warning' });
+        return ccEmbed(`${CC.emoji} Daily`, `⏳ خدت اليومي بتاعك خلاص.\nتقدر تاخده تاني <t:${nextAt}:R>.\n\n🎮 عايز CC دلوقتي؟ العب في روم الألعاب.`, { color: 'warning' });
     }
     const bonus = result.bonus ? `\n✨ بونص البريميوم: +${formatCC(result.bonus)}` : '';
     return ccEmbed(`${CC.emoji} Daily`, `✅ ${member} خد +${formatCC(result.amount)}${bonus}\n\n💰 رصيدك: ${formatCC(result.balance)}\n⏳ اليومي الجاي <t:${Math.floor(result.nextAt / 1000)}:R>`);

@@ -146,6 +146,16 @@ export async function awardSoloWin(client, guildId, userId, game, { now = Date.n
     }
 }
 
+/** Gives CC for something outside `daily` and the reward rules above (the games bot, via ccApi.js). */
+export async function grantCC(client, guildId, userId, amount, { source = 'unknown', reason = '' } = {}) {
+    if (!Number.isSafeInteger(amount) || amount <= 0) throw new Error('Invalid CC amount');
+    return updateRecord(client, guildId, userId, (state) => {
+        credit(state, amount);
+        logger.info('[CC] Granted', { guildId, userId, amount, source, reason });
+        return { ok: true, amount };
+    });
+}
+
 /** Takes CC away (store purchases). Returns `{ ok: false, balance }` when the member can't afford it. */
 export async function spendCC(client, guildId, userId, amount, reason = 'unknown') {
     if (!Number.isSafeInteger(amount) || amount <= 0) throw new Error('Invalid CC amount');
