@@ -1,6 +1,6 @@
 import { Events } from 'discord.js';
 import { logger, startupLog } from '../utils/logger.js';
-import { deleteRetiredRoles, synchronizeStaffRoles } from '../services/staffRoleHierarchyService.js';
+import { deleteRetiredRoles, synchronizeStaffRoles, publishStaffPermissionBoard } from '../services/staffRoleHierarchyService.js';
 
 export default {
   name: Events.ClientReady,
@@ -11,10 +11,11 @@ export default {
     let updated = 0;
     let positioned = 0;
     let retired = 0;
+    let boardEdited = 0;
 
     for (const guild of client.guilds.cache.values()) {
-      // The permission board is never posted automatically on startup; it is only
-      // published on demand via /publish-board admin-permissions.
+      // The permission board is never posted automatically on startup (first post: /publish-board
+      // admin-permissions); its existing messages are only edited to match the synced permissions.
       try {
         retired += await deleteRetiredRoles(guild);
       } catch (error) {
@@ -28,8 +29,13 @@ export default {
       } catch (error) {
         logger.error(`Failed to synchronize staff roles in ${guild.name}:`, error);
       }
+      try {
+        boardEdited += (await publishStaffPermissionBoard(guild, { editOnly: true })).edited;
+      } catch (error) {
+        logger.warn(`Permission board not refreshed in ${guild.name}: ${error.message}`);
+      }
     }
 
-    startupLog(`Staff role hierarchy: created ${created}, updated ${updated}, positioned ${positioned}, retired ${retired}`);
+    startupLog(`Staff role hierarchy: created ${created}, updated ${updated}, positioned ${positioned}, retired ${retired}, board messages refreshed ${boardEdited}`);
   },
 };

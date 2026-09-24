@@ -17,6 +17,7 @@ export const commandAliases = {
   serverstats: 'serverstats', ss: 'serverstats', sstats: 'serverstats', rr: 'reactroles', reactionroles: 'reactroles',
   jtc: 'jointocreate', jointocreate: 'jointocreate', np: 'nowplaying', now: 'nowplaying',
   شغل: 'play',
+  اكس: 'xo', حجر: 'rps',
 };
 
 export const subcommandAliases = {

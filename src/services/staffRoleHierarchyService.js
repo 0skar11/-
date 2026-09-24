@@ -31,7 +31,7 @@ const ROLE_DEFINITIONS = [
   { name: '🛡️ Admin', color: '#e67e22', permissions: [PermissionFlagsBits.ViewAuditLog, PermissionFlagsBits.ManageGuild, PermissionFlagsBits.ManageChannels, PermissionFlagsBits.ManageRoles, PermissionFlagsBits.ManageMessages, PermissionFlagsBits.ManageNicknames, PermissionFlagsBits.KickMembers, PermissionFlagsBits.BanMembers, PermissionFlagsBits.ModerateMembers, PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.ReadMessageHistory] },
   { name: '🔨 Moderator', color: '#2ecc71', permissions: [PermissionFlagsBits.ViewAuditLog, PermissionFlagsBits.KickMembers, PermissionFlagsBits.BanMembers, PermissionFlagsBits.ModerateMembers, PermissionFlagsBits.ManageMessages, PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.ReadMessageHistory] },
   { name: '🔰 Trial Moderator', color: '#3498db', permissions: [PermissionFlagsBits.ViewAuditLog, PermissionFlagsBits.KickMembers, PermissionFlagsBits.ModerateMembers, PermissionFlagsBits.ManageMessages, PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.ReadMessageHistory] },
-  { name: '📢 Event Manager', color: '#f39c12', permissions: [PermissionFlagsBits.Administrator] },
+  { name: '📢 Event Manager', color: '#f39c12', permissions: [PermissionFlagsBits.ViewAuditLog, PermissionFlagsBits.ManageEvents, PermissionFlagsBits.MentionEveryone, PermissionFlagsBits.ManageMessages, PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.ReadMessageHistory] },
 ];
 
 // Roles removed from the server on purpose (🧪 Developer and the non-booster VIP); deleted on startup if they still exist.
@@ -93,7 +93,9 @@ export async function synchronizeStaffRoles(guild) {
   return { created, updated, positioned: positionUpdates.length };
 }
 
-export async function publishStaffPermissionBoard(guild) {
+// `editOnly`: refresh the board messages that already exist and never post new ones (used on startup,
+// so a restart can't create duplicates; the first post is made with /publish-board).
+export async function publishStaffPermissionBoard(guild, { editOnly = false } = {}) {
   const channel = await guild.channels.fetch(ROLE_PERMISSIONS_CHANNEL_ID).catch(() => null);
   if (!channel?.isTextBased?.()) throw new Error(`Permission channel ${ROLE_PERMISSIONS_CHANNEL_ID} was not found in guild ${guild.id}`);
 
@@ -126,7 +128,7 @@ export async function publishStaffPermissionBoard(guild) {
     if (existing) {
       await existing.edit({ embeds: [embed] });
       edited += 1;
-    } else {
+    } else if (!editOnly) {
       await channel.send({ embeds: [embed] });
       sent += 1;
     }
