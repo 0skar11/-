@@ -4,7 +4,7 @@ import { handleArabicUtilityShortcuts } from '../utils/arabicUtilityShortcuts.js
 import { handleMessageDeleteShortcut } from '../utils/messageDeleteShortcut.js';
 import { parsePrefixCommand, parseMessageCommand, mapArgumentsToOptions } from '../utils/prefixParser.js';
 import { supportsPrefixExecution, executePrefixCommand, resolvePrefixAccessKey } from '../utils/messageAdapter.js';
-import { resolveCommandAlias, resolveSubcommandAlias, twoWordCommandAliases } from '../config/commands/commandAliases.js';
+import { resolveCommandAlias, resolveSubcommandAlias, twoWordCommandAliases, commandArgAliases, standaloneOnlyAliases, isStandaloneInvocation } from '../config/commands/commandAliases.js';
 import { getPrefixRestriction } from '../config/commands/prefixRestrictions.js';
 import { getGuildConfig } from '../services/config/guildConfig.js';
 import { getCommandPrefix, isBotOwner, isCommandCategoryEnabled, isMaintenanceMode } from '../config/bot.js';
@@ -50,8 +50,9 @@ function toWesternDigits(value) {
 }
 
 function parseCommandMessage(content, prefix) {
-  const parsed = parsePrefixCommand(content, prefix) || parseMessageCommand(content, prefix);
-  return parsed && { commandName: parsed.commandName, args: parsed.args.map(toWesternDigits) };
+  const prefixed = parsePrefixCommand(content, prefix);
+  const parsed = prefixed || parseMessageCommand(content, prefix);
+  return parsed && { commandName: parsed.commandName, args: parsed.args.map(toWesternDigits), prefixed: Boolean(prefixed) };
 }
 
 const USER_ARG = /^(?:<@!?\d{17,20}>|\d{17,20})$/u;
@@ -94,10 +95,17 @@ async function handlePrefixCommand(message, client) {
       await handleClearWarningsShortcut(message, args.slice(1));
       return;
     }
-    const twoWordCommand = twoWordCommandAliases[`${typedCommand} ${args[0] || ''}`];
+    const twoWordCommand = twoWordCommandAliases[`${typedCommand} ${(args[0] || '').toLowerCase()}`];
     if (twoWordCommand) {
       commandName = twoWordCommand;
       args = args.slice(1);
+    }
+    if (!parsed.prefixed && standaloneOnlyAliases.has(typedCommand) && !isStandaloneInvocation(args)) return;
+    const argAlias = commandArgAliases[typedCommand];
+    if (argAlias) {
+      const [aliasCommand, ...aliasArgs] = argAlias.split(' ');
+      commandName = aliasCommand;
+      args = [...aliasArgs, ...args];
     }
 
     const musicPrefixShortcut = commandName.toLowerCase();

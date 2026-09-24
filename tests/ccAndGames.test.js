@@ -1,0 +1,251 @@
+import { test, describe } from 'node:test';
+import assert from 'node:assert/strict';
+import {
+    groupRewards, soloRewardLeft, claimDaily, awardGroupGame, awardSoloWin, spendCC, adjustCC, getProfile, getLeaderboard,
+} from '../src/services/cc/ccService.js';
+import { validateStoreItem, buyItem } from '../src/services/cc/ccStoreService.js';
+import { CC } from '../src/config/cc.js';
+import { normalizeAnswer, isAnswer } from '../src/services/games/text.js';
+import { splitLetters, scrambleWord, gameWords } from '../src/services/games/data/words.js';
+import { triviaQuestions } from '../src/services/games/data/trivia.js';
+import { rankScores, judgeGuess, makeMathQuestion, ROUND_GAMES } from '../src/services/games/roundGames.js';
+import { resolveRouletteChoice } from '../src/services/games/roulette.js';
+import { rankChairs } from '../src/services/games/chairs.js';
+import { assignRoles, checkWinner, tallyVotes } from '../src/services/games/mafia.js';
+import { isSlotsWin } from '../src/services/games/solo.js';
+import { claimChannel, releaseChannel, getActiveGame } from '../src/services/games/session.js';
+import { commandArgAliases, standaloneOnlyAliases, isStandaloneInvocation, twoWordCommandAliases } from '../src/config/commands/commandAliases.js';
+import gameCommand from '../src/commands/Games/game.js';
+import soloCommand from '../src/commands/Games/solo.js';
+
+const GUILD = '100000000000000001';
+const A = '200000000000000001';
+const B = '200000000000000002';
+const C = '200000000000000003';
+const D = '200000000000000004';
+
+function fakeClient() {
+    const store = new Map();
+    return {
+        store,
+        db: {
+            get: async (key, fallback = null) => (store.has(key) ? structuredClone(store.get(key)) : fallback),
+            set: async (key, value) => { store.set(key, structuredClone(value)); return true; },
+            list: async (prefix) => [...store.keys()].filter((key) => key.startsWith(prefix)),
+        },
+    };
+}
+
+describe('CC rewards', () => {
+    test('group rewards grow with players, pay fewer places than players and stop growing at the cap', () => {
+        assert.deepEqual(groupRewards(1), []);
+        assert.deepEqual(groupRewards(2), [10]);
+        assert.deepEqual(groupRewards(3), [15, 9]);
+        assert.deepEqual(groupRewards(10), [50, 30, 20]);
+        assert.deepEqual(groupRewards(30), [150, 90, 60]);
+        assert.deepEqual(groupRewards(80), groupRewards(30));
+    });
+
+    test('solo wins stop paying at the daily cap', () => {
+        assert.equal(soloRewardLeft(0), CC.solo.win);
+        assert.equal(soloRewardLeft(CC.solo.dailyCap - 2), 2);
+        assert.equal(soloRewardLeft(CC.solo.dailyCap), 0);
+    });
+});
+
+describe('CC service', () => {
+    test('daily pays once per 24 hours, with the premium bonus', async () => {
+        const client = fakeClient();
+        const now = Date.UTC(2026, 0, 1);
+        const first = await claimDaily(client, GUILD, A, { now });
+        assert.equal(first.ok, true);
+        assert.equal(first.balance, CC.daily.amount);
+        const again = await claimDaily(client, GUILD, A, { now: now + 1000 });
+        assert.equal(again.ok, false);
+        assert.equal(again.remaining, CC.daily.cooldownMs - 1000);
+        const next = await claimDaily(client, GUILD, A, { now: now + CC.daily.cooldownMs, premium: true });
+        assert.equal(next.balance, CC.daily.amount * 2 + Math.floor(CC.daily.amount * CC.daily.premiumBonus));
+    });
+
+    test('group games pay the top places and count the game for everyone', async () => {
+        const client = fakeClient();
+        const paid = await awardGroupGame(client, GUILD, { game: 'trivia', ranking: [B, A, C, D], playerIds: [A, B, C, D] });
+        assert.deepEqual(paid.map((w) => [w.userId, w.place, w.amount]), [[B, 1, 20], [A, 2, 12], [C, 3, 8]]);
+        const b = await getProfile(client, GUILD, B);
+        assert.equal(b.cc, 20);
+        assert.equal(b.stats.groupWins, 1);
+        const d = await getProfile(client, GUILD, D);
+        assert.equal(d.cc, 0);
+        assert.equal(d.stats.gamesPlayed, 1);
+        const board = await getLeaderboard(client, GUILD);
+        assert.deepEqual(board.map((row) => row.userId), [B, A, C]);
+    });
+
+    test('solo wins respect the daily cap and reset the next day', async () => {
+        const client = fakeClient();
+        const day = Date.UTC(2026, 0, 1, 12);
+        let total = 0;
+        for (let i = 0; i < 15; i += 1) total += (await awardSoloWin(client, GUILD, A, 'slots', { now: day })).amount;
+        assert.equal(total, CC.solo.dailyCap);
+        const tomorrow = await awardSoloWin(client, GUILD, A, 'slots', { now: day + 24 * 60 * 60 * 1000 });
+        assert.equal(tomorrow.amount, CC.solo.win);
+    });
+
+    test('spending needs enough CC and staff adjustments never go below zero', async () => {
+        const client = fakeClient();
+        await adjustCC(client, GUILD, A, 50, 'staff');
+        assert.equal((await spendCC(client, GUILD, A, 80)).ok, false);
+        const spent = await spendCC(client, GUILD, A, 30, 'test');
+        assert.deepEqual([spent.ok, spent.balance, spent.stats.spent], [true, 20, 30]);
+        const removed = await adjustCC(client, GUILD, A, -500, 'staff');
+        assert.equal(removed.balance, 0);
+    });
+
+    test('keeps the old economy fields untouched', async () => {
+        const client = fakeClient();
+        client.store.set(`guild:${GUILD}:economy:${A}`, { wallet: 999, bank: 5 });
+        await claimDaily(client, GUILD, A);
+        const record = client.store.get(`guild:${GUILD}:economy:${A}`);
+        assert.deepEqual([record.wallet, record.bank, record.cc], [999, 5, CC.daily.amount]);
+    });
+});
+
+describe('CC store', () => {
+    const role = { id: 'vip', name: 'VIP', price: 100, type: 'role', roleId: '300000000000000001' };
+    const item = { id: 'ticket', name: 'Ticket', price: 40, type: 'item', maxOwned: 2 };
+
+    test('validates catalog items', () => {
+        assert.deepEqual(validateStoreItem(role), []);
+        assert.deepEqual(validateStoreItem(item), []);
+        assert.ok(validateStoreItem({ id: 'Bad Id', name: '', price: 0, type: 'x' }).length >= 4);
+        assert.ok(validateStoreItem({ id: 'r', name: 'r', price: 5, type: 'role' }).some((p) => p.includes('roleId')));
+    });
+
+    test('buys items and roles with CC', async () => {
+        const client = fakeClient();
+        const roles = new Set();
+        const member = { id: A, guild: { id: GUILD }, roles: { cache: { has: (id) => roles.has(id) }, add: async (id) => { roles.add(id); } } };
+        const options = { items: [role, item], settings: { open: true, maxQuantity: 10 } };
+
+        assert.equal((await buyItem(client, member, 'vip', 1, { ...options, settings: { open: false } })).reason, 'closed');
+        await adjustCC(client, GUILD, A, 150, 'staff');
+        assert.equal((await buyItem(client, member, 'nope', 1, options)).reason, 'not_found');
+        const bought = await buyItem(client, member, 'vip', 1, options);
+        assert.deepEqual([bought.ok, bought.balance, roles.has(role.roleId)], [true, 50, true]);
+        assert.equal((await buyItem(client, member, 'vip', 1, options)).reason, 'owned');
+        assert.equal((await buyItem(client, member, 'ticket', 3, options)).reason, 'max_owned');
+        assert.equal((await buyItem(client, member, 'ticket', 2, options)).reason, 'no_cc');
+        assert.equal((await buyItem(client, member, 'ticket', 1, options)).ok, true);
+        assert.equal((await getProfile(client, GUILD, A)).inventory.ticket, 1);
+    });
+});
+
+describe('game helpers', () => {
+    test('answers match without tashkeel, hamza or ة/ه differences', () => {
+        assert.equal(normalizeAnswer('  القاهرةُ  '), 'القاهره');
+        assert.ok(isAnswer('أسد', ['اسد']));
+        assert.ok(isAnswer('٢٠٦', ['206']));
+        assert.ok(!isAnswer('', ['']));
+        assert.ok(!isAnswer('القاهرة الجديدة', ['القاهرة']));
+    });
+
+    test('word games', () => {
+        assert.equal(splitLetters('سيارة'), 'س ي ا ر ة');
+        for (const word of gameWords) assert.notEqual(scrambleWord(word).replace(/ /gu, ''), word.replace(/ /gu, ''));
+        assert.ok(triviaQuestions.every((q) => q.q && q.a.length));
+    });
+
+    test('round games rank by points, then by who got there first', () => {
+        const scores = new Map([[A, { points: 2, reachedAt: 50 }], [B, { points: 3, reachedAt: 90 }], [C, { points: 2, reachedAt: 10 }], [D, { points: 0, reachedAt: 0 }]]);
+        assert.deepEqual(rankScores(scores), [B, C, A]);
+    });
+
+    test('guess the number hints and ignores chat', () => {
+        assert.equal(judgeGuess('50', 70, 1, 100), 'higher');
+        assert.equal(judgeGuess('٩٠', 70, 1, 100), 'lower');
+        assert.equal(judgeGuess('70', 70, 1, 100), true);
+        assert.equal(judgeGuess('هاي', 70, 1, 100), null);
+        assert.equal(judgeGuess('500', 70, 1, 100), null);
+    });
+
+    test('math questions have the right answers', () => {
+        for (let i = 0; i < 50; i += 1) {
+            const { text, answer } = makeMathQuestion();
+            const [a, op, b] = text.split(' ');
+            const expected = op === '+' ? Number(a) + Number(b) : op === '-' ? Number(a) - Number(b) : Number(a) * Number(b);
+            assert.equal(answer, expected);
+            assert.ok(answer >= 0);
+        }
+    });
+
+    test('every round game makes the rounds it is asked for', () => {
+        for (const game of Object.values(ROUND_GAMES)) {
+            const rounds = game.makeRounds(3);
+            assert.equal(rounds.length, 3);
+            for (const round of rounds) assert.equal(round.judge(round.reveal), true);
+        }
+    });
+
+    test('roulette picks, random and withdraw', () => {
+        const alive = [{ id: A }, { id: B }, { id: C }];
+        assert.equal(resolveRouletteChoice(`roulette_kick_${B}`, alive, alive[0]).id, B);
+        assert.equal(resolveRouletteChoice('roulette_quit', alive, alive[0]).id, A);
+        assert.equal(resolveRouletteChoice(null, alive, alive[0]).id, A);
+        assert.equal(resolveRouletteChoice('roulette_random', alive, alive[0], (list) => list[1]).id, C);
+    });
+
+    test('chairs ranks survivors, then the latest losers', () => {
+        assert.deepEqual(rankChairs([A], [[D], [C], [B]]), [A, B, C, D]);
+    });
+
+    test('mafia roles, winner and votes', () => {
+        const ids = Array.from({ length: 8 }, (_, i) => `id${i}`);
+        const roles = assignRoles(ids, (list) => list);
+        const counts = [...roles.values()].reduce((acc, role) => ({ ...acc, [role]: (acc[role] || 0) + 1 }), {});
+        assert.deepEqual(counts, { mafia: 2, doctor: 1, detective: 1, citizen: 4 });
+        assert.equal(assignRoles(ids.slice(0, 5)).size, 5);
+        assert.equal(checkWinner(roles, ['id2', 'id3']), 'town');
+        assert.equal(checkWinner(roles, ['id0', 'id5']), 'mafia');
+        assert.equal(checkWinner(roles, ['id0', 'id4', 'id5']), null);
+        assert.equal(tallyVotes(new Map([[A, B], [C, B], [D, A]])), B);
+        assert.equal(tallyVotes(new Map([[A, B], [C, A]])), null);
+        assert.equal(tallyVotes(new Map([[A, 'skip'], [C, 'skip'], [D, A]])), null);
+        assert.equal(tallyVotes(new Map([[A, B], [C, A]]), { allowTie: true, random: (list) => list[0] }), B);
+    });
+
+    test('slots win on three of a kind', () => {
+        assert.ok(isSlotsWin(['💎', '💎', '💎']));
+        assert.ok(!isSlotsWin(['💎', '💎', '🍒']));
+    });
+
+    test('one game per channel', () => {
+        const session = claimChannel('chan', 'trivia', A);
+        assert.ok(session);
+        assert.equal(claimChannel('chan', 'roulette', B), null);
+        assert.equal(getActiveGame('chan').game, 'trivia');
+        releaseChannel(session);
+        assert.equal(getActiveGame('chan'), null);
+    });
+});
+
+describe('game words', () => {
+    test('every alias points at a real subcommand', () => {
+        const subcommands = {
+            game: gameCommand.data.toJSON().options.map((o) => o.name),
+            solo: soloCommand.data.toJSON().options.map((o) => o.name),
+        };
+        for (const [word, target] of Object.entries(commandArgAliases)) {
+            const [command, sub] = target.split(' ');
+            assert.ok(subcommands[command]?.includes(sub), `${word} → ${target}`);
+            assert.ok(standaloneOnlyAliases.has(word));
+        }
+        assert.equal(twoWordCommandAliases['top cc'], 'cctop');
+    });
+
+    test('everyday words only run on their own, with a number or a mention', () => {
+        assert.ok(isStandaloneInvocation([]));
+        assert.ok(isStandaloneInvocation(['5']));
+        assert.ok(isStandaloneInvocation([`<@${A}>`]));
+        assert.ok(!isStandaloneInvocation(['يا', 'جماعة']));
+    });
+});

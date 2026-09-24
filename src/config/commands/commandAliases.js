@@ -1,14 +1,13 @@
 /** Command aliases configuration. */
 export const commandAliases = {
-  bal: 'balance', money: 'balance', cash: 'balance', dep: 'deposit', with: 'withdraw',
-  bet: 'gamble', give: 'pay', send: 'pay', h: 'help', info: 'help',
+  bal: 'cc', balance: 'cc', money: 'cc', cash: 'cc', credits: 'cc', h: 'help', info: 'help',
+  رصيد: 'cc', رصيدي: 'cc', فلوس: 'cc', كريدت: 'cc', يومي: 'daily', دايلي: 'daily',
   بان: 'ban', انبان: 'unban', تايم: 'timeout', انتايم: 'untimeout', mute: 'timeout', unmute: 'untimeout',
   وارن: 'warn', وارنات: 'warnings', كلير: 'clear', clear: 'clear',
   طرد: 'kick', تحذير: 'warn', تحذيرات: 'warnings', مسح: 'clear', قفل: 'lock', فتح: 'unlock',
   حالات: 'cases', ملاحظات: 'usernotes', قل: 'say', قول: 'say', خاص: 'dm',
   kick: 'kick', ban: 'ban', warn: 'warn', untimeout: 'untimeout',
   rank: 'rank', lvl: 'rank', xp: 'rank', leaderboard: 'leaderboard', lb: 'leaderboard', top: 'leaderboard',
-  shop: 'shop', buy: 'buy', inventory: 'inventory', inv: 'inventory', items: 'inventory',
   user: 'userinfo', avatar: 'avatar', pfp: 'avatar', icon: 'avatar', bd: 'birthday', bday: 'birthday', b: 'birthday',
   flip: 'flip', coin: 'flip', roll: 'roll', dice: 'roll', fight: 'fight',
   gstart: 'gcreate', gstop: 'gend', groll: 'greroll', ticket: 'ticket', t: 'ticket', new: 'ticket',
@@ -25,12 +24,47 @@ export const subcommandAliases = {
   a: 'add', c: 'complete', done: 'complete', d: 'complete', start: 'create', stop: 'end', roll: 'reroll', add: 'add', remove: 'remove', list: 'list',
 };
 
-/** Two-word Arabic commands (`ماس بان ID1 ID2`), keyed by their first two words. */
+/** Two-word commands (`ماس بان ID1 ID2`, `top cc`), keyed by their first two words. */
 export const twoWordCommandAliases = {
   'هارد بان': 'massban',
   'ماس بان': 'massban',
   'ماس طرد': 'masskick',
+  'top cc': 'cctop',
+  'توب cc': 'cctop',
+  'توب كريدت': 'cctop',
 };
+
+/** Words that run a command with fixed leading arguments: `روليت` = `game roulette`, `اسئلة 5` = `game trivia 5`. */
+export const commandArgAliases = {
+  روليت: 'game roulette', roulette: 'game roulette',
+  كراسي: 'game chairs', chairs: 'game chairs',
+  مافيا: 'game mafia', mafia: 'game mafia',
+  اسئلة: 'game trivia', اسئله: 'game trivia', أسئلة: 'game trivia', أسئله: 'game trivia', trivia: 'game trivia',
+  خمن: 'game guess', guess: 'game guess',
+  اسرع: 'game fast', أسرع: 'game fast', fast: 'game fast',
+  فكك: 'game fakkek', fakkek: 'game fakkek',
+  رتب: 'game scramble', scramble: 'game scramble',
+  حساب: 'game math',
+  العاب: 'game list', ألعاب: 'game list', games: 'game list',
+  وقف: 'game stop',
+  سؤال: 'solo question',
+  رقم: 'solo number',
+  سلوت: 'solo slots', سلوتس: 'solo slots', slots: 'solo slots',
+};
+
+/**
+ * Everyday words: typed without the prefix they only run the command when the message is just the
+ * word, optionally followed by a number or a mention (`خمن`, `اسئلة 5`, `رصيد @member`), so chat like
+ * `سؤال يا جماعة` or `رصيد موبايلي خلص` is left alone.
+ */
+export const standaloneOnlyAliases = new Set([
+  ...Object.keys(commandArgAliases),
+  'رصيد', 'رصيدي', 'فلوس', 'كريدت', 'يومي', 'دايلي',
+]);
+
+export function isStandaloneInvocation(args) {
+  return args.every((arg) => /^(?:\d+|<@!?\d{17,20}>)$/u.test(arg));
+}
 
 export function resolveCommandAlias(commandName) {
   const normalized = String(commandName || '').toLowerCase();
