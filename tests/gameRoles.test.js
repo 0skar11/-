@@ -2,7 +2,7 @@ import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import { access } from 'fs/promises';
 import { Collection, PermissionsBitField } from 'discord.js';
-import { ensureGameRoles, GAME_ROLES } from '../src/services/gameRolesService.js';
+import { ensureGameRoles, keepGameRolesAtBottom, GAME_ROLES } from '../src/services/gameRolesService.js';
 
 const makeRole = (id, name, position, { color = 0, permissions = 0n, icon = null, editable = true } = {}) => ({
   id, name, position, color, icon, unicodeEmoji: null, managed: false, editable,
@@ -20,7 +20,7 @@ const guildWith = ({ roles = [], features = ['ROLE_ICONS'], permissions = Permis
   const cache = new Collection([everyone, ...roles].map((role) => [role.id, role]));
   let next = 100;
   const guild = {
-    id: 'guild', name: 'test', features,
+    id: 'guild', name: 'test', features, moves: 0,
     members: { me: { permissions: new PermissionsBitField(permissions) } },
     roles: {
       fetch: async () => cache,
@@ -31,10 +31,8 @@ const guildWith = ({ roles = [], features = ['ROLE_ICONS'], permissions = Permis
         return role;
       },
       async setPositions(list) {
-        const moved = new Set(list.map(({ role }) => role));
-        const rest = [...cache.values()].filter((role) => role.id !== 'guild' && !moved.has(role.id)).sort((a, b) => a.position - b.position);
+        guild.moves += 1;
         for (const { role, position } of list) cache.get(role).position = position;
-        rest.forEach((role, index) => { role.position = list.length + 1 + index; });
       },
     },
   };
@@ -72,6 +70,23 @@ describe('game roles', () => {
     assert.equal(cache.get('v').permissions.bitfield, 0n);
     const again = await ensureGameRoles(guild);
     assert.deepEqual(again, { skipped: false, created: 0, icons: 0, positioned: false, canUseIcons: true });
+  });
+
+  test('moves the game roles back under a role created later at the bottom', async () => {
+    const { guild, cache } = guildWith({ roles: [makeRole('chaos', 'chaos', 1)] });
+    await ensureGameRoles(guild);
+    cache.set('new', makeRole('new', 'new role', 1));
+    assert.equal(await keepGameRolesAtBottom(guild), true);
+    assert.deepEqual(bottomNames(cache), GAME_ROLES.map((game) => game.name));
+    assert.ok(cache.get('new').position > GAME_ROLES.length && cache.get('chaos').position > GAME_ROLES.length);
+    assert.equal(await keepGameRolesAtBottom(guild), false);
+  });
+
+  test('does not move the roles when one is above the bot', async () => {
+    const { guild, cache } = guildWith({ roles: [makeRole('chaos', 'chaos', 1), makeRole('v', 'Valorant', 2, { editable: false })] });
+    await ensureGameRoles(guild);
+    assert.equal(guild.moves, 0);
+    assert.equal(cache.get('chaos').position, 1);
   });
 
   test('skips icons without the ROLE_ICONS feature', async () => {

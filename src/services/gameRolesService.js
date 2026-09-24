@@ -24,6 +24,10 @@ export const GAME_ROLES = [
 
 const REASON = 'Game role for Onboarding';
 
+// Lowest role first. Roles on the same position are ordered like Discord does: the older (smaller id) one is higher.
+const idKey = (role) => String(role.id).padStart(20, '0');
+const byPosition = (a, b) => a.position - b.position || idKey(b).localeCompare(idKey(a));
+
 const findRole = (roles, name) => roles.find((role) => !role.managed && role.name.toLowerCase() === name.toLowerCase());
 
 /** Creates the game roles and keeps them colourless, permissionless, with their icon and at the bottom. */
@@ -35,7 +39,6 @@ export async function ensureGameRoles(guild) {
 
   const canUseIcons = guild.features?.includes('ROLE_ICONS') ?? false;
   const roles = await guild.roles.fetch();
-  const gameRoles = [];
   let created = 0;
   let icons = 0;
 
@@ -65,24 +68,50 @@ export async function ensureGameRoles(guild) {
     } else {
       logger.warn(`Game role ${game.name} in ${guild.name} is above the bot's highest role and can't be edited.`);
     }
-    gameRoles.push(role);
   }
 
-  // Bottom of the list: Other at position 1 (right above @everyone), Valorant on top of the group.
-  const wanted = [...gameRoles].reverse();
-  const bottom = [...roles.values()]
-    .filter((role) => role.id !== guild.id)
-    .sort((a, b) => a.position - b.position)
-    .slice(0, wanted.length);
-  let positioned = false;
-  if (created || wanted.some((role, index) => bottom[index]?.id !== role.id)) {
-    if (wanted.every((role) => role.editable)) {
-      await guild.roles.setPositions(wanted.map((role, index) => ({ role: role.id, position: index + 1 })));
-      positioned = true;
-    } else {
-      logger.warn(`Game roles in ${guild.name} can't all be moved to the bottom: some are above the bot's highest role.`);
-    }
-  }
-
+  // Fetch again: the roles created or edited above are not in `roles`.
+  const positioned = await keepGameRolesAtBottom(guild);
   return { skipped: false, created, icons, positioned, canUseIcons };
+}
+
+/**
+ * Moves the game roles to the very bottom of the role list (Other right above @everyone, Valorant on
+ * top of the group). Discord puts every new role at the bottom, so this runs again whenever roles change.
+ * Returns true when the roles were moved.
+ */
+export async function keepGameRolesAtBottom(guild) {
+  const roles = await guild.roles.fetch();
+  const gameRoles = GAME_ROLES.map((game) => findRole(roles, game.name)).filter(Boolean).reverse();
+  if (!gameRoles.length) return false;
+
+  const current = [...roles.values()].filter((role) => role.id !== guild.id).sort(byPosition);
+  if (gameRoles.every((role, index) => current[index]?.id === role.id)) return false;
+  if (!gameRoles.every((role) => role.editable)) {
+    logger.warn(`Game roles in ${guild.name} can't all be moved to the bottom: some are above the bot's highest role.`);
+    return false;
+  }
+
+  // Send the whole order (like discord.js does for one role) so no other role ends up between them.
+  const gameIds = new Set(gameRoles.map((role) => role.id));
+  const order = [...gameRoles, ...current.filter((role) => !gameIds.has(role.id))];
+  await guild.roles.setPositions(order.map((role, index) => ({ role: role.id, position: index + 1 })));
+  return true;
+}
+
+// Role changes come in bursts (moving roles fires one update per role), so wait for them to settle.
+const SETTLE_MS = 3_000;
+const pending = new Map();
+
+/** Re-checks the game roles' place a few seconds after roles in the guild were created or moved. */
+export function scheduleKeepGameRolesAtBottom(guild) {
+  clearTimeout(pending.get(guild.id));
+  pending.set(guild.id, setTimeout(async () => {
+    pending.delete(guild.id);
+    try {
+      await keepGameRolesAtBottom(guild);
+    } catch (error) {
+      logger.error(`Failed to keep the game roles at the bottom in ${guild.name}:`, error);
+    }
+  }, SETTLE_MS));
 }
