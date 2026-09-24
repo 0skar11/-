@@ -116,11 +116,17 @@ async function awardRoleReward(guild, member, roleId, level) {
   }
 }
 
+// Level-up messages always go to this channel; the configured level-up channel, then the channel
+// where the member leveled up, are only used if it can't be found.
+const LEVEL_UP_CHANNEL_ID = '1552786804451573772';
+
 // One message per level-up (even when several levels are gained at once). It only pings the member
 // every 5 levels (see levelUi.js); the old free-text levelUpMessage is no longer used.
 async function sendLevelUpAnnouncement(guild, member, levelData, config, { channel, fromLevel, rewardRoleIds }) {
   try {
-    const levelUpChannel = (config.levelUpChannel && guild.channels.cache.get(config.levelUpChannel))
+    const levelUpChannel = guild.channels.cache.get(LEVEL_UP_CHANNEL_ID)
+      || await guild.channels.fetch(LEVEL_UP_CHANNEL_ID).catch(() => null)
+      || (config.levelUpChannel && guild.channels.cache.get(config.levelUpChannel))
       || channel
       || guild.systemChannel;
 
