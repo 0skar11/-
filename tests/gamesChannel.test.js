@@ -93,6 +93,26 @@ describe('games channel', () => {
         assert.ok(!isBlockedSlashCommand('123456789012345678', 'ban', MEMBER));
     });
 
+    test('CC words and the natural ways of typing stop', () => {
+        assert.equal(typedCommandName('يومي', '!'), 'daily');
+        assert.equal(typedCommandName('يومى', '!'), 'daily');
+        assert.equal(typedCommandName('رصيدى', '!'), 'cc');
+        assert.equal(typedCommandName('Top CC', '!'), 'cctop');
+        assert.equal(typedCommandName('وقف', '!'), 'game');
+        assert.equal(typedCommandName('ايقاف', '!'), 'game');
+        assert.deepEqual(applyWordAliases('وقف', ['اللعبة'], false), { commandName: 'game', args: ['stop'] });
+        assert.deepEqual(applyWordAliases('إيقاف', ['اللعبه'], false), { commandName: 'game', args: ['stop'] });
+        assert.deepEqual(applyWordAliases('top', ['cc'], false), { commandName: 'cctop', args: [] });
+        assert.deepEqual(applyWordAliases('ماس', ['بان', '1'], true), { commandName: 'massban', args: ['1'] });
+    });
+
+    test('CC commands live in the Games category, so turning off Economy never hides them', async () => {
+        const { loadCommands } = await import('../src/handlers/loaders/commandLoader.js');
+        const loaded = {};
+        await loadCommands(loaded);
+        for (const name of ['daily', 'cc', 'cctop', 'game', 'solo']) assert.equal(loaded.commands.get(name).category, 'Games', name);
+    });
+
     test('word aliases', () => {
         assert.deepEqual(applyWordAliases('خمن', ['3'], false), { commandName: 'game', args: ['guess', '3'] });
         assert.equal(applyWordAliases('خمن', ['ايه', 'ده'], false), null);

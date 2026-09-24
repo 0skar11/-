@@ -48,12 +48,15 @@ Game words typed without the prefix only start a game when the message is just t
 | `فكك [جولات]` | `/game fakkek` | Split the word into letters |
 | `رتب [جولات]` | `/game scramble` | Unscramble the letters |
 | `حساب [جولات]` | `/game math` | Quick math |
-| `وقف` | `/game stop` | Stop the running game (its host or staff with Manage Messages) |
+| `وقف` / `وقف اللعبة` / `ايقاف` | `/game stop` | Stop the running game (its host or staff with Manage Messages) |
 | `سؤال` | `/solo question` | One question, one try |
 | `رقم` | `/solo number` | Guess 1–50 in 6 tries |
 | `سلوت` | `/solo slots` | Slot machine, three of a kind wins |
 
 Only one group game can run per channel.
+
+The CC commands (`daily`, `cc`, `cctop`) are in the Games category with the games, so turning
+off the Economy category in the command access dashboard doesn't hide them.
 
 ## The games panel
 

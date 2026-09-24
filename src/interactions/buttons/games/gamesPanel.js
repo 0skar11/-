@@ -2,9 +2,9 @@ import { MessageFlags } from 'discord.js';
 import { PANEL_BUTTON_PREFIX, isGroupGame, startGroupGame, stopGroupGame } from '../../../services/games/panel.js';
 import { startSoloGame } from '../../../services/games/solo.js';
 import { getGuildConfig } from '../../../services/config/guildConfig.js';
-import { dailyEmbed } from '../../../commands/Economy/daily.js';
-import { ccProfileEmbed } from '../../../commands/Economy/cc.js';
-import { ccTopEmbed } from '../../../commands/Economy/cctop.js';
+import { dailyEmbed } from '../../../commands/Games/daily.js';
+import { ccProfileEmbed } from '../../../commands/Games/cc.js';
+import { ccTopEmbed } from '../../../commands/Games/cctop.js';
 import rpsCommand from '../../../commands/Fun/rps.js';
 
 // Buttons of the `العاب` panel (`gamespanel:<action>`). Games start in the panel's channel; daily,
