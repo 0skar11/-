@@ -48,6 +48,8 @@ export const commandArgAliases = {
   روليت: 'game roulette', roulette: 'game roulette',
   كراسي: 'game chairs', chairs: 'game chairs',
   مافيا: 'game mafia', mafia: 'game mafia',
+  غميضه: 'game hide', غميضة: 'game hide', hide: 'game hide',
+  صيد: 'game hunt', hunt: 'game hunt',
   اسئلة: 'game trivia', اسئله: 'game trivia', أسئلة: 'game trivia', أسئله: 'game trivia', trivia: 'game trivia',
   خمن: 'game guess', guess: 'game guess',
   اسرع: 'game fast', أسرع: 'game fast', fast: 'game fast',

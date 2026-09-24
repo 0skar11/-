@@ -5,7 +5,7 @@ import { startGroupGame, stopGroupGame, buildGamesPanel } from '../../services/g
 
 // Group games: the whole server can play and the top 3 win CC (more players = bigger rewards).
 // `العاب` (game list) posts the games panel with a button for every game.
-// Prefix words (روليت، كراسي، مافيا، اسئلة، خمن، اسرع، فكك، رتب، حساب، العاب، وقف) are in commandAliases.js.
+// Prefix words (روليت، كراسي، مافيا، غميضه، صيد، اسئلة، خمن، اسرع، فكك، رتب، حساب، العاب، وقف) are in commandAliases.js.
 
 function addRoundsOption(subcommand, max = ROUND_LIMITS.max) {
     return subcommand.addIntegerOption((option) => option
@@ -24,6 +24,8 @@ export default {
         .addSubcommand((sub) => sub.setName('roulette').setDescription('Roulette: the wheel picks who kicks someone out'))
         .addSubcommand((sub) => sub.setName('chairs').setDescription('Musical chairs'))
         .addSubcommand((sub) => sub.setName('mafia').setDescription('Mafia with doctor, detective and citizens'))
+        .addSubcommand((sub) => sub.setName('hide').setDescription('Hide and seek: hide in a square, a random player opens one each turn'))
+        .addSubcommand((sub) => sub.setName('hunt').setDescription('Hunt: one hunter, the rest are sheep hiding among fake sheep'))
         .addSubcommand((sub) => addRoundsOption(sub.setName('trivia').setDescription('General knowledge questions')))
         .addSubcommand((sub) => addRoundsOption(sub.setName('guess').setDescription('Guess the number from 0 to 200, 7 tries each'), ROUND_GAMES.guess.maxRounds))
         .addSubcommand((sub) => addRoundsOption(sub.setName('fast').setDescription('First to type the word wins the round')))
