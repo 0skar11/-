@@ -33,7 +33,7 @@ export async function handleMessageXp(message, client) {
     const cooldownMs = (config.xpCooldown || DEFAULT_COOLDOWN_S) * 1000;
     if (Date.now() - (userData.lastMessage || 0) < cooldownMs) return;
 
-    await addXp(client, message.guild, message.member, rollXp(config), { channel: message.channel });
+    await addXp(client, message.guild, message.member, rollXp(config));
   } catch (error) {
     logger.error('Error handling leveling for message:', error);
   }
