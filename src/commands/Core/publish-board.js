@@ -10,7 +10,7 @@ export default {
     .setName('publish-board')
     .setDescription('Post a bot info board once (skipped if it already exists)')
     .addSubcommand((sub) => sub.setName('moderation-commands').setDescription('Post the Arabic moderation commands list'))
-    .addSubcommand((sub) => sub.setName('admin-permissions').setDescription('Post or refresh the staff permission board'))
+    .addSubcommand((sub) => sub.setName('admin-permissions').setDescription('Refresh the staff permission board (edit only)'))
     .addSubcommand((sub) => sub.setName('trusted').setDescription('Post or refresh the Anti-Nuke trusted list'))
     .addSubcommand((sub) => sub.setName('rules').setDescription('Post (with @everyone) or refresh the server rules')),
 
@@ -20,12 +20,13 @@ export default {
 
     try {
       if (interaction.options.getSubcommand() === 'admin-permissions') {
+        // Edit only: the bot doesn't post new messages in the permission channel.
         const result = await publishStaffPermissionBoard(interaction.guild);
-        const parts = [];
-        if (result.sent) parts.push(`إرسال ${result.sent}`);
-        if (result.edited) parts.push(`تحديث ${result.edited}`);
-        const summary = parts.length ? `✅ تم ${parts.join(' و ')} رسالة في الروم <#${result.channelId}>.` : `ℹ️ لم يتم العثور على رتب الستاف في الروم <#${result.channelId}>.`;
-        return interaction.reply({ content: summary, ephemeral: true });
+        const content = {
+          updated: `✅ تم تحديث رسالة الصلاحيات في الروم <#${result.channelId}>.`,
+          missing: `ℹ️ رسالة الصلاحيات غير موجودة في الروم <#${result.channelId}>، والبوت لا يرسل رسائل جديدة هناك.`,
+        }[result.status] || `ℹ️ لم يتم العثور على رتب الستاف.`;
+        return interaction.reply({ content, ephemeral: true });
       } else if (interaction.options.getSubcommand() === 'trusted') {
         const result = await publishTrustedBoard(interaction.client, { allowSend: true });
         const verb = result.status === 'sent' ? 'إرسال' : 'تحديث';
