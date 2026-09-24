@@ -12,17 +12,17 @@ import { getGuildConfig, updateGuildConfig } from './config/guildConfig.js';
 const EMOJI_DIR = path.join(path.dirname(fileURLToPath(import.meta.url)), '../assets/emojis');
 
 export const GAME_ROLES = [
-  { name: 'Valorant', emoji: 'game_valorant' },
-  { name: 'Among Us', emoji: 'game_amongus' },
-  { name: 'Minecraft', emoji: 'game_minecraft' },
-  { name: 'Roblox', emoji: 'game_roblox' },
-  { name: 'Codenames', emoji: 'game_codenames' },
-  { name: 'Fortnite', emoji: 'game_fortnite' },
-  { name: 'PUBG', emoji: 'game_pubg' },
-  { name: 'Brawlhalla', emoji: 'game_brawlhalla' },
-  { name: 'ARK', emoji: 'game_ark' },
-  { name: 'Warframe', emoji: 'game_warframe' },
-  { name: 'Other', emoji: 'game_other' },
+  { name: 'Valorant', emoji: 'valorant' },
+  { name: 'Among Us', emoji: 'among_us' },
+  { name: 'Minecraft', emoji: 'minecraft' },
+  { name: 'Roblox', emoji: 'roblox' },
+  { name: 'Codenames', emoji: 'codenames' },
+  { name: 'Fortnite', emoji: 'fortnite' },
+  { name: 'PUBG', emoji: 'pubg' },
+  { name: 'Brawlhalla', emoji: 'brawlhalla' },
+  { name: 'ARK', emoji: 'ark' },
+  { name: 'Warframe', emoji: 'warframe' },
+  { name: 'Other', emoji: 'other_games' },
 ].map((game) => ({ ...game, icon: path.join(EMOJI_DIR, `${game.emoji}.png`) }));
 
 const REASON = 'Game role for Onboarding';
