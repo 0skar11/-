@@ -42,7 +42,8 @@ describe('games are off by default', () => {
         const loaded = {};
         await loadCommands(loaded);
         for (const name of ['game', 'solo', 'rps', 'xo', 'fight']) assert.equal(loaded.commands.has(name), false, name);
-        for (const name of ['daily', 'cc', 'cctop']) assert.equal(loaded.commands.get(name).category, 'Games', name);
+        assert.equal(loaded.commands.has('daily'), false);
+        for (const name of ['cc', 'cctop']) assert.equal(loaded.commands.get(name).category, 'Games', name);
     });
 
     test('the games channel is left alone for the games bot', async () => {

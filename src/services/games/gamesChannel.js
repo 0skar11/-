@@ -1,6 +1,6 @@
 // gamesChannel.js — the games channel is for game commands only. Anything else posted there is
 // deleted with a short notice that goes away after a few seconds. Still allowed:
-//   • game and CC commands (`روليت`، `العاب`، `يومي`، `/game`...) and the panel buttons
+//   • game and CC commands (`روليت`، `العاب`، `رصيد`، `/game`...) and the panel buttons
 //   • answers while a game runs there: everyone during chat games, only the players during
 //     روليت / كراسي / مافيا (mafia needs its day discussion), and the player of a solo `سؤال` / `رقم`
 //   • the server owners and this bot
@@ -18,7 +18,7 @@ import { gameAcceptsChat } from './session.js';
 import { isPlayingSoloIn } from './solo.js';
 
 export const GAMES_CHANNEL_ID = '1552714038817857556';
-export const GAME_COMMANDS = new Set(['game', 'solo', 'rps', 'xo', 'fight', 'cc', 'cctop', 'daily']);
+export const GAME_COMMANDS = new Set(['game', 'solo', 'rps', 'xo', 'fight', 'cc', 'cctop']);
 export const GAMES_ONLY_NOTICE = '🎮 الروم ده لأوامر الألعاب بس. اكتب `العاب` عشان تشوف الألعاب.';
 
 const NOTICE_DELETE_MS = 4_000;

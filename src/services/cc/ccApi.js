@@ -1,11 +1,11 @@
 // ccApi.js — the HTTP API the games bot uses to read and pay Chaos Credits.
 //
-// The games live in a separate bot now, but CC stays here (one balance, one `daily`, one Top CC).
+// The games live in a separate bot now, but CC stays here (one balance, one Top CC).
 // The games bot reports results to this API and this bot pays them with the usual rules from
 // config/cc.js. Every request needs `Authorization: Bearer <CC_API_TOKEN>`; without CC_API_TOKEN
 // (at least 16 characters) the API answers 503 and changes nothing.
 //
-//   GET  /api/cc/:guildId/users/:userId   balance, stats and last daily of a member
+//   GET  /api/cc/:guildId/users/:userId   balance and stats of a member
 //   GET  /api/cc/:guildId/top?limit=10    leaderboard (1–100 rows)
 //   POST /api/cc/:guildId/group-game      { game, players: [ids], ranking: [ids, 1st first] }
 //                                          pays the top 3 like our group games did
@@ -140,8 +140,8 @@ export function createCCApiRouter(client, { token = () => process.env.CC_API_TOK
     };
 
     router.get('/:guildId/users/:userId', handle(async (guildId, body, req) => {
-        const { cc, stats, lastDaily } = await getProfile(client, guildId, userId(req.params.userId));
-        return { userId: req.params.userId, cc, stats, lastDaily };
+        const { cc, stats } = await getProfile(client, guildId, userId(req.params.userId));
+        return { userId: req.params.userId, cc, stats };
     }));
 
     router.get('/:guildId/top', handle(async (guildId, body, req) => {

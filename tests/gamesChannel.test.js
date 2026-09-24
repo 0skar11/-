@@ -99,8 +99,7 @@ describe('games channel', () => {
     });
 
     test('CC words and the natural ways of typing stop', () => {
-        assert.equal(typedCommandName('يومي', '!'), 'daily');
-        assert.equal(typedCommandName('يومى', '!'), 'daily');
+        assert.equal(isGameCommandMessage('يومي', ['!']), false);
         assert.equal(typedCommandName('رصيدى', '!'), 'cc');
         assert.equal(typedCommandName('Top CC', '!'), 'cctop');
         assert.equal(typedCommandName('وقف', '!'), 'game');
@@ -115,7 +114,7 @@ describe('games channel', () => {
         const { loadCommands } = await import('../src/handlers/loaders/commandLoader.js');
         const loaded = {};
         await loadCommands(loaded);
-        for (const name of ['daily', 'cc', 'cctop', 'game', 'solo']) assert.equal(loaded.commands.get(name).category, 'Games', name);
+        for (const name of ['cc', 'cctop', 'game', 'solo']) assert.equal(loaded.commands.get(name).category, 'Games', name);
     });
 
     test('word aliases', () => {

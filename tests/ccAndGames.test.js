@@ -1,7 +1,7 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-    groupRewards, soloRewardLeft, claimDaily, awardGroupGame, awardSoloWin, spendCC, adjustCC, getProfile, getLeaderboard,
+    groupRewards, soloRewardLeft, grantCC, awardGroupGame, awardSoloWin, spendCC, adjustCC, getProfile, getLeaderboard,
 } from '../src/services/cc/ccService.js';
 import { validateStoreItem, buyItem } from '../src/services/cc/ccStoreService.js';
 import { CC } from '../src/config/cc.js';
@@ -54,19 +54,6 @@ describe('CC rewards', () => {
 });
 
 describe('CC service', () => {
-    test('daily pays once per 24 hours, with the premium bonus', async () => {
-        const client = fakeClient();
-        const now = Date.UTC(2026, 0, 1);
-        const first = await claimDaily(client, GUILD, A, { now });
-        assert.equal(first.ok, true);
-        assert.equal(first.balance, CC.daily.amount);
-        const again = await claimDaily(client, GUILD, A, { now: now + 1000 });
-        assert.equal(again.ok, false);
-        assert.equal(again.remaining, CC.daily.cooldownMs - 1000);
-        const next = await claimDaily(client, GUILD, A, { now: now + CC.daily.cooldownMs, premium: true });
-        assert.equal(next.balance, CC.daily.amount * 2 + Math.floor(CC.daily.amount * CC.daily.premiumBonus));
-    });
-
     test('group games pay the top places and count the game for everyone', async () => {
         const client = fakeClient();
         const paid = await awardGroupGame(client, GUILD, { game: 'trivia', ranking: [B, A, C, D], playerIds: [A, B, C, D] });
@@ -104,9 +91,9 @@ describe('CC service', () => {
     test('keeps the old economy fields untouched', async () => {
         const client = fakeClient();
         client.store.set(`guild:${GUILD}:economy:${A}`, { wallet: 999, bank: 5 });
-        await claimDaily(client, GUILD, A);
+        await grantCC(client, GUILD, A, 10);
         const record = client.store.get(`guild:${GUILD}:economy:${A}`);
-        assert.deepEqual([record.wallet, record.bank, record.cc], [999, 5, CC.daily.amount]);
+        assert.deepEqual([record.wallet, record.bank, record.cc], [999, 5, 10]);
     });
 });
 

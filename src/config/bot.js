@@ -158,8 +158,8 @@ export const botConfig = {
   // =========================
   // ECONOMY SETTINGS
   // =========================
-  // The currency is Chaos Credits (CC): daily amount, game rewards and caps live in src/config/cc.js.
-  // Members only earn CC from `daily` and games (work, crime, rob, beg, fish, mine, gamble and pay were removed).
+  // The currency is Chaos Credits (CC): game rewards and caps live in src/config/cc.js.
+  // Members only earn CC from games (daily, work, crime, rob, beg, fish, mine, gamble and pay were removed).
   economy: {
     currency: {
       name: "CC",
