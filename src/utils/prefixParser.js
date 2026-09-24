@@ -54,6 +54,17 @@ export function parseMessageCommand(content, prefix) {
   };
 }
 
+function toWesternDigits(value) {
+  return value.replace(/[٠-٩]/gu, (digit) => String('٠١٢٣٤٥٦٧٨٩'.indexOf(digit)));
+}
+
+/** A typed command with or without the prefix; `prefixed` says which. Arabic digits become 0-9. */
+export function parseTypedCommand(content, prefix) {
+  const prefixed = parsePrefixCommand(content, prefix);
+  const parsed = prefixed || parseMessageCommand(content, prefix);
+  return parsed && { commandName: parsed.commandName, args: parsed.args.map(toWesternDigits), prefixed: Boolean(prefixed) };
+}
+
 function parseArguments(input) {
   const args = [];
   let current = '';

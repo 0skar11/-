@@ -2,9 +2,9 @@ import { Events } from 'discord.js';
 import { logger } from '../utils/logger.js';
 import { handleArabicUtilityShortcuts } from '../utils/arabicUtilityShortcuts.js';
 import { handleMessageDeleteShortcut } from '../utils/messageDeleteShortcut.js';
-import { parsePrefixCommand, parseMessageCommand, mapArgumentsToOptions } from '../utils/prefixParser.js';
+import { parseTypedCommand, mapArgumentsToOptions } from '../utils/prefixParser.js';
 import { supportsPrefixExecution, executePrefixCommand, resolvePrefixAccessKey } from '../utils/messageAdapter.js';
-import { resolveCommandAlias, resolveSubcommandAlias, twoWordCommandAliases, commandArgAliases, standaloneOnlyAliases, isStandaloneInvocation } from '../config/commands/commandAliases.js';
+import { resolveCommandAlias, resolveSubcommandAlias, applyWordAliases } from '../config/commands/commandAliases.js';
 import { getPrefixRestriction } from '../config/commands/prefixRestrictions.js';
 import { getGuildConfig } from '../services/config/guildConfig.js';
 import { getCommandPrefix, isBotOwner, isCommandCategoryEnabled, isMaintenanceMode } from '../config/bot.js';
@@ -19,6 +19,7 @@ import { handleProtectedChannelMessage } from '../services/protectedChannelsServ
 import { handleEveryoneMention } from '../services/everyoneMentionGuardService.js';
 import { handleForeignInviteLink } from '../services/inviteLinkGuardService.js';
 import { handleMediaMessage } from '../services/mediaRoleService.js';
+import { handleGamesChannelMessage, isGamesOnlyFor, isGameCommandMessage } from '../services/games/gamesChannel.js';
 
 export default {
   name: Events.MessageCreate,
@@ -26,6 +27,7 @@ export default {
     try {
       // Runs before the bot check so other bots cannot post in the protected board channels either.
       if (await handleProtectedChannelMessage(message)) return;
+      if (await handleGamesChannelMessage(message, client)) return;
       if (message.author.bot || !message.guild) return;
       logger.debug(`Message received from ${message.author.tag}: ${message.content}`);
 
@@ -33,10 +35,12 @@ export default {
       if (await handleForeignInviteLink(message)) return;
       if (await handleMediaMessage(message)) return;
       if (await handleReportChannelMessage(message)) return;
-      if (await handleArabicUtilityShortcuts(message)) return;
-      if (await handleMessageDeleteShortcut(message)) return;
+      // In the games channel only game commands run (the rest there is game answers).
+      const gamesOnly = isGamesOnlyFor(message);
+      if (!gamesOnly && await handleArabicUtilityShortcuts(message)) return;
+      if (!gamesOnly && await handleMessageDeleteShortcut(message)) return;
       if (await handleCountingGame(message, client)) return;
-      await handlePrefixCommand(message, client);
+      await handlePrefixCommand(message, client, gamesOnly);
     } catch (error) {
       logger.error('Error in messageCreate event:', error);
     }
@@ -45,16 +49,6 @@ export default {
 
 // Commands also work without the prefix, but only as the first word of the message
 // (`تايم @member 5m`). A command word in the middle of a sentence is ignored.
-function toWesternDigits(value) {
-  return value.replace(/[٠-٩]/gu, (digit) => String('٠١٢٣٤٥٦٧٨٩'.indexOf(digit)));
-}
-
-function parseCommandMessage(content, prefix) {
-  const prefixed = parsePrefixCommand(content, prefix);
-  const parsed = prefixed || parseMessageCommand(content, prefix);
-  return parsed && { commandName: parsed.commandName, args: parsed.args.map(toWesternDigits), prefixed: Boolean(prefixed) };
-}
-
 const USER_ARG = /^(?:<@!?\d{17,20}>|\d{17,20})$/u;
 
 // Replying to someone's message makes them the target: (reply) `تايم 5m سبام` = `تايم @member 5m سبام`.
@@ -67,12 +61,13 @@ async function applyReplyTarget(message, commandData, args) {
   return [referenced.author.id, ...args];
 }
 
-async function handlePrefixCommand(message, client) {
+async function handlePrefixCommand(message, client, gamesOnly = false) {
   try {
     const guildConfig = await getGuildConfig(client, message.guild.id);
     const prefix = guildConfig?.prefix || getCommandPrefix();
+    if (gamesOnly && !isGameCommandMessage(message.content, [prefix])) return;
     if (await handleArabicRoleShortcut(message, [prefix, getCommandPrefix()])) return;
-    const parsed = parseCommandMessage(message.content, prefix);
+    const parsed = parseTypedCommand(message.content, prefix);
     if (!parsed) return;
 
     let { commandName, args } = parsed;
@@ -95,18 +90,9 @@ async function handlePrefixCommand(message, client) {
       await handleClearWarningsShortcut(message, args.slice(1));
       return;
     }
-    const twoWordCommand = twoWordCommandAliases[`${typedCommand} ${(args[0] || '').toLowerCase()}`];
-    if (twoWordCommand) {
-      commandName = twoWordCommand;
-      args = args.slice(1);
-    }
-    if (!parsed.prefixed && standaloneOnlyAliases.has(typedCommand) && !isStandaloneInvocation(args)) return;
-    const argAlias = commandArgAliases[typedCommand];
-    if (argAlias) {
-      const [aliasCommand, ...aliasArgs] = argAlias.split(' ');
-      commandName = aliasCommand;
-      args = [...aliasArgs, ...args];
-    }
+    const aliased = applyWordAliases(typedCommand, args, parsed.prefixed);
+    if (!aliased) return;
+    ({ commandName, args } = aliased);
 
     const musicPrefixShortcut = commandName.toLowerCase();
     if (new Set(['leave', 'pause', 'resume', 'skip', 'stop', 'volume']).has(musicPrefixShortcut)) {

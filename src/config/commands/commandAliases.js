@@ -1,7 +1,7 @@
 /** Command aliases configuration. */
 export const commandAliases = {
   bal: 'cc', balance: 'cc', money: 'cc', cash: 'cc', credits: 'cc', h: 'help', info: 'help',
-  رصيد: 'cc', رصيدي: 'cc', فلوس: 'cc', كريدت: 'cc', يومي: 'daily', دايلي: 'daily',
+  رصيد: 'cc', رصيدي: 'cc', رصيدى: 'cc', فلوس: 'cc', كريدت: 'cc', يومي: 'daily', يومى: 'daily', دايلي: 'daily', دايلى: 'daily',
   بان: 'ban', انبان: 'unban', تايم: 'timeout', انتايم: 'untimeout', mute: 'timeout', unmute: 'untimeout',
   وارن: 'warn', وارنات: 'warnings', كلير: 'clear', clear: 'clear',
   طرد: 'kick', تحذير: 'warn', تحذيرات: 'warnings', مسح: 'clear', قفل: 'lock', فتح: 'unlock',
@@ -24,7 +24,10 @@ export const subcommandAliases = {
   a: 'add', c: 'complete', done: 'complete', d: 'complete', start: 'create', stop: 'end', roll: 'reroll', add: 'add', remove: 'remove', list: 'list',
 };
 
-/** Two-word commands (`ماس بان ID1 ID2`, `top cc`), keyed by their first two words. */
+/**
+ * Two-word commands (`ماس بان ID1 ID2`, `top cc`, `وقف اللعبة`), keyed by their first two words.
+ * A value with a space also adds leading arguments (`game stop`).
+ */
 export const twoWordCommandAliases = {
   'هارد بان': 'massban',
   'ماس بان': 'massban',
@@ -32,6 +35,12 @@ export const twoWordCommandAliases = {
   'top cc': 'cctop',
   'توب cc': 'cctop',
   'توب كريدت': 'cctop',
+  'وقف اللعبة': 'game stop',
+  'وقف اللعبه': 'game stop',
+  'ايقاف اللعبة': 'game stop',
+  'ايقاف اللعبه': 'game stop',
+  'إيقاف اللعبة': 'game stop',
+  'إيقاف اللعبه': 'game stop',
 };
 
 /** Words that run a command with fixed leading arguments: `روليت` = `game roulette`, `اسئلة 5` = `game trivia 5`. */
@@ -46,7 +55,7 @@ export const commandArgAliases = {
   رتب: 'game scramble', scramble: 'game scramble',
   حساب: 'game math',
   العاب: 'game list', ألعاب: 'game list', games: 'game list',
-  وقف: 'game stop',
+  وقف: 'game stop', ايقاف: 'game stop', إيقاف: 'game stop',
   سؤال: 'solo question',
   رقم: 'solo number',
   سلوت: 'solo slots', سلوتس: 'solo slots', slots: 'solo slots',
@@ -59,11 +68,34 @@ export const commandArgAliases = {
  */
 export const standaloneOnlyAliases = new Set([
   ...Object.keys(commandArgAliases),
-  'رصيد', 'رصيدي', 'فلوس', 'كريدت', 'يومي', 'دايلي',
+  'رصيد', 'رصيدي', 'رصيدى', 'فلوس', 'كريدت', 'يومي', 'يومى', 'دايلي', 'دايلى',
 ]);
 
 export function isStandaloneInvocation(args) {
   return args.every((arg) => /^(?:\d+|<@!?\d{17,20}>)$/u.test(arg));
+}
+
+/**
+ * Applies the two-word and word-with-arguments aliases to a typed command (`top cc` → `cctop`,
+ * `روليت` → `game roulette`). Returns null when an everyday word was typed without the prefix as
+ * part of a normal sentence, i.e. it is not a command.
+ */
+export function applyWordAliases(typedCommand, args, prefixed) {
+  const twoWordCommand = twoWordCommandAliases[`${typedCommand} ${(args[0] || '').toLowerCase()}`];
+  if (twoWordCommand) {
+    const [twoWordName, ...twoWordArgs] = twoWordCommand.split(' ');
+    return { commandName: twoWordName, args: [...twoWordArgs, ...args.slice(1)] };
+  }
+  let commandName = typedCommand;
+  let rest = args;
+  if (!prefixed && standaloneOnlyAliases.has(typedCommand) && !isStandaloneInvocation(rest)) return null;
+  const argAlias = commandArgAliases[typedCommand];
+  if (argAlias) {
+    const [aliasCommand, ...aliasArgs] = argAlias.split(' ');
+    commandName = aliasCommand;
+    rest = [...aliasArgs, ...rest];
+  }
+  return { commandName, args: rest };
 }
 
 export function resolveCommandAlias(commandName) {

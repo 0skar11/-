@@ -53,7 +53,7 @@ export const ROUND_GAMES = {
         title: '❓ أسئلة عامة',
         how: 'أول واحد يكتب الإجابة الصح ياخد الجولة.',
         rounds: 10,
-        seconds: 25,
+        seconds: 10,
         makeRounds: (count) => sample(triviaQuestions, count).map((question) => ({
             prompt: `**${question.q}**`,
             reveal: question.a[0],
@@ -156,6 +156,7 @@ export async function runRoundGame(interaction, client, session, gameKey, reques
     const channel = interaction.channel;
     const participants = new Set();
     const scores = new Map();
+    session.chatOpen = true;
 
     await InteractionHelper.safeReply(interaction, {
         embeds: [gameEmbed(game.title, [

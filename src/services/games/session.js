@@ -14,7 +14,9 @@ const activeGames = new Map();
 export function claimChannel(channelId, game, hostId) {
     if (activeGames.has(channelId)) return null;
     const controller = new AbortController();
-    const session = { channelId, game, hostId, signal: controller.signal, stop: () => controller.abort(), startedAt: Date.now() };
+    // chatOpen: anyone may chat in the channel during the game (chat round games); players: only these
+    // members may (lobby games, set when the lobby starts). Used by the games-only channel guard.
+    const session = { channelId, game, hostId, signal: controller.signal, stop: () => controller.abort(), startedAt: Date.now(), chatOpen: false, players: null };
     activeGames.set(channelId, session);
     return session;
 }
@@ -25,6 +27,12 @@ export function releaseChannel(session) {
 
 export function getActiveGame(channelId) {
     return activeGames.get(channelId) || null;
+}
+
+/** Whether `userId` may type in `channelId` because of the game running there (answers, mafia talk). */
+export function gameAcceptsChat(channelId, userId) {
+    const session = activeGames.get(channelId);
+    return Boolean(session && (session.chatOpen || session.players?.has(userId)));
 }
 
 /** Stops `collector` as soon as the game is stopped with `وقف`. */
@@ -133,6 +141,7 @@ export async function runLobby(interaction, session, { title, description, minPl
     });
 
     const started = result !== 'cancel' && result !== 'stopped' && players.size >= minPlayers;
+    if (started) session.players = new Set(players.keys());
     const note = started
         ? '\n🎮 **اللعبة بدأت!**'
         : result === 'cancel' || result === 'stopped' ? '\n✖️ **اللعبة اتلغت.**' : `\n⌛ **اللعبة اتلغت:** محتاجين ${minPlayers} لاعبين على الأقل.`;
