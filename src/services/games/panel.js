@@ -3,9 +3,9 @@
 // The panel's buttons are handled by src/interactions/buttons/games/gamesPanel.js, so they keep
 // working after restarts.
 
-import { ActionRowBuilder, ButtonBuilder, ButtonStyle, MessageFlags, PermissionFlagsBits } from 'discord.js';
+import { ActionRowBuilder, ButtonBuilder, ButtonStyle, MessageFlags } from 'discord.js';
 import { InteractionHelper } from '../../utils/interactionHelper.js';
-import { withChannelGame, getActiveGame, rewardsLine } from './session.js';
+import { withChannelGame, getActiveGame, rewardsLine, canControlGame } from './session.js';
 import { ROUND_GAMES, runRoundGame } from './roundGames.js';
 import { runRoulette, ROULETTE_LIMITS } from './roulette.js';
 import { runChairs, CHAIRS_LIMITS } from './chairs.js';
@@ -38,17 +38,15 @@ export async function startGroupGame(interaction, client, key, rounds = null) {
     }
 }
 
-/** `وقف`: stops the channel's game when asked by its host or staff with Manage Messages. */
+/** `وقف`: stops the channel's game when asked by its host or a trusted member. */
 export async function stopGroupGame(interaction) {
     const running = getActiveGame(interaction.channel?.id);
     if (!running) {
         await InteractionHelper.safeReply(interaction, { content: 'مفيش لعبة شغالة في الروم ده.', flags: MessageFlags.Ephemeral });
         return;
     }
-    const canStop = running.hostId === interaction.user.id
-        || interaction.member?.permissions?.has(PermissionFlagsBits.ManageMessages);
-    if (!canStop) {
-        await InteractionHelper.safeReply(interaction, { content: 'صاحب اللعبة أو الإدارة بس اللي يقدروا يوقفوها.', flags: MessageFlags.Ephemeral });
+    if (!await canControlGame(interaction.guild, interaction.user.id, running)) {
+        await InteractionHelper.safeReply(interaction, { content: 'صاحب اللعبة أو التراست بس اللي يقدروا يوقفوها.', flags: MessageFlags.Ephemeral });
         return;
     }
     running.stop();
@@ -144,7 +142,7 @@ export function buildGamesPanel() {
                     `📅 **يومي** — ${CC.daily.amount} ${CC.short} كل 24 ساعة`,
                     '💰 **رصيد** — رصيدك وإحصائياتك',
                     '🏆 **top cc** — الترتيب',
-                    '🛑 **وقف** — يوقف اللعبة (صاحبها أو الإدارة)',
+                    '🛑 **وقف** — يوقف اللعبة (صاحبها أو التراست)',
                 ].join('\n'),
                 inline: true,
             },
