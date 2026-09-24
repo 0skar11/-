@@ -8,7 +8,7 @@ import { CC } from '../src/config/cc.js';
 import { normalizeAnswer, isAnswer } from '../src/services/games/text.js';
 import { splitLetters, scrambleWord, gameWords } from '../src/services/games/data/words.js';
 import { triviaQuestions } from '../src/services/games/data/trivia.js';
-import { rankScores, judgeGuess, makeMathQuestion, ROUND_GAMES } from '../src/services/games/roundGames.js';
+import { rankScores, judgeGuess, makeMathQuestion, ROUND_GAMES, GUESS_NUMBER } from '../src/services/games/roundGames.js';
 import { resolveRouletteChoice } from '../src/services/games/roulette.js';
 import { rankChairs, planRound, chairButton } from '../src/services/games/chairs.js';
 import { assignRoles, checkWinner, tallyVotes, kickAfk, PHASE_MS } from '../src/services/games/mafia.js';
@@ -166,6 +166,18 @@ describe('game helpers', () => {
         assert.equal(judgeGuess('70', 70, 1, 100), true);
         assert.equal(judgeGuess('هاي', 70, 1, 100), null);
         assert.equal(judgeGuess('500', 70, 1, 100), null);
+        assert.equal(judgeGuess('0', 70, 0, 200), 'higher');
+        assert.equal(judgeGuess('200', 70, 0, 200), 'lower');
+        assert.equal(judgeGuess('201', 70, 0, 200), null);
+    });
+
+    test('guess the number is 0 to 200 with 6 tries per player', () => {
+        assert.deepEqual(GUESS_NUMBER, { min: 0, max: 200, tries: 6 });
+        const [round] = ROUND_GAMES.guess.makeRounds(1);
+        const target = Number(round.reveal);
+        assert.ok(target >= 0 && target <= 200);
+        assert.equal(round.maxTries, 6);
+        assert.equal(round.judge(round.reveal), true);
     });
 
     test('math questions have the right answers', () => {

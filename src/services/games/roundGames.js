@@ -43,10 +43,14 @@ export function judgeGuess(content, target, min, max) {
 
 const HINT_REACTIONS = { higher: '⬆️', lower: '⬇️' };
 
+/** `خمن` and solo `رقم`: the number is picked from min to max and each player has `tries` guesses. */
+export const GUESS_NUMBER = { min: 0, max: 200, tries: 6 };
+
 /**
  * Each game: title, how it's played, default/max rounds, seconds per round and makeRounds(count) →
  * rounds of { prompt, reveal, judge(content) } where judge returns true (correct), false (wrong),
- * null (not an attempt) or 'higher' / 'lower' (a hint for خمن).
+ * null (not an attempt) or 'higher' / 'lower' (a hint for خمن). A round with `maxTries` gives each
+ * player that many attempts; after that their messages are ignored for the rest of the round.
  */
 export const ROUND_GAMES = {
     trivia: {
@@ -62,16 +66,18 @@ export const ROUND_GAMES = {
     },
     guess: {
         title: '🔢 خمن الرقم',
-        how: 'البوت اختار رقم من 1 لـ 100، اكتبوا أرقام و البوت هيقولكم ⬆️ أعلى ولا ⬇️ أقل. أول واحد يجيبه ياخد الجولة.',
+        how: `البوت اختار رقم من ${GUESS_NUMBER.min} لـ ${GUESS_NUMBER.max}، اكتبوا أرقام و البوت هيقولكم ⬆️ أعلى ولا ⬇️ أقل. كل واحد ليه **${GUESS_NUMBER.tries}** محاولات في الجولة، وأول واحد يجيبه ياخدها.`,
         rounds: 3,
         maxRounds: 5,
         seconds: 60,
         makeRounds: (count) => Array.from({ length: count }, () => {
-            const target = randomInt(1, 100);
+            const { min, max, tries } = GUESS_NUMBER;
+            const target = randomInt(min, max);
             return {
-                prompt: 'خمنوا الرقم من **1** لـ **100**!',
+                prompt: `خمنوا الرقم من **${min}** لـ **${max}**! كل واحد ليه **${tries}** محاولات.`,
                 reveal: String(target),
-                judge: (content) => judgeGuess(content, target, 1, 100),
+                maxTries: tries,
+                judge: (content) => judgeGuess(content, target, min, max),
             };
         }),
     },
@@ -129,11 +135,15 @@ export const ROUND_LIMITS = { min: 3, max: 15 };
 async function playRound(channel, session, round, { participants, seconds }) {
     return new Promise((resolve) => {
         const collector = channel.createMessageCollector({ filter: (message) => !message.author.bot, time: seconds * 1000 });
+        const triesUsed = new Map();
         stopOnAbort(collector, session.signal);
         collector.on('collect', (message) => {
+            const userId = message.author.id;
+            if (round.maxTries && (triesUsed.get(userId) || 0) >= round.maxTries) return;
             const verdict = round.judge(message.content);
             if (verdict === null) return;
-            participants.add(message.author.id);
+            participants.add(userId);
+            triesUsed.set(userId, (triesUsed.get(userId) || 0) + 1);
             if (verdict === true) {
                 message.react('✅').catch(() => {});
                 collector.stop('answered');
@@ -141,6 +151,8 @@ async function playRound(channel, session, round, { participants, seconds }) {
                 return;
             }
             if (HINT_REACTIONS[verdict]) message.react(HINT_REACTIONS[verdict]).catch(() => {});
+            // Out of tries for this round.
+            if (round.maxTries && triesUsed.get(userId) >= round.maxTries) message.react('🚫').catch(() => {});
         });
         collector.on('end', (_collected, reason) => {
             if (reason !== 'answered') resolve(null);

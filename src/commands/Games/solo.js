@@ -10,7 +10,7 @@ export default {
         .setDescription(`Play a solo game (a win gives ${CC.solo.win} CC, up to ${CC.solo.dailyCap} CC a day)`)
         .setDMPermission(false)
         .addSubcommand((sub) => sub.setName('question').setDescription('Answer one general knowledge question'))
-        .addSubcommand((sub) => sub.setName('number').setDescription('Guess the number from 1 to 50 in 6 tries'))
+        .addSubcommand((sub) => sub.setName('number').setDescription('Guess the number from 0 to 200 in 6 tries'))
         .addSubcommand((sub) => sub.setName('slots').setDescription('Spin the slot machine')),
 
     async execute(interaction, config, client) {

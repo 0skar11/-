@@ -3,7 +3,7 @@
 
 import { triviaQuestions } from './data/trivia.js';
 import { isAnswer, pick, randomInt } from './text.js';
-import { judgeGuess } from './roundGames.js';
+import { judgeGuess, GUESS_NUMBER } from './roundGames.js';
 import { MessageFlags } from 'discord.js';
 import { gameEmbed, getActiveGame } from './session.js';
 import { awardSoloWin } from '../cc/ccService.js';
@@ -63,16 +63,16 @@ export async function playSoloQuestion(interaction, client) {
 }
 
 export async function playSoloNumber(interaction, client) {
-    const target = randomInt(1, 50);
-    const maxTries = 6;
+    const { min, max, tries: maxTries } = GUESS_NUMBER;
+    const target = randomInt(min, max);
     let tries = 0;
     let won = false;
     await InteractionHelper.safeReply(interaction, {
-        embeds: [gameEmbed('🔢 خمن الرقم', `${interaction.user} اخترت رقم من **1** لـ **50**.\nعندك **${maxTries}** محاولات ودقيقة، هقولك ⬆️ أعلى ولا ⬇️ أقل.`)],
+        embeds: [gameEmbed('🔢 خمن الرقم', `${interaction.user} اخترت رقم من **${min}** لـ **${max}**.\nعندك **${maxTries}** محاولات ودقيقة، هقولك ⬆️ أعلى ولا ⬇️ أقل.`)],
         allowedMentions: { parse: [] },
     });
     await awaitPlayerMessages(interaction, 60, (message) => {
-        const verdict = judgeGuess(message.content, target, 1, 50);
+        const verdict = judgeGuess(message.content, target, min, max);
         if (verdict === null) return false;
         tries += 1;
         if (verdict === true) {

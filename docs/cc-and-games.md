@@ -47,14 +47,14 @@ Game words typed without the prefix only start a game when the message is just t
 | `كراسي` | `/game chairs` | Chairs (3–25 players): grey chairs flash 🔴 at random (pressing then knocks you out), then turn 🟢 at a random moment and everyone races to sit |
 | `مافيا` | `/game mafia` | Mafia with doctor and detective (5–20 players), 20 second phases |
 | `اسئلة [جولات]` | `/game trivia` | General knowledge questions, anyone can answer |
-| `خمن [جولات]` | `/game guess` | Guess the number 1–100 with ⬆️/⬇️ hints |
+| `خمن [جولات]` | `/game guess` | Guess the number 0–200 with ⬆️/⬇️ hints, 6 tries per player each round (🚫 when they run out) |
 | `اسرع [جولات]` | `/game fast` | First to type the word |
 | `فكك [جولات]` | `/game fakkek` | Split the word into letters |
 | `رتب [جولات]` | `/game scramble` | Unscramble the letters |
 | `حساب [جولات]` | `/game math` | Quick math |
 | `وقف` / `وقف اللعبة` / `ايقاف` | `/game stop` | Stop the running game (its host or a trusted member) |
 | `سؤال` | `/solo question` | One question, one try |
-| `رقم` | `/solo number` | Guess 1–50 in 6 tries |
+| `رقم` | `/solo number` | Guess 0–200 in 6 tries |
 | `سلوت` | `/solo slots` | Slot machine, three of a kind wins |
 
 Only one group game can run per channel. A game is controlled (start or cancel the lobby, stop
