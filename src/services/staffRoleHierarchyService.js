@@ -1,4 +1,4 @@
-import { PermissionFlagsBits } from 'discord.js';
+import { PermissionFlagsBits, PermissionsBitField } from 'discord.js';
 import { logger } from '../utils/logger.js';
 import { findBoardMessage, rememberBoardMessage } from '../utils/boardMessage.js';
 import { getGuildConfig, updateGuildConfig } from './config/guildConfig.js';
@@ -23,16 +23,41 @@ const PERMISSION_LABELS = new Map([
   [PermissionFlagsBits.ReadMessageHistory, 'Read Message History — قراءة سجل الرسائل'],
   [PermissionFlagsBits.Connect, 'Connect — دخول الصوت'],
   [PermissionFlagsBits.Speak, 'Speak — التحدث بالصوت'],
+  [PermissionFlagsBits.MoveMembers, 'Move Members — سحب ونقل من الفويس'],
+  [PermissionFlagsBits.MuteMembers, 'Mute Members — ميوت بالفويس'],
+  [PermissionFlagsBits.DeafenMembers, 'Deafen Members — ديفن بالفويس'],
+  [PermissionFlagsBits.ManageThreads, 'Manage Threads — إدارة الثريدات'],
   [PermissionFlagsBits.ManageEvents, 'Manage Events — إدارة الفعاليات'],
   [PermissionFlagsBits.MentionEveryone, 'Mention Everyone — منشن الجميع'],
 ]);
 
+// Every permission except Administrator: 🛡️ Admin can do everything without being an administrator.
+const ALL_EXCEPT_ADMINISTRATOR = new PermissionsBitField(PermissionsBitField.All).remove(PermissionFlagsBits.Administrator).bitfield;
+
+// Trial staff: moderate chat and voice (timeout, voice disconnect/move, server mute, server deafen) but never ban or kick.
+const TRIAL_STAFF_PERMISSIONS = [
+  PermissionFlagsBits.ViewAuditLog,
+  PermissionFlagsBits.ModerateMembers,
+  PermissionFlagsBits.ManageMessages,
+  PermissionFlagsBits.ManageNicknames,
+  PermissionFlagsBits.ManageThreads,
+  PermissionFlagsBits.MoveMembers,
+  PermissionFlagsBits.MuteMembers,
+  PermissionFlagsBits.DeafenMembers,
+  PermissionFlagsBits.ViewChannel,
+  PermissionFlagsBits.SendMessages,
+  PermissionFlagsBits.ReadMessageHistory,
+  PermissionFlagsBits.Connect,
+  PermissionFlagsBits.Speak,
+];
+
 const ROLE_DEFINITIONS = [
   { name: '👑 Owner', color: '#f1c40f', permissions: [PermissionFlagsBits.Administrator] },
-  { name: '⚡ Head Admin', color: '#e74c3c', permissions: [PermissionFlagsBits.ViewAuditLog, PermissionFlagsBits.ManageGuild, PermissionFlagsBits.ManageChannels, PermissionFlagsBits.ManageRoles, PermissionFlagsBits.ManageWebhooks, PermissionFlagsBits.ManageMessages, PermissionFlagsBits.ManageNicknames, PermissionFlagsBits.KickMembers, PermissionFlagsBits.BanMembers, PermissionFlagsBits.ModerateMembers, PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.ReadMessageHistory, PermissionFlagsBits.Connect, PermissionFlagsBits.Speak, PermissionFlagsBits.ManageEvents, PermissionFlagsBits.MentionEveryone] },
-  { name: '🛡️ Admin', color: '#e67e22', permissions: [PermissionFlagsBits.ViewAuditLog, PermissionFlagsBits.ManageGuild, PermissionFlagsBits.ManageChannels, PermissionFlagsBits.ManageRoles, PermissionFlagsBits.ManageMessages, PermissionFlagsBits.ManageNicknames, PermissionFlagsBits.KickMembers, PermissionFlagsBits.BanMembers, PermissionFlagsBits.ModerateMembers, PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.ReadMessageHistory] },
-  { name: '🔨 Moderator', color: '#2ecc71', permissions: [PermissionFlagsBits.ViewAuditLog, PermissionFlagsBits.KickMembers, PermissionFlagsBits.BanMembers, PermissionFlagsBits.ModerateMembers, PermissionFlagsBits.ManageMessages, PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.ReadMessageHistory] },
-  { name: '🔰 Trial Moderator', color: '#3498db', permissions: [PermissionFlagsBits.ViewAuditLog, PermissionFlagsBits.KickMembers, PermissionFlagsBits.ModerateMembers, PermissionFlagsBits.ManageMessages, PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.ReadMessageHistory] },
+  { name: '⚡ Head Admin', color: '#e74c3c', permissions: [PermissionFlagsBits.Administrator] },
+  // allButAdministrator: the board sums Admin up in one line; ~50 permissions spelled out would not fit Discord's embed limits.
+  { name: '🛡️ Admin', color: '#e67e22', permissions: [ALL_EXCEPT_ADMINISTRATOR], allButAdministrator: true },
+  { name: '🔨 Moderator', color: '#2ecc71', permissions: TRIAL_STAFF_PERMISSIONS },
+  { name: '🔰 Trial Moderator', color: '#3498db', permissions: TRIAL_STAFF_PERMISSIONS },
   { name: '📢 Event Manager', color: '#f39c12', permissions: [PermissionFlagsBits.ViewAuditLog, PermissionFlagsBits.ManageEvents, PermissionFlagsBits.MentionEveryone, PermissionFlagsBits.ManageMessages, PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.ReadMessageHistory] },
 ];
 
@@ -44,10 +69,17 @@ function permissionNames(permissions) {
   return permissions.map((permission) => `✅ ${PERMISSION_LABELS.get(PermissionFlagsBits[permission] ?? permission) || permission}`);
 }
 
+function allButAdministratorLines(role) {
+  const lines = ['✅ كل الصلاحيات ما عدا Administrator'];
+  const missing = role.permissions.missing(ALL_EXCEPT_ADMINISTRATOR, false);
+  if (missing.length) lines.push(`❌ ناقصة: ${missing.join(', ')}`);
+  return lines;
+}
+
 // A plain embed object rather than an EmbedBuilder: src/utils/embeds.js drops builder footers (and strips emojis),
 // and the footer is how the bot recognizes its board message to edit it instead of posting a new one.
 function buildBoardEmbed(role, definition) {
-  const permissionLines = permissionNames(role.permissions.toArray());
+  const permissionLines = definition.allButAdministrator ? allButAdministratorLines(role) : permissionNames(role.permissions.toArray());
   return {
     color: role.color || parseInt(definition.color.slice(1), 16),
     title: `${role.name} — الصلاحيات`,
@@ -67,6 +99,14 @@ export async function deleteRetiredRoles(guild) {
   return deleted;
 }
 
+function grantablePermissions(botMember, definition) {
+  const wanted = new PermissionsBitField(definition.permissions);
+  if (botMember.permissions.has(PermissionFlagsBits.Administrator)) return wanted.bitfield;
+  const missing = botMember.permissions.missing(wanted, false);
+  if (missing.length) logger.warn(`${definition.name}: the bot lacks ${missing.join(', ')} and cannot grant it. Give the bot Administrator.`);
+  return new PermissionsBitField(wanted.bitfield & botMember.permissions.bitfield).bitfield;
+}
+
 export async function synchronizeStaffRoles(guild) {
   const botMember = guild.members.me || await guild.members.fetchMe().catch(() => null);
   if (!botMember?.permissions.has(PermissionFlagsBits.ManageRoles)) {
@@ -80,15 +120,23 @@ export async function synchronizeStaffRoles(guild) {
   let updated = 0;
 
   for (const definition of ROLE_DEFINITIONS) {
+    // Discord only lets the bot grant permissions it holds itself (all of them when it is an Administrator).
+    const permissions = grantablePermissions(botMember, definition);
     let role = roles.find((candidate) => candidate.name === definition.name && !candidate.managed);
-    if (!role) {
-      role = await guild.roles.create({ name: definition.name, color: definition.color, hoist: true, mentionable: false, permissions: definition.permissions, reason: 'Create/update ordered staff role hierarchy' });
-      created += 1;
-    } else if (role.position < botMember.roles.highest.position) {
-      await role.edit({ color: definition.color, hoist: true, permissions: definition.permissions, reason: 'Synchronize ordered staff role permissions' });
-      updated += 1;
+    try {
+      if (!role) {
+        role = await guild.roles.create({ name: definition.name, color: definition.color, hoist: true, mentionable: false, permissions, reason: 'Create/update ordered staff role hierarchy' });
+        created += 1;
+      } else if (role.position < botMember.roles.highest.position) {
+        await role.edit({ color: definition.color, hoist: true, permissions, reason: 'Synchronize ordered staff role permissions' });
+        updated += 1;
+      } else {
+        logger.warn(`Role ${definition.name} in ${guild.name} is above the bot's highest role; its permissions were not synchronized.`);
+      }
+    } catch (error) {
+      logger.error(`Failed to synchronize ${definition.name} in ${guild.name}:`, error);
     }
-    if (!role.managed && role.position < botMember.roles.highest.position) managedRoles.push(role);
+    if (role && !role.managed && role.position < botMember.roles.highest.position) managedRoles.push(role);
   }
 
   const refreshedBotMember = await guild.members.fetchMe();
@@ -186,4 +234,4 @@ export async function refreshStaffPermissionBoard(guild) {
   return result;
 }
 
-export { ROLE_DEFINITIONS, ROLE_PERMISSIONS_CHANNEL_ID, RETIRED_ROLE_IDS, BOARD_RESET_VERSION };
+export { ROLE_DEFINITIONS, ALL_EXCEPT_ADMINISTRATOR, TRIAL_STAFF_PERMISSIONS, ROLE_PERMISSIONS_CHANNEL_ID, RETIRED_ROLE_IDS, BOARD_RESET_VERSION };
