@@ -2,7 +2,8 @@
 //
 // CC is earned from games only: wins in the games bot (Clover), and this bot's own games when they
 // are switched back on (config/games.js). There is no `daily` any more; work, crime, rob, beg, fish,
-// mine, gamble and pay were removed on purpose too.
+// mine and gamble were removed on purpose too. Members can send CC to each other with `give`, which
+// takes a tax that grows when someone sends a lot in a week (`transfer` below).
 
 import { getColor } from './bot.js';
 
@@ -33,6 +34,17 @@ export const CC = {
         win: 10,
         // Most CC a member can get from games bot wins per day (UTC).
         dailyCap: 200,
+    },
+
+    // `give` / `تحويل`: sending CC to another member. The receiver gets the amount minus the tax.
+    // The first `cheapPerWeek` transfers of the last 7 days pay `taxPercent`; each one after that pays
+    // `extraPercentPerTransfer` more, up to `maxTaxPercent`. With these numbers: 5%, 5%, 5%, 10%, 15%, ... 50%.
+    transfer: {
+        minAmount: 10,
+        taxPercent: 5,
+        cheapPerWeek: 3,
+        extraPercentPerTransfer: 5,
+        maxTaxPercent: 50,
     },
 };
 
