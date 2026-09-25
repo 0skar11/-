@@ -55,4 +55,45 @@ describe('afk', () => {
     await handleAfkMessage(message(away, { content: 'afk y' }), client, { isAfkCommand: true });
     assert.ok(await getAfk(client, guild.id, '1'));
   });
+
+  test('nicknames come back exactly as they were', async () => {
+    const { client, member, message } = setup();
+    const cases = [
+      ['long', 'A really long nickname here!!!'], // 30 chars: "[AFK] " version gets cut
+      ['same', 'user3'],                          // nickname equal to the username
+      ['none', null],                             // no nickname at all
+    ];
+    for (const [id, nick] of cases) {
+      const away = member(id, nick);
+      away.user.username = id === 'same' ? 'user3' : away.user.username;
+      await setAfk(client, away, 'x');
+      assert.ok(away.nickname.startsWith('[AFK] '));
+      assert.ok(away.nickname.length <= 32);
+      await handleAfkMessage(message(away), client);
+      assert.equal(away.nickname, nick, `nickname for ${id}`);
+    }
+  });
+
+  test('afk twice keeps the first nickname, and a nickname changed while AFK is left alone', async () => {
+    const { client, member, message } = setup();
+    const away = member('1', 'Zito');
+    await setAfk(client, away, 'a');
+    await setAfk(client, away, 'b');
+    await handleAfkMessage(message(away), client);
+    assert.equal(away.nickname, 'Zito');
+
+    const other = member('2', 'Old');
+    await setAfk(client, other, 'a');
+    other.nickname = 'Changed myself';
+    await handleAfkMessage(message(other), client);
+    assert.equal(other.nickname, 'Changed myself');
+  });
+
+  test('AFK saved before this fix still gets the prefix removed', async () => {
+    const { client, store, member, message, guild } = setup();
+    store.set(`guild:${guild.id}:afklist`, { 9: { reason: 'old', since: Date.now() } });
+    const away = member('9', '[AFK] Legacy');
+    await handleAfkMessage(message(away), client);
+    assert.equal(away.nickname, 'Legacy');
+  });
 });

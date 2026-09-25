@@ -58,11 +58,14 @@ const ROLE_DEFINITIONS = [
   { name: '🛡️ Admin', color: '#e67e22', permissions: [ALL_EXCEPT_ADMINISTRATOR], allButAdministrator: true },
   { name: '🔨 Moderator', color: '#2ecc71', permissions: TRIAL_STAFF_PERMISSIONS },
   { name: '🔰 Trial Moderator', color: '#3498db', permissions: TRIAL_STAFF_PERMISSIONS },
-  { name: '📢 Event Manager', color: '#f39c12', permissions: [PermissionFlagsBits.ViewAuditLog, PermissionFlagsBits.ManageEvents, PermissionFlagsBits.MentionEveryone, PermissionFlagsBits.ManageMessages, PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.ReadMessageHistory] },
 ];
 
 // Roles removed from the server on purpose (🧪 Developer and the non-booster VIP); deleted on startup if they still exist.
 const RETIRED_ROLE_IDS = ['1551308801439698965', '1551311500025798736'];
+// Retired roles known only by name (the owner removed Event Manager completely), matched on their letters
+// only so "📢 Event Manager", "Event Manager" or "event manger" all count.
+const RETIRED_ROLE_NAMES = ['eventmanager', 'eventmanger'];
+export const isRetiredRoleName = (name) => RETIRED_ROLE_NAMES.includes(String(name || '').toLowerCase().replace(/[^a-z]/g, ''));
 
 // role.permissions.toArray() returns flag names ('ViewAuditLog'), while the labels are keyed by bit.
 function permissionNames(permissions) {
@@ -93,6 +96,12 @@ export async function deleteRetiredRoles(guild) {
   for (const roleId of RETIRED_ROLE_IDS) {
     const role = await guild.roles.fetch(roleId).catch(() => null);
     if (!role) continue;
+    await role.delete('Retired role removed by the owner');
+    deleted += 1;
+  }
+  const roles = await guild.roles.fetch().catch(() => null);
+  for (const role of roles?.values() || []) {
+    if (!isRetiredRoleName(role.name) || role.managed || !role.editable) continue;
     await role.delete('Retired role removed by the owner');
     deleted += 1;
   }

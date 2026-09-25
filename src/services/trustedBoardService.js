@@ -147,8 +147,9 @@ async function fetchBoardChannel(client) {
 async function publish(client, allowSend) {
   const channel = await fetchBoardChannel(client);
   const embed = await buildEmbed(channel.guild);
-  // Only the owner and the bot can post here, so any embed from the bot is the board, whatever its title.
-  const existing = await findBoardMessage(channel, BOARD_KEY, (message) => message.embeds.length > 0);
+  // The channel also holds the saved ideas post, so the board is the bot's embed titled "…Trusted"
+  // (the emoji is stripped from EmbedBuilder titles, so match the words).
+  const existing = await findBoardMessage(channel, BOARD_KEY, (message) => Boolean(message.embeds[0]?.title?.includes('Trusted')));
   if (existing) {
     await existing.edit({ content: '', embeds: [embed], allowedMentions: { parse: [] } });
     return { status: 'updated', channelId: channel.id };

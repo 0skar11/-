@@ -31,31 +31,46 @@ export function formatVoiceTime(minutes) {
     return rest ? `${hours.toLocaleString('en-US')}س ${rest}د` : `${hours.toLocaleString('en-US')}س`;
 }
 
+const SOURCES = {
+    chat: { icon: '💬', name: 'الشات', how: 'من الكلام في الشات', color: COLORS.chat },
+    voice: { icon: '🎙️', name: 'الفويس', how: 'من القعدة في الفويس', color: COLORS.voice },
+};
+
 /**
- * The level-up message. Every 5th level it pings the member (content mention); otherwise the member is
- * shown as a mention inside the embed, which never notifies anyone.
+ * The level-up message. It says clearly where the XP came from (chat or voice) with its own colour,
+ * icon and title, then the member's totals and the progress to the next level.
+ * Every 5th level it pings the member (content mention); otherwise the member is shown as a mention
+ * inside the embed, which never notifies anyone.
  */
-export function buildLevelUpMessage(member, { fromLevel, level, xp, xpNeeded, rewardRoleIds = [] }) {
+export function buildLevelUpMessage(member, { fromLevel, level, xp, xpNeeded, rewardRoleIds = [], source = 'chat', messages = null, voiceMinutes = null }) {
     const milestone = isMilestone(fromLevel, level);
     const nextMilestone = Math.ceil((level + 1) / PING_EVERY_LEVELS) * PING_EVERY_LEVELS;
+    const from = SOURCES[source] || SOURCES.chat;
+    const totals = [
+        messages === null ? null : `💬 الرسايل: **${number(messages)}**`,
+        voiceMinutes === null ? null : `🎙️ الفويس: **${formatVoiceTime(voiceMinutes)}**`,
+    ].filter(Boolean).join('  •  ');
+
     const lines = [
         milestone ? `🎉 مبروك ${member}! وصلت **لفل ${level}**` : `${member} وصل **لفل ${level}**`,
+        `${from.icon} ${from.how}`,
+        totals ? `\n${totals}` : null,
         '',
-        `**التقدم للفل ${level + 1}**`,
-        progressBar(xp, xpNeeded),
-        `\`${number(xp)} / ${number(xpNeeded)} XP\``,
-    ];
-    if (rewardRoleIds.length) lines.push('', `🎁 **رتبة جديدة:** ${rewardRoleIds.map((id) => `<@&${id}>`).join(' ')}`);
+        `📈 **التقدم للفل ${level + 1}**`,
+        `${progressBar(xp, xpNeeded)}  \`${number(xp)} / ${number(xpNeeded)} XP\``,
+        rewardRoleIds.length ? `\n🎁 **رتبة جديدة:** ${rewardRoleIds.map((id) => `<@&${id}>`).join(' ')}` : null,
+    ].filter((line) => line !== null);
 
     return {
         content: milestone ? `${member}` : null,
         embeds: [{
-            color: milestone ? COLORS.milestone : COLORS.levelUp,
+            color: milestone ? COLORS.milestone : from.color,
             author: { name: member.displayName || member.user?.username, icon_url: member.displayAvatarURL?.() },
-            title: milestone ? `🏆 إنجاز — لفل ${level}` : `⬆️ لفل ${level}`,
-            thumbnail: milestone ? { url: member.displayAvatarURL?.({ size: 256 }) } : undefined,
+            title: milestone ? `🏆 إنجاز — لفل ${level} ${from.icon}` : `${from.icon} لفل ${level} من ${from.name}`,
+            thumbnail: { url: member.displayAvatarURL?.({ size: 256 }) },
             description: lines.join('\n'),
             footer: { text: milestone ? 'rank لمستواك • top للترتيب' : `المنشن الجاي في لفل ${nextMilestone} • rank لمستواك` },
+            timestamp: new Date().toISOString(),
         }],
         allowedMentions: milestone ? { users: [member.id] } : { parse: [] },
     };

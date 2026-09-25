@@ -31,13 +31,18 @@ export async function getAfk(client, guildId, userId) {
 
 export async function setAfk(client, member, reason) {
     const afk = await loadGuild(client, member.guild.id);
-    afk.set(member.id, { reason, since: Date.now() });
-    await save(client, member.guild.id, afk);
+    const previous = afk.get(member.id);
+    // The member's exact nickname before AFK (null = none) is saved and put back as-is when they return.
+    // Running afk again while AFK keeps the first one, so "[AFK] name" is never saved as their nickname.
+    const entry = { reason, since: Date.now(), nickname: previous ? previous.nickname ?? null : member.nickname ?? null, renamed: previous?.renamed || false };
+
     // Shows [AFK] in front of the name when the bot is allowed to change it.
     const name = member.nickname || member.user.globalName || member.user.username;
-    if (member.manageable && !name.startsWith(NICK_PREFIX)) {
-        await member.setNickname(`${NICK_PREFIX}${name}`.slice(0, MAX_NICK), 'AFK').catch(() => {});
+    if (!entry.renamed && member.manageable && !name.startsWith(NICK_PREFIX)) {
+        entry.renamed = await member.setNickname(`${NICK_PREFIX}${name}`.slice(0, MAX_NICK), 'AFK').then(() => true).catch(() => false);
     }
+    afk.set(member.id, entry);
+    await save(client, member.guild.id, afk);
 }
 
 export async function clearAfk(client, member) {
@@ -46,10 +51,13 @@ export async function clearAfk(client, member) {
     if (!entry) return null;
     afk.delete(member.id);
     await save(client, member.guild.id, afk);
-    if (member.manageable && member.nickname?.startsWith(NICK_PREFIX)) {
-        const original = member.nickname.slice(NICK_PREFIX.length);
-        const plain = member.user.globalName || member.user.username;
-        await member.setNickname(original === plain ? null : original, 'Back from AFK').catch(() => {});
+    // Only undo our own rename: if the member changed their nickname while AFK, theirs is kept.
+    if (!member.manageable || !member.nickname?.startsWith(NICK_PREFIX)) return entry;
+    if ('renamed' in entry) {
+        if (entry.renamed) await member.setNickname(entry.nickname ?? null, 'Back from AFK').catch(() => {});
+    } else {
+        // AFK set before the original nickname was saved: drop the prefix from the current name.
+        await member.setNickname(member.nickname.slice(NICK_PREFIX.length) || null, 'Back from AFK').catch(() => {});
     }
     return entry;
 }
