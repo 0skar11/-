@@ -4,7 +4,8 @@
 //
 // Prices change at the start of every hour (5:00, 6:00, 7:00...). Each hour an asset moves up or down
 // by a random amount of at most `volatility` (0.05 = 5%), and never leaves [min, max]. Near a limit
-// the move leans back towards the middle so the price doesn't stick to it.
+// the move leans back towards the middle so the price doesn't stick to it, and a price never lands
+// on a limit itself, so prices always look random (1,325, not 2,000).
 //
 // Demand: every member who bought an asset during the hour (more than they sold) pushes its next
 // move up by `demand.perBuyerPercent`, every net seller pushes it down, together at most
@@ -13,7 +14,7 @@
 // `demand.raiseDecayPercent`, so the price comes back to its normal range by itself.
 //
 // Asset fields: id (lowercase, stays the same forever: it is the key in members' holdings), name,
-// emoji, min, max, start (the first price), volatility.
+// emoji, min, max, start (the first price is random around it), volatility.
 
 export const bourseAssets = [
     { id: 'motorcycle', name: 'موتوسيكل', emoji: '🏍️', min: 200, max: 600, start: 400, volatility: 0.08 },

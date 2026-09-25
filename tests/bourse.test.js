@@ -2,7 +2,7 @@ import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import { bourseAssets, bourseSettings } from '../src/config/store/bourse.js';
 import {
-    HOUR_MS, hourOf, nextChangeAt, assetCeiling, normalizeMarket, demandMove, tickAsset, advanceMarket,
+    HOUR_MS, hourOf, nextChangeAt, assetCeiling, keepInside, normalizeMarket, demandMove, tickAsset, advanceMarket,
     findAsset, sellFee, getMarket, invest, sell, getHoldings,
 } from '../src/services/cc/bourseService.js';
 import { adjustCC, getProfile } from '../src/services/cc/ccService.js';
@@ -53,16 +53,38 @@ describe('bourse prices', () => {
         assert.equal(nextChangeAt(NOW), Date.UTC(2026, 8, 25, 18, 0));
     });
 
-    test('a new market starts at the start prices', () => {
-        const market = normalizeMarket(null, { hour: 10 });
+    test('a new market starts at random prices around the start prices', () => {
+        const market = normalizeMarket(null, { hour: 10, rng: seeded(5) });
         assert.equal(market.hour, 10);
-        for (const asset of bourseAssets) assert.equal(market.assets[asset.id].price, asset.start);
+        for (const asset of bourseAssets) {
+            const { price } = market.assets[asset.id];
+            assert.ok(Math.abs(price - asset.start) <= Math.ceil(asset.start * asset.volatility), asset.id);
+        }
+        assert.ok(bourseAssets.some((asset) => market.assets[asset.id].price !== asset.start));
+        // A middle draw is the start price itself.
+        assert.equal(normalizeMarket(null, { rng: () => 0.5 }).assets.car.price, 1300);
+    });
+
+    test('prices never land on a round limit', () => {
+        assert.equal(keepInside(1500, 800, 2000), 1500);
+        const top = keepInside(2400, 800, 2000, () => 0.99);
+        assert.ok(top < 2000 && top >= 2000 - 1 - 24, String(top));
+        const bottom = keepInside(700, 800, 2000, () => 0);
+        assert.equal(bottom, 801);
+        const rng = seeded(9);
+        for (const asset of bourseAssets) {
+            let entry = normalizeMarket(null, { rng }).assets[asset.id];
+            for (let hour = 0; hour < 500; hour += 1) {
+                entry = tickAsset(asset, entry, { rng });
+                assert.ok(entry.price !== asset.min && entry.price !== asset.max, `${asset.id} ${entry.price}`);
+            }
+        }
     });
 
     test('random moves stay between min and max without demand', () => {
         const rng = seeded(7);
         for (const asset of bourseAssets) {
-            let entry = normalizeMarket(null).assets[asset.id];
+            let entry = normalizeMarket(null, { rng }).assets[asset.id];
             for (let hour = 0; hour < 2000; hour += 1) {
                 const next = tickAsset(asset, entry, { rng });
                 assert.ok(next.price >= asset.min && next.price <= asset.max, `${asset.id} ${next.price}`);
@@ -143,7 +165,7 @@ describe('bourse trading', () => {
 
         const { quotes } = await getMarket(client, GUILD, options);
         const car = quotes.find((entry) => entry.asset.id === 'car');
-        assert.equal(car.price, byId('car').start);
+        assert.ok(car.price > byId('car').min && car.price < byId('car').max);
 
         assert.equal((await invest(client, GUILD, A, 'nothing', 1, options)).reason, 'not_found');
         assert.equal((await invest(client, GUILD, A, 'car', 0, options)).reason, 'bad_quantity');

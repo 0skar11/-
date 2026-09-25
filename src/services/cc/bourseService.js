@@ -34,28 +34,42 @@ function clamp(value, low, high) {
     return Math.min(high, Math.max(low, value));
 }
 
-function freshEntry(asset) {
-    return { price: asset.start, previous: asset.start, raise: 0, flow: {} };
+/**
+ * Keeps a price inside [low, high] without landing on a round limit: a price past a limit ends a
+ * random step (up to 2% of the range) inside it, so prices always look random (1,325, not 2,000).
+ */
+export function keepInside(price, low, high, rng = Math.random) {
+    const step = Math.max(1, Math.round((high - low) * 0.02));
+    if (price >= high) return high - 1 - Math.floor(rng() * step);
+    if (price <= low) return low + 1 + Math.floor(rng() * step);
+    return price;
+}
+
+/** A new asset starts at a random price around `start` (up to its volatility away). */
+function freshEntry(asset, rng = Math.random) {
+    const price = keepInside(Math.round(asset.start * (1 + (rng() * 2 - 1) * asset.volatility)), asset.min, asset.max, rng);
+    return { price, previous: price, raise: 0, flow: {} };
 }
 
 /** Repairs a saved market (or makes a new one) so every asset has a valid entry. */
-export function normalizeMarket(raw, { assets = bourseAssets, hour = hourOf() } = {}) {
+export function normalizeMarket(raw, { assets = bourseAssets, hour = hourOf(), rng = Math.random } = {}) {
     const market = {
         hour: Number.isSafeInteger(raw?.hour) ? raw.hour : hour,
         assets: {},
     };
     for (const asset of assets) {
         const saved = raw?.assets?.[asset.id];
-        const entry = freshEntry(asset);
-        if (saved && typeof saved === 'object') {
-            entry.raise = clamp(Number(saved.raise) || 0, 0, bourseSettings.demand.maxRaisePercent);
-            const ceiling = assetCeiling(asset, entry.raise);
-            if (Number.isSafeInteger(saved.price)) entry.price = clamp(saved.price, asset.min, ceiling);
-            entry.previous = Number.isSafeInteger(saved.previous) ? saved.previous : entry.price;
-            if (saved.flow && typeof saved.flow === 'object') {
-                for (const [userId, net] of Object.entries(saved.flow)) {
-                    if (Number.isSafeInteger(net) && net !== 0) entry.flow[userId] = net;
-                }
+        if (!saved || typeof saved !== 'object' || !Number.isSafeInteger(saved.price)) {
+            market.assets[asset.id] = freshEntry(asset, rng);
+            continue;
+        }
+        const raise = clamp(Number(saved.raise) || 0, 0, bourseSettings.demand.maxRaisePercent);
+        // A price outside the range (after the range was changed in the config) is moved inside it.
+        const price = keepInside(saved.price, asset.min, assetCeiling(asset, raise), rng);
+        const entry = { price, previous: Number.isSafeInteger(saved.previous) ? saved.previous : price, raise, flow: {} };
+        if (saved.flow && typeof saved.flow === 'object') {
+            for (const [userId, net] of Object.entries(saved.flow)) {
+                if (Number.isSafeInteger(net) && net !== 0) entry.flow[userId] = net;
             }
         }
         market.assets[asset.id] = entry;
@@ -91,7 +105,7 @@ export function tickAsset(asset, entry, { settings = bourseSettings, rng = Math.
         : Math.max(0, entry.raise - settings.demand.raiseDecayPercent);
 
     const move = (rng() * 2 - 1) * volatility + lean + demand;
-    const price = clamp(Math.round(entry.price * (1 + move)), min, assetCeiling(asset, raise));
+    const price = keepInside(Math.round(entry.price * (1 + move)), min, assetCeiling(asset, raise), rng);
     return { price, previous: entry.price, raise: Math.round(raise * 100) / 100, flow: {} };
 }
 
@@ -117,7 +131,7 @@ async function withMarket(client, guildId, change, { now = Date.now(), rng = Mat
     return Mutex.runExclusive(`bourse:${guildId}`, async () => {
         const key = getBourseKey(guildId);
         const raw = await client.db.get(key, null);
-        const market = normalizeMarket(raw, { assets, hour: hourOf(now) });
+        const market = normalizeMarket(raw, { assets, hour: hourOf(now), rng });
         const before = JSON.stringify(market);
         advanceMarket(market, hourOf(now), { assets, rng });
         const result = await change(market);

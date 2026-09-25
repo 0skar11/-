@@ -204,7 +204,9 @@ hour (5:00, 6:00, 7:00...). The commands work in any channel (the store and game
 | ✈️ طيارة | 8,000 | 18,000 | 12,000 | up to ±10% |
 
 - Each hour an asset moves by a random amount up to its volatility and never leaves its range.
-  Near a limit the move leans back towards the middle.
+  Near a limit the move leans back towards the middle. Prices always look random (1,325, not
+  2,000): the first price is random around `start`, and a price past a limit ends a random step
+  inside it instead of on the limit.
 - **Demand:** every member who bought an asset during the hour (more than they sold) adds +1% to
   its next move and every net seller −1% (together at most ±15%). Buying also lifts the asset's
   ceiling above its max by the same percent (up to +50%); each hour without buying demand lowers it
