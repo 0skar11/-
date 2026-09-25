@@ -16,6 +16,7 @@ import {
 import { runKeyMigration } from './database/keyMigration.js';
 import {
     tableStatements,
+    columnStatements,
     indexStatements,
     UPDATE_TIMESTAMP_FUNCTION,
     triggerDefinitions,
@@ -282,6 +283,14 @@ class PostgreSQLDatabase {
             }
         }
         
+        for (const column of columnStatements) {
+            try {
+                await this.pool.query(column);
+            } catch (error) {
+                logger.error('Error adding column:', error);
+            }
+        }
+
         logger.info('Database tables created/verified');
         
         await this.createIndexes();
@@ -656,7 +665,7 @@ class PostgreSQLDatabase {
                 
                 case 'user_level': {
                     const userLevelResult = await this.pool.query(
-                        `SELECT xp, level, total_xp, last_message, rank FROM ${pgConfig.tables.user_levels} WHERE guild_id = $1 AND user_id = $2`,
+                        `SELECT xp, chat_xp, voice_xp, level, total_xp, last_message, rank FROM ${pgConfig.tables.user_levels} WHERE guild_id = $1 AND user_id = $2`,
                         [parsedKey.guildId, parsedKey.userId]
                     );
                     if (userLevelResult.rows.length === 0) return defaultValue;
@@ -668,6 +677,11 @@ class PostgreSQLDatabase {
                         totalXp: Number(levelRow.total_xp) || 0,
                         lastMessage: Number(levelRow.last_message) || 0,
                         rank: Number(levelRow.rank) || 0,
+                        // Left out when NULL (saved before chat and voice XP were split).
+                        ...(levelRow.chat_xp === null && levelRow.voice_xp === null ? {} : {
+                            chatXp: Number(levelRow.chat_xp) || 0,
+                            voiceXp: Number(levelRow.voice_xp) || 0,
+                        }),
                     };
                 }
                 
@@ -837,11 +851,13 @@ class PostgreSQLDatabase {
                     const normalizedLastMessage = normalizeTimestampInput(lastMessageValue, new Date());
                     
                     await this.pool.query(
-                        `INSERT INTO ${pgConfig.tables.user_levels} (guild_id, user_id, xp, level, total_xp, last_message, rank, updated_at) 
-                         VALUES ($1, $2, $3, $4, $5, $6, $7, CURRENT_TIMESTAMP) 
+                        `INSERT INTO ${pgConfig.tables.user_levels} (guild_id, user_id, xp, level, total_xp, last_message, rank, chat_xp, voice_xp, updated_at) 
+                         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, CURRENT_TIMESTAMP) 
                          ON CONFLICT (guild_id, user_id) DO UPDATE SET 
-                         xp = $3, level = $4, total_xp = $5, last_message = $6, rank = $7, updated_at = CURRENT_TIMESTAMP`,
-                        [parsedKey.guildId, parsedKey.userId, value.xp || 0, value.level || 0, value.totalXp || 0, normalizedLastMessage, value.rank || 0]
+                         xp = $3, level = $4, total_xp = $5, last_message = $6, rank = $7, chat_xp = $8, voice_xp = $9, updated_at = CURRENT_TIMESTAMP`,
+                        [parsedKey.guildId, parsedKey.userId, value.xp || 0, value.level || 0, value.totalXp || 0, normalizedLastMessage, value.rank || 0,
+                            value.chatXp === undefined ? null : Number(value.chatXp) || 0,
+                            value.voiceXp === undefined ? null : Number(value.voiceXp) || 0]
                     );
                     return true;
                 

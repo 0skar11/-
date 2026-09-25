@@ -23,6 +23,32 @@ export function getXpForLevel(level) {
   return 5 * Math.pow(level, 2) + 50 * level + 50;
 }
 
+// To level up a member needs BOTH chat XP and voice XP: each side must reach its own share of the
+// level's XP (half each), so chatting alone or sitting in voice alone is not enough.
+export const LEVEL_XP_SHARE = { chat: 0.5, voice: 0.5 };
+
+/** The chat XP and the voice XP a member at `level` needs to reach the next level. */
+export function getSplitXpForLevel(level) {
+  const total = getXpForLevel(level);
+  return { chat: Math.ceil(total * LEVEL_XP_SHARE.chat), voice: Math.ceil(total * LEVEL_XP_SHARE.voice) };
+}
+
+/**
+ * Levels the member up while both their chat XP and their voice XP cover the current level, taking
+ * each side's share off. XP past a finished side is kept for the next levels. Mutates and returns levelData.
+ */
+export function applyLevelUps(levelData) {
+  while (levelData.level < MAX_LEVEL) {
+    const needed = getSplitXpForLevel(levelData.level);
+    if (levelData.chatXp < needed.chat || levelData.voiceXp < needed.voice) break;
+    levelData.chatXp -= needed.chat;
+    levelData.voiceXp -= needed.voice;
+    levelData.level += 1;
+  }
+  levelData.xp = levelData.chatXp + levelData.voiceXp;
+  return levelData;
+}
+
 export function getLevelFromXp(xp) {
   if (!Number.isInteger(xp) || xp < 0) {
     throw new TitanBotError(
@@ -196,15 +222,25 @@ export async function getUserLevelData(client, guildId, userId) {
     if (!data) {
       return {
         xp: 0,
+        chatXp: 0,
+        voiceXp: 0,
         level: 0,
         totalXp: 0,
         lastMessage: 0,
         rank: 0
       };
     }
-    
+
+    // Progress saved before chat and voice were counted apart is split evenly between them.
+    const xp = Math.max(0, data.xp || 0);
+    const split = data.chatXp === undefined && data.voiceXp === undefined;
+    const chatXp = split ? Math.floor(xp / 2) : Math.max(0, Number(data.chatXp) || 0);
+    const voiceXp = split ? xp - chatXp : Math.max(0, Number(data.voiceXp) || 0);
+
     return {
-      xp: Math.max(0, data.xp || 0),
+      xp: chatXp + voiceXp,
+      chatXp,
+      voiceXp,
       level: Math.max(0, Math.min(data.level || 0, MAX_LEVEL)),
       totalXp: Math.max(0, data.totalXp || 0),
       lastMessage: data.lastMessage || 0,
@@ -237,8 +273,12 @@ export async function saveUserLevelData(client, guildId, userId, data) {
       );
     }
 
+    const hasSplit = data.chatXp !== undefined || data.voiceXp !== undefined;
+    const chatXp = Math.max(0, Number(data.chatXp) || 0);
+    const voiceXp = Math.max(0, Number(data.voiceXp) || 0);
     const sanitizedData = {
-      xp: Math.max(0, Number(data.xp) || 0),
+      xp: hasSplit ? chatXp + voiceXp : Math.max(0, Number(data.xp) || 0),
+      ...(hasSplit ? { chatXp, voiceXp } : {}),
       level: Math.max(0, Math.min(Number(data.level) || 0, MAX_LEVEL)),
       totalXp: Math.max(0, Number(data.totalXp) || 0),
       lastMessage: Number(data.lastMessage) || 0,
@@ -335,6 +375,8 @@ export async function addLevels(client, guildId, userId, levels) {
 
     userData.level = newLevel;
     userData.xp = newXp;
+    userData.chatXp = 0;
+    userData.voiceXp = 0;
     userData.totalXp = newTotalXp;
 
     await saveUserLevelData(client, guildId, userId, userData);
@@ -379,6 +421,8 @@ export async function removeLevels(client, guildId, userId, levels) {
 
     userData.level = newLevel;
     userData.xp = newXp;
+    userData.chatXp = 0;
+    userData.voiceXp = 0;
     userData.totalXp = newTotalXp;
 
     await saveUserLevelData(client, guildId, userId, userData);
@@ -422,6 +466,8 @@ export async function setUserLevel(client, guildId, userId, level) {
 
     userData.level = level;
     userData.xp = newXp;
+    userData.chatXp = 0;
+    userData.voiceXp = 0;
     userData.totalXp = newTotalXp;
 
     await saveUserLevelData(client, guildId, userId, userData);

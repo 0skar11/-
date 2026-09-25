@@ -77,7 +77,7 @@ describe('voice XP', () => {
         const top = buildTopVoiceEmbed({ name: 'void' }, ranked, { callerId: A, callerEntry: ranked[1] });
         assert.match(top.description, /🥇 <@200000000000000002> — \*\*1س 30د\*\*/u);
         assert.match(top.description, /ترتيبك:\*\* #2 — 30د/u);
-        const card = buildRankEmbed({ displayName: 'x', displayAvatarURL: () => '' }, { level: 1, xp: 0, totalXp: 0, xpNeeded: 100, position: null, rankedCount: 0, voiceMinutes: 75 });
+        const card = buildRankEmbed({ displayName: 'x', displayAvatarURL: () => '' }, { level: 1, totalXp: 0, chatXpNeeded: 50, voiceXpNeeded: 50, position: null, rankedCount: 0, voiceMinutes: 75 });
         assert.ok(card.fields.some((field) => field.value === '**1س 15د**'));
     });
 

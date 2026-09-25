@@ -14,7 +14,7 @@ describe('level system', () => {
   });
 
   test('a normal level-up shows the mention without pinging', () => {
-    const message = buildLevelUpMessage(member, { fromLevel: 6, level: 7, xp: 10, xpNeeded: 400 });
+    const message = buildLevelUpMessage(member, { fromLevel: 6, level: 7, chatXp: 10, voiceXp: 0, chatXpNeeded: 200, voiceXpNeeded: 200 });
     assert.equal(message.content, null);
     assert.deepEqual(message.allowedMentions, { parse: [] });
     assert.match(message.embeds[0].description, /<@42> وصل \*\*لفل 7\*\*/u);
@@ -22,7 +22,7 @@ describe('level system', () => {
   });
 
   test('every 5 levels the member is pinged', () => {
-    const message = buildLevelUpMessage(member, { fromLevel: 9, level: 10, xp: 0, xpNeeded: 1050, rewardRoleIds: ['99'] });
+    const message = buildLevelUpMessage(member, { fromLevel: 9, level: 10, chatXp: 0, voiceXp: 0, chatXpNeeded: 525, voiceXpNeeded: 525, rewardRoleIds: ['99'] });
     assert.equal(message.content, '<@42>');
     assert.deepEqual(message.allowedMentions, { users: ['42'] });
     assert.match(message.embeds[0].title, /لفل 10/u);
@@ -32,7 +32,7 @@ describe('level system', () => {
   test('progress bar and cards', () => {
     assert.equal(progressBar(50, 100, 10), '▰▰▰▰▰▱▱▱▱▱ 50%');
     assert.equal(progressBar(500, 100, 4), '▰▰▰▰ 100%');
-    const rank = buildRankEmbed(member, { level: 3, xp: 40, totalXp: 900, xpNeeded: 245, position: 2, rankedCount: 8 });
+    const rank = buildRankEmbed(member, { level: 3, chatXp: 40, voiceXp: 0, chatXpNeeded: 123, voiceXpNeeded: 123, totalXp: 900, position: 2, rankedCount: 8 });
     assert.equal(rank.fields[1].value, '**#2** من 8');
     const top = buildTopEmbed({ name: 'void' }, [{ userId: '1', level: 9, totalXp: 5000 }, { userId: '2', level: 4, totalXp: 900 }], { callerId: '3', callerEntry: null });
     assert.match(top.description, /🥇 <@1> — لفل \*\*9\*\*/u);
@@ -97,8 +97,8 @@ describe('level words and top chat', () => {
 
 describe('level-up message source', () => {
   test('chat and voice level-ups look different and show both totals', () => {
-    const chat = buildLevelUpMessage(member, { fromLevel: 6, level: 7, xp: 10, xpNeeded: 400, source: 'chat', messages: 1234, voiceMinutes: 125 });
-    const voice = buildLevelUpMessage(member, { fromLevel: 6, level: 7, xp: 10, xpNeeded: 400, source: 'voice', messages: 1234, voiceMinutes: 125 });
+    const chat = buildLevelUpMessage(member, { fromLevel: 6, level: 7, chatXp: 10, voiceXp: 0, chatXpNeeded: 200, voiceXpNeeded: 200, source: 'chat', messages: 1234, voiceMinutes: 125 });
+    const voice = buildLevelUpMessage(member, { fromLevel: 6, level: 7, chatXp: 10, voiceXp: 0, chatXpNeeded: 200, voiceXpNeeded: 200, source: 'voice', messages: 1234, voiceMinutes: 125 });
     assert.equal(chat.embeds[0].title, '💬 لفل 7 من الشات');
     assert.equal(voice.embeds[0].title, '🎙️ لفل 7 من الفويس');
     assert.notEqual(chat.embeds[0].color, voice.embeds[0].color);
@@ -109,7 +109,7 @@ describe('level-up message source', () => {
   });
 
   test('a milestone keeps the ping and still shows the source', () => {
-    const message = buildLevelUpMessage(member, { fromLevel: 9, level: 10, xp: 0, xpNeeded: 1050, source: 'voice' });
+    const message = buildLevelUpMessage(member, { fromLevel: 9, level: 10, chatXp: 0, voiceXp: 0, chatXpNeeded: 525, voiceXpNeeded: 525, source: 'voice' });
     assert.equal(message.content, '<@42>');
     assert.match(message.embeds[0].title, /لفل 10 🎙️/u);
   });

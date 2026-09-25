@@ -1,14 +1,16 @@
 import { SlashCommandBuilder } from 'discord.js';
 import { logger } from '../../utils/logger.js';
 import { TitanBotError, ErrorTypes } from '../../utils/errorHandler.js';
-import { getUserLevelData, getLevelingConfig, getXpForLevel, getLeaderboard } from '../../services/leveling/leveling.js';
+import { getUserLevelData, getLevelingConfig, getSplitXpForLevel, getLeaderboard } from '../../services/leveling/leveling.js';
 import { buildRankEmbed } from '../../services/leveling/levelUi.js';
 import { getChatCounts } from '../../services/leveling/chatCounter.js';
-import { getVoiceMinutes } from '../../services/leveling/voiceXp.js';
+import { averageVoiceXp, getVoiceMinutes } from '../../services/leveling/voiceXp.js';
+import { averageChatXp } from '../../services/leveling/messageXp.js';
 
 import { InteractionHelper } from '../../utils/interactionHelper.js';
 
-// `rank` / `لفل` / `لفل @member`: a member's level, place on the server, messages, voice time and progress to the next level.
+// `rank` / `لفل` / `لفل @member`: a member's level, place on the server, messages, voice time and the chat XP
+// and voice XP still missing for the next level (a level needs both).
 export default {
   data: new SlashCommandBuilder()
     .setName('rank')
@@ -46,12 +48,16 @@ export default {
     const everyone = await getLeaderboard(client, interaction.guildId, 100).catch(() => []);
     const entry = everyone.find((item) => item.userId === targetUser.id);
 
+    const needed = getSplitXpForLevel(level);
     const embed = buildRankEmbed(member, {
       level,
-      xp: userData?.xp ?? 0,
+      chatXp: userData?.chatXp ?? 0,
+      voiceXp: userData?.voiceXp ?? 0,
+      chatXpNeeded: needed.chat,
+      voiceXpNeeded: needed.voice,
+      perMessage: averageChatXp(levelingConfig),
+      perMinute: averageVoiceXp(levelingConfig),
       totalXp: userData?.totalXp ?? 0,
-      // The XP system levels up at getXpForLevel(level), so that's what the bar fills towards.
-      xpNeeded: getXpForLevel(level),
       position: entry?.rank ?? null,
       rankedCount: everyone.length,
       messages: (await getChatCounts(client, interaction.guildId).catch(() => ({})))[targetUser.id] || 0,

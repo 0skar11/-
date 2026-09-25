@@ -17,6 +17,14 @@ export function rollXp(config, random = Math.random) {
   return config.xpMultiplier > 1 ? Math.floor(xp * config.xpMultiplier) : xp;
 }
 
+/** The average XP one message gives (for `rank`'s "≈ N messages left"). */
+export function averageChatXp(config = {}) {
+  const range = config.xpRange || config.xpPerMessage || {};
+  const min = Math.max(1, range.min || 15);
+  const max = Math.max(min, range.max || 25);
+  return ((min + max) / 2) * (config.xpMultiplier > 1 ? config.xpMultiplier : 1);
+}
+
 export async function handleMessageXp(message, client) {
   try {
     if (!message.member) return;

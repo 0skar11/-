@@ -32,6 +32,13 @@ export function rollVoiceXp(config = {}, random = Math.random) {
     return config.xpMultiplier > 1 ? Math.floor(xp * config.xpMultiplier) : xp;
 }
 
+/** The average XP one voice minute gives (for `rank`'s "≈ time left"). */
+export function averageVoiceXp(config = {}) {
+    const min = Math.max(1, VOICE_XP.perMinute.min);
+    const max = Math.max(min, VOICE_XP.perMinute.max);
+    return ((min + max) / 2) * (config.xpMultiplier > 1 ? config.xpMultiplier : 1);
+}
+
 async function addVoiceMinutes(client, guildId, userIds) {
     const stored = (await client.db.get(voiceMinutesKey(guildId), {})) || {};
     for (const userId of userIds) stored[userId] = (stored[userId] || 0) + 1;

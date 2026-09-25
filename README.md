@@ -61,6 +61,7 @@ TitanBot offers a complete suite of tools for Discord server management and comm
 ### Leveling & XP System
 - **XP Tracking** - Automatic message-based XP
 - **Voice XP** - XP for every minute talking in voice with someone else, and `top voice`
+- **Chat + Voice Levels** - Each level needs both chat XP and voice XP; `rank` shows how much of each is missing
 - **Level Roles** - Auto-assign roles by level
 - **Custom Configuration** - Personalize leveling
 

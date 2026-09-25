@@ -31,6 +31,26 @@ export function formatVoiceTime(minutes) {
     return rest ? `${hours.toLocaleString('en-US')}س ${rest}د` : `${hours.toLocaleString('en-US')}س`;
 }
 
+/**
+ * The two bars a level needs (chat and voice) and what's missing on each. `perMessage` / `perMinute`
+ * are the average XP a message / a voice minute gives, to turn what's missing into messages and time.
+ */
+export function levelRequirementLines({ chatXp = 0, voiceXp = 0, chatXpNeeded = 0, voiceXpNeeded = 0, perMessage = null, perMinute = null }) {
+    const chatLeft = Math.max(0, chatXpNeeded - chatXp);
+    const voiceLeft = Math.max(0, voiceXpNeeded - voiceXp);
+    const chatHow = perMessage > 0 ? ` (≈ ${number(Math.ceil(chatLeft / perMessage))} رسالة)` : '';
+    const voiceHow = perMinute > 0 ? ` (≈ ${formatVoiceTime(Math.ceil(voiceLeft / perMinute))} فويس)` : '';
+    const lines = [
+        `💬 **شات:** ${progressBar(chatXp, chatXpNeeded, 10)}  \`${number(Math.min(chatXp, chatXpNeeded))} / ${number(chatXpNeeded)}\``,
+        chatLeft ? `↳ ناقصك **${number(chatLeft)} XP** شات${chatHow}` : '↳ ✅ الشات كامل',
+        `🎙️ **فويس:** ${progressBar(voiceXp, voiceXpNeeded, 10)}  \`${number(Math.min(voiceXp, voiceXpNeeded))} / ${number(voiceXpNeeded)}\``,
+        voiceLeft ? `↳ ناقصك **${number(voiceLeft)} XP** فويس${voiceHow}` : '↳ ✅ الفويس كامل',
+    ];
+    if (chatLeft && !voiceLeft) lines.push('\n⚠️ الفويس خلص، فاضل الشات بس عشان تعلى');
+    else if (!chatLeft && voiceLeft) lines.push('\n⚠️ الشات خلص، فاضل الفويس بس عشان تعلى');
+    return lines;
+}
+
 const SOURCES = {
     chat: { icon: '💬', name: 'الشات', how: 'من الكلام في الشات', color: COLORS.chat },
     voice: { icon: '🎙️', name: 'الفويس', how: 'من القعدة في الفويس', color: COLORS.voice },
@@ -42,7 +62,7 @@ const SOURCES = {
  * Every 5th level it pings the member (content mention); otherwise the member is shown as a mention
  * inside the embed, which never notifies anyone.
  */
-export function buildLevelUpMessage(member, { fromLevel, level, xp, xpNeeded, rewardRoleIds = [], source = 'chat', messages = null, voiceMinutes = null }) {
+export function buildLevelUpMessage(member, { fromLevel, level, chatXp = 0, voiceXp = 0, chatXpNeeded = 0, voiceXpNeeded = 0, rewardRoleIds = [], source = 'chat', messages = null, voiceMinutes = null }) {
     const milestone = isMilestone(fromLevel, level);
     const nextMilestone = Math.ceil((level + 1) / PING_EVERY_LEVELS) * PING_EVERY_LEVELS;
     const from = SOURCES[source] || SOURCES.chat;
@@ -56,8 +76,8 @@ export function buildLevelUpMessage(member, { fromLevel, level, xp, xpNeeded, re
         `${from.icon} ${from.how}`,
         totals ? `\n${totals}` : null,
         '',
-        `📈 **التقدم للفل ${level + 1}**`,
-        `${progressBar(xp, xpNeeded)}  \`${number(xp)} / ${number(xpNeeded)} XP\``,
+        `📈 **للفل ${level + 1} محتاج الشات والفويس الاتنين**`,
+        ...levelRequirementLines({ chatXp, voiceXp, chatXpNeeded, voiceXpNeeded }),
         rewardRoleIds.length ? `\n🎁 **رتبة جديدة:** ${rewardRoleIds.map((id) => `<@&${id}>`).join(' ')}` : null,
     ].filter((line) => line !== null);
 
@@ -77,7 +97,7 @@ export function buildLevelUpMessage(member, { fromLevel, level, xp, xpNeeded, re
 }
 
 /** `rank`: the member's level card. `position` is their place on the server (null when unranked). */
-export function buildRankEmbed(member, { level, xp, totalXp, xpNeeded, position, rankedCount, messages = null, voiceMinutes = null }) {
+export function buildRankEmbed(member, { level, chatXp = 0, voiceXp = 0, chatXpNeeded = 0, voiceXpNeeded = 0, perMessage = null, perMinute = null, totalXp, position, rankedCount, messages = null, voiceMinutes = null }) {
     return {
         color: COLORS.rank,
         author: { name: member.displayName || member.user?.username, icon_url: member.displayAvatarURL?.() },
@@ -89,9 +109,12 @@ export function buildRankEmbed(member, { level, xp, totalXp, xpNeeded, position,
             { name: '✨ إجمالي XP', value: `**${number(totalXp)}**`, inline: true },
             ...(messages === null ? [] : [{ name: '💬 الرسايل', value: `**${number(messages)}**`, inline: true }]),
             ...(voiceMinutes === null ? [] : [{ name: '🎙️ الفويس', value: `**${formatVoiceTime(voiceMinutes)}**`, inline: true }]),
-            { name: `📈 التقدم للفل ${level + 1}`, value: `${progressBar(xp, xpNeeded, 16)}\n\`${number(xp)} / ${number(xpNeeded)} XP\`` },
+            {
+                name: `📈 عشان توصل لفل ${level + 1} محتاج الاتنين`,
+                value: levelRequirementLines({ chatXp, voiceXp, chatXpNeeded, voiceXpNeeded, perMessage, perMinute }).join('\n'),
+            },
         ],
-        footer: { text: 'اتكلم في الشات أو الفويس عشان تجمع XP • top للترتيب' },
+        footer: { text: 'اللفل محتاج XP شات و XP فويس الاتنين، مش واحد بس • top للترتيب' },
     };
 }
 

@@ -1,7 +1,7 @@
 // xpSystem.js
 
 import { logger } from '../../utils/logger.js';
-import { getLevelingConfig, getXpForLevel, getUserLevelData, saveUserLevelData } from './leveling.js';
+import { applyLevelUps, getLevelingConfig, getSplitXpForLevel, getUserLevelData, saveUserLevelData } from './leveling.js';
 import { logEvent, EVENT_TYPES } from '../loggingService.js';
 import { formatLogLine } from '../../utils/logging/logEmbeds.js';
 import { Mutex } from '../../utils/mutex.js';
@@ -31,21 +31,17 @@ export const addXp = wrapServiceBoundary(async function addXp(client, guild, mem
 
     const levelData = await getUserLevelData(client, guild.id, member.user.id);
 
-    levelData.xp += xpToAdd;
+    // Chat and voice XP fill their own bars; a level needs both (see getSplitXpForLevel).
+    if (fromVoice) levelData.voiceXp += xpToAdd;
+    else levelData.chatXp += xpToAdd;
     levelData.totalXp += xpToAdd;
     if (!fromVoice) levelData.lastMessage = Date.now();
 
-    let xpNeededForNextLevel = getXpForLevel(levelData.level);
-    let didLevelUp = false;
     const initialLevel = levelData.level;
+    applyLevelUps(levelData);
+    const didLevelUp = levelData.level > initialLevel;
     const rewardRoleIds = [];
-
-    while (levelData.xp >= xpNeededForNextLevel && levelData.level < 1000) {
-      levelData.xp -= xpNeededForNextLevel;
-      levelData.level += 1;
-      didLevelUp = true;
-      xpNeededForNextLevel = getXpForLevel(levelData.level);
-
+    if (didLevelUp) {
       logger.info(`🎉 ${member.user.tag} leveled up to level ${levelData.level} in ${guild.name}`);
     }
 
@@ -83,11 +79,15 @@ export const addXp = wrapServiceBoundary(async function addXp(client, guild, mem
 
     await saveUserLevelData(client, guild.id, member.user.id, levelData);
 
+    const needed = getSplitXpForLevel(levelData.level);
     return {
       level: levelData.level,
       xp: levelData.xp,
+      chatXp: levelData.chatXp,
+      voiceXp: levelData.voiceXp,
       totalXp: levelData.totalXp,
-      xpNeeded: getXpForLevel(levelData.level + 1),
+      chatXpNeeded: needed.chat,
+      voiceXpNeeded: needed.voice,
       leveledUp: didLevelUp,
     };
   });
@@ -124,11 +124,14 @@ async function sendLevelUpAnnouncement(guild, member, levelData, config, { fromL
       getChatCounts(client, guild.id).then((counts) => counts[member.id] || 0).catch(() => null),
       getVoiceMinutes(client, guild.id).then((minutes) => minutes[member.id] || 0).catch(() => null),
     ]);
+    const needed = getSplitXpForLevel(levelData.level);
     const payload = buildLevelUpMessage(member, {
       fromLevel,
       level: levelData.level,
-      xp: levelData.xp,
-      xpNeeded: getXpForLevel(levelData.level),
+      chatXp: levelData.chatXp,
+      voiceXp: levelData.voiceXp,
+      chatXpNeeded: needed.chat,
+      voiceXpNeeded: needed.voice,
       rewardRoleIds,
       source,
       messages,

@@ -105,6 +105,8 @@ export const tableStatements = [
         xp BIGINT DEFAULT 0,
         level INTEGER DEFAULT 0,
         total_xp BIGINT DEFAULT 0,
+        chat_xp BIGINT,
+        voice_xp BIGINT,
         last_message TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         rank INTEGER DEFAULT 0,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -173,6 +175,13 @@ export const tableStatements = [
         expires_at TIMESTAMP,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )`,
+];
+
+// Columns added to tables that already exist on older databases. chat_xp / voice_xp are the level
+// progress from chat and from voice (a level needs both); NULL means saved before they were split.
+export const columnStatements = [
+    `ALTER TABLE ${t.user_levels} ADD COLUMN IF NOT EXISTS chat_xp BIGINT`,
+    `ALTER TABLE ${t.user_levels} ADD COLUMN IF NOT EXISTS voice_xp BIGINT`,
 ];
 
 export const indexStatements = [
