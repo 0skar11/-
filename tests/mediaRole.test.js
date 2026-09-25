@@ -1,6 +1,6 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
-import { PermissionsBitField } from 'discord.js';
+import { PermissionsBitField, PermissionFlagsBits } from 'discord.js';
 import { hasMediaContent, isPlayCommand, ensureMediaRole, grantMediaRoleToAllMembers, CHAOS_ROLE_ID, MEDIA_PERMISSIONS } from '../src/services/mediaRoleService.js';
 
 const message = (content, attachments = 0) => ({ content, attachments: { size: attachments } });
@@ -10,7 +10,6 @@ describe('media lock', () => {
     assert.equal(hasMediaContent(message('', 1)), true);
     assert.equal(hasMediaContent(message('شوف https://example.com')), true);
     assert.equal(hasMediaContent(message('www.example.com')), true);
-    assert.equal(hasMediaContent(message('https://tenor.com/view/cat-gif-123')), true);
     assert.equal(hasMediaContent(message('discord.gg/abc')), true);
   });
 
@@ -21,12 +20,23 @@ describe('media lock', () => {
     assert.equal(isPlayCommand(message('شغل https://example.com', 1)), false);
   });
 
+  test('GIFs are allowed for everyone, other links around them are not', () => {
+    assert.equal(hasMediaContent(message('https://tenor.com/view/cat-gif-123')), false);
+    assert.equal(hasMediaContent(message('ههه https://media.tenor.com/abc/x.gif')), false);
+    assert.equal(hasMediaContent(message('https://giphy.com/gifs/funny-abc')), false);
+    assert.equal(hasMediaContent(message('https://media.discordapp.net/attachments/1/2/a.gif?ex=1')), false);
+    assert.equal(hasMediaContent(message('https://tenor.com/view/a https://youtube.com/x')), true);
+    assert.equal(hasMediaContent(message('https://tenor.com.evil.com/x')), true);
+    assert.equal(hasMediaContent(message('https://evil.com/tenor.com/x')), true);
+    assert.equal(hasMediaContent(message('https://scam.com/?a.gif')), true);
+  });
+
   test('plain text is not media', () => {
     assert.equal(hasMediaContent(message('ازيك يا جماعة')), false);
     assert.equal(hasMediaContent(message('3.5 ساعة')), false);
   });
 
-  test('creates the media role right below chaos and strips media from @everyone and chaos', async () => {
+  test('creates the media role right below chaos, locks files for @everyone and chaos, keeps GIF embeds', async () => {
     const mediaBits = new PermissionsBitField(MEDIA_PERMISSIONS);
     const role = (id, position, permissions) => ({
       id, position, name: id, managed: false, editable: true,
@@ -34,7 +44,8 @@ describe('media lock', () => {
       async setPermissions(value) { this.permissions = new PermissionsBitField(value); },
       async setPosition(value) { this.position = value; },
     });
-    const everyone = role('everyone', 0, mediaBits);
+    // @everyone had Embed Links taken away by the old lock: it gets it back so GIFs show.
+    const everyone = role('everyone', 0, [PermissionFlagsBits.AttachFiles]);
     const chaos = role(CHAOS_ROLE_ID, 3, mediaBits);
     let media;
     const roles = new Map([[everyone.id, everyone], [chaos.id, chaos]]);
@@ -54,8 +65,9 @@ describe('media lock', () => {
     assert.equal(media.name, 'media');
     assert.equal(media.permissions.has(MEDIA_PERMISSIONS), true);
     assert.equal(media.position, chaos.position - 1);
-    assert.equal(everyone.permissions.any(MEDIA_PERMISSIONS), false);
-    assert.equal(chaos.permissions.any(MEDIA_PERMISSIONS), false);
+    assert.equal(everyone.permissions.has(PermissionFlagsBits.AttachFiles), false);
+    assert.equal(everyone.permissions.has(PermissionFlagsBits.EmbedLinks), true);
+    assert.equal(chaos.permissions.has(PermissionFlagsBits.AttachFiles), false);
   });
 
   test('moves a media role that sits above chaos down to right below it', async () => {

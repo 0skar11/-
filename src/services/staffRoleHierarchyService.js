@@ -42,7 +42,6 @@ const PERMISSION_LABELS = new Map([
   [PermissionFlagsBits.UseSoundboard, 'Use Soundboard — الساوند بورد'],
   [PermissionFlagsBits.UseExternalSounds, 'Use External Sounds — أصوات خارجية'],
   [PermissionFlagsBits.UseEmbeddedActivities, 'Use Activities — الأنشطة في الفويس'],
-  [PermissionFlagsBits.SetVoiceChannelStatus, 'Set Voice Status — حالة روم الفويس'],
 ]);
 
 // Every permission except Administrator: 🔨 Moderator can do everything without being an administrator.
@@ -77,7 +76,8 @@ const VOICE_MODERATOR_PERMISSIONS = [
   PermissionFlagsBits.UseSoundboard,
   PermissionFlagsBits.UseExternalSounds,
   PermissionFlagsBits.UseEmbeddedActivities,
-  PermissionFlagsBits.SetVoiceChannelStatus,
+  // No Set Voice Status: discord.js has no flag for it (PermissionFlagsBits.SetVoiceChannelStatus is
+  // undefined), and an undefined flag makes every permission sync and the permission board throw.
   PermissionFlagsBits.MoveMembers,
   PermissionFlagsBits.MuteMembers,
   PermissionFlagsBits.DeafenMembers,

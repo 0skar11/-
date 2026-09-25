@@ -4,23 +4,36 @@ import { canLiftHardBan } from './moderation/hardBanService.js';
 import { getGuildConfig, updateGuildConfig } from './config/guildConfig.js';
 import { logger } from '../utils/logger.js';
 
-// Images/files, links and GIFs are locked for everyone except members of the `media` role.
-// The role holds Attach Files + Embed Links and sits right below the chaos (member) role;
-// both permissions are taken off @everyone and chaos. Discord permissions can't stop a
-// plain link or a GIF-picker link from being sent, so the message guard below deletes those.
+// Images/files and links are locked for everyone except members of the `media` role; GIFs are open
+// to everyone. The role holds Attach Files + Embed Links and sits right below the chaos (member) role.
+// Attach Files is taken off @everyone and chaos, while @everyone keeps Embed Links so GIFs from the
+// GIF picker (Tenor/Giphy links) show. Discord permissions can't stop a plain link from being sent,
+// so the message guard below deletes those.
 const MEDIA_ROLE_NAME = 'media';
 const MEDIA_ROLE_COLOR = '#9b59b6';
 const CHAOS_ROLE_ID = '1155238281861156955';
 const MEDIA_PERMISSIONS = [PermissionFlagsBits.AttachFiles, PermissionFlagsBits.EmbedLinks];
-const BLOCKED_NOTICE_DELETE_MS = 1_000;
+// Taken off @everyone and chaos. Embed Links stays with everyone, or GIFs would show as bare links.
+const LOCKED_PERMISSIONS = [PermissionFlagsBits.AttachFiles];
+const BLOCKED_NOTICE_DELETE_MS = 5_000;
 // Guild config flag set once every member who was in the server got the media role.
 const GRANTED_TO_ALL_KEY = 'mediaRoleGrantedToAll';
 
 const LINK = /(?:https?:\/\/|www\.)\S+|(?:discord(?:app)?\.com\/invite|discord\.gg)\/[\w-]+/iu;
+// GIFs anyone may send: GIF picker links (Tenor, Giphy) and .gif files on Discord's CDN. Anything else
+// left in the message (another site around them) is still caught as a link.
+const GIF_LINK = /(?:https?:\/\/)?(?:[\w-]+\.)*(?:tenor\.com|giphy\.com|gph\.is)\/\S*|(?:https?:\/\/)?(?:cdn\.discordapp\.com|media\.discordapp\.net)\/\S+?\.gif(?:[?#]\S*)?(?=\s|$)/giu;
 
 async function stripMediaPermissions(role) {
-  if (!role?.editable || !role.permissions.any(MEDIA_PERMISSIONS)) return false;
-  await role.setPermissions(role.permissions.remove(MEDIA_PERMISSIONS), `Media is limited to the ${MEDIA_ROLE_NAME} role`);
+  if (!role?.editable || !role.permissions.any(LOCKED_PERMISSIONS)) return false;
+  await role.setPermissions(role.permissions.remove(LOCKED_PERMISSIONS), `Media is limited to the ${MEDIA_ROLE_NAME} role`);
+  return true;
+}
+
+// Gives Embed Links back to @everyone (it used to be locked too) so everyone's GIFs show.
+async function allowGifEmbeds(everyone) {
+  if (!everyone?.editable || everyone.permissions.has(PermissionFlagsBits.EmbedLinks)) return false;
+  await everyone.setPermissions(everyone.permissions.add(PermissionFlagsBits.EmbedLinks), 'GIFs are allowed for everyone');
   return true;
 }
 
@@ -59,6 +72,7 @@ export async function ensureMediaRole(guild) {
   for (const role of [guild.roles.everyone, chaos]) {
     if (await stripMediaPermissions(role)) locked += 1;
   }
+  await allowGifEmbeds(guild.roles.everyone);
   return { created, positioned, locked };
 }
 
@@ -101,9 +115,9 @@ export async function grantMediaRoleToAllMembers(guild) {
   return { skipped: false, granted, failed };
 }
 
-/** A message counts as media when it has an attachment or a link (GIFs from the picker are Tenor links). */
+/** A message counts as media when it has an attachment or a link. GIF links (the GIF picker's Tenor/Giphy links) don't count. */
 export function hasMediaContent(message) {
-  return Boolean(message.attachments?.size) || LINK.test(message.content || '');
+  return Boolean(message.attachments?.size) || LINK.test((message.content || '').replace(GIF_LINK, ' '));
 }
 
 // `شغل <link>` / `play <link>` (with or without a prefix) is a music request, not media, so it isn't blocked.
@@ -128,7 +142,7 @@ export async function handleMediaMessage(message) {
 
   await message.delete().catch(() => {});
   const notice = await message.channel.send({
-    content: `🚫 <@${message.author.id}> الصور واللينكات والـ gifs لرتبة ${MEDIA_ROLE_NAME} بس.`,
+    content: `🚫 <@${message.author.id}> الصور واللينكات لرتبة ${MEDIA_ROLE_NAME} بس.`,
     allowedMentions: { users: [message.author.id] },
   }).catch(() => null);
   if (notice) setTimeout(() => notice.delete().catch(() => {}), BLOCKED_NOTICE_DELETE_MS);
