@@ -1,4 +1,4 @@
-// solo.js — one-player games. A win pays CC.solo.win (5 CC) until the member hits the daily solo cap.
+// solo.js — one-player games. A win pays CC.solo.win (5 CC) until the member hits the daily solo cap (only during the CC event).
 // rps (حجر) and xo (اكس) use soloRewardText() too.
 
 import { triviaQuestions } from './data/trivia.js';
@@ -7,7 +7,7 @@ import { judgeGuess, GUESS_NUMBER } from './roundGames.js';
 import { MessageFlags } from 'discord.js';
 import { gameEmbed, getActiveGame } from './session.js';
 import { awardSoloWin } from '../cc/ccService.js';
-import { CC, formatCC } from '../../config/cc.js';
+import { CC, formatCC, soloDailyCap } from '../../config/cc.js';
 import { InteractionHelper } from '../../utils/interactionHelper.js';
 
 /** Pays a solo win and returns the line to show under the result. */
@@ -15,7 +15,7 @@ export async function soloRewardText(client, guildId, userId, game) {
     const { amount, failed } = await awardSoloWin(client, guildId, userId, game);
     if (failed) return '⚠️ ماقدرتش أضيف الـ CC، جرب تاني بعدين.';
     if (amount > 0) return `🌀 +${formatCC(amount)}`;
-    return `🌀 وصلت للحد اليومي للألعاب الفردية (${CC.solo.dailyCap} ${CC.short}). الألعاب الجماعية لسه بتدي CC!`;
+    return `🌀 وصلت للحد اليومي للألعاب الفردية (${soloDailyCap().toLocaleString('en-US')} ${CC.short}). الألعاب الجماعية لسه بتدي CC!`;
 }
 
 export const SLOT_SYMBOLS = ['🍒', '🍋', '🍇', '💎', '🌀'];

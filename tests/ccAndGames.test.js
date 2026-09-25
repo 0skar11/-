@@ -51,10 +51,10 @@ describe('CC rewards', () => {
         assert.deepEqual(groupRewards(80), groupRewards(30));
     });
 
-    test('solo wins stop paying at the daily cap', () => {
+    test('solo wins have no daily cap outside a CC event', () => {
+        assert.equal(CC.solo.dailyCap, null);
         assert.equal(soloRewardLeft(0), CC.solo.win);
-        assert.equal(soloRewardLeft(CC.solo.dailyCap - 2), 2);
-        assert.equal(soloRewardLeft(CC.solo.dailyCap), 0);
+        assert.equal(soloRewardLeft(1_000_000), CC.solo.win);
     });
 });
 
@@ -73,14 +73,12 @@ describe('CC service', () => {
         assert.deepEqual(board.map((row) => row.userId), [B, A, C]);
     });
 
-    test('solo wins respect the daily cap and reset the next day', async () => {
+    test('solo wins keep paying outside a CC event', async () => {
         const client = fakeClient();
         const day = Date.UTC(2026, 0, 1, 12);
         let total = 0;
         for (let i = 0; i < 15; i += 1) total += (await awardSoloWin(client, GUILD, A, 'slots', { now: day })).amount;
-        assert.equal(total, CC.solo.dailyCap);
-        const tomorrow = await awardSoloWin(client, GUILD, A, 'slots', { now: day + 24 * 60 * 60 * 1000 });
-        assert.equal(tomorrow.amount, CC.solo.win);
+        assert.equal(total, CC.solo.win * 15);
     });
 
     test('spending needs enough CC and staff adjustments never go below zero', async () => {

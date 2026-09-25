@@ -11,7 +11,7 @@
 
 CC is the server's only currency and it is earned from games only: [Clover wins](#clover-wins),
 and this bot's own games when they are switched back on (group games pay the top 3, solo games pay
-a little with a daily cap). There is no `daily`.
+a little, with a daily cap only during a CC event). There is no `daily`.
 
 The old ways to earn coins (daily, work, crime, rob, beg, fish, mine, gamble, slut, pay) and the old
 bank/shop/inventory commands were removed. Members can send CC to each other with
@@ -34,7 +34,7 @@ pays the winner.
 | 10 | 50 | 30 | 20 |
 | 30+ | 150 | 90 | 60 |
 
-Solo games (`سؤال`, `رقم`, `سلوت`, `حجر`, `اكس`): 5 CC per win, at most 50 CC a day (UTC).
+Solo games (`سؤال`, `رقم`, `سلوت`, `حجر`, `اكس`): 5 CC per win (×5 during a CC event). During a CC event a member can earn at most 1,500 CC a day (UTC) from solo games; outside an event there is no daily cap.
 
 Games against another member (`اكس @عضو`, `fight @عضو`) start with an invite: the other member has
 20 seconds to press قبول or رفض (the challenger can take it back with رفض). Only after قبول does the
@@ -151,8 +151,10 @@ next one, who invited them, and the members they invited (newest first) with eac
 ## CC events (`CC.boost`)
 
 `CC.boost` in `src/config/cc.js` multiplies every CC earned from games (group games, solo wins,
-Clover wins and the games bot's API rewards), level-up CC, and the daily caps until the `until` time, then stops
-by itself. While it runs, `رصيد` and `top cc` show `🔥 CC ×5` with when it ends, and Clover win
+Clover wins and the games bot's API rewards) and level-up CC until the `until` time, then stops
+by itself. The daily caps are flat amounts, not multiplied: solo wins are capped at **1,500 CC** a
+day and Clover wins at **5,000 CC** a day while the event runs, and neither has a cap after it
+(`CC.solo` and `CC.gamesBot`). While it runs, `رصيد` and `top cc` show `🔥 CC ×5` with when it ends, and Clover win
 notices show the multiplier. Transfers and staff changes are never multiplied. To end it early, set
 `multiplier: 1`.
 
@@ -294,7 +296,7 @@ Only guilds this bot is in are accepted (`404` otherwise). User IDs are strings.
 | `GET /api/cc/:guildId/users/:userId` | – | `{ userId, cc, stats }` |
 | `GET /api/cc/:guildId/top?limit=10` | – | `{ members, total, top: [{ userId, cc, earned }] }` (1–100 rows) |
 | `POST /api/cc/:guildId/group-game` | `{ game, players: [ids], ranking: [ids] }` | Pays a finished group game with the rules above (pool `10 × players`, 50/30/20 for the top 3); `ranking` is the finishing order, 1st first. Returns `{ paid: [{ userId, place, amount, balance }] }` |
-| `POST /api/cc/:guildId/solo-win` | `{ userId, game }` | A solo win: 5 CC, at most 50 CC a day. Returns `{ amount, capped, balance }` |
+| `POST /api/cc/:guildId/solo-win` | `{ userId, game }` | A solo win: 5 CC (×event), at most 1,500 CC a day during a CC event, no cap after. Returns `{ amount, capped, balance }` |
 | `POST /api/cc/:guildId/add` | `{ userId, amount, reason }` | Custom reward, 1–10,000 CC. Returns `{ ok, amount, balance }` |
 | `POST /api/cc/:guildId/spend` | `{ userId, amount, reason }` | Takes CC (entry fee, bet). Returns `{ ok: false, balance }` when the member can't afford it |
 

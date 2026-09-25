@@ -7,7 +7,7 @@ export default {
     abuseProtection: { enabled: true, maxAttempts: 3, windowMs: 30_000 },
     data: new SlashCommandBuilder()
         .setName('solo')
-        .setDescription(`Play a solo game (a win gives ${CC.solo.win} CC, up to ${CC.solo.dailyCap} CC a day)`)
+        .setDescription(`Play a solo game (a win gives ${CC.solo.win} CC)`)
         .setDMPermission(false)
         .addSubcommand((sub) => sub.setName('question').setDescription('Answer one general knowledge question'))
         .addSubcommand((sub) => sub.setName('number').setDescription('Guess the number from 0 to 200 in 7 tries'))

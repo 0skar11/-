@@ -17,7 +17,7 @@ import { successEmbed } from '../../../utils/embeds.js';
 import { logger } from '../../../utils/logger.js';
 import { TitanBotError, ErrorTypes, replyUserError } from '../../../utils/errorHandler.js';
 import { adjustCC, getLeaderboard } from '../../../services/cc/ccService.js';
-import { CC, formatCC, gamesBotDailyCap } from '../../../config/cc.js';
+import { CC, formatCC, gamesBotDailyCap, soloDailyCap, capText } from '../../../config/cc.js';
 
 // Staff dashboard for Chaos Credits: server totals plus adding/removing CC by hand (corrections,
 // event prizes). Members themselves only get CC from games.
@@ -41,8 +41,8 @@ async function buildDashboardEmbed(guild, client) {
             { name: `${CC.emoji} Total in circulation`, value: `\`${total.toLocaleString('en-US')} ${CC.short}\``, inline: true },
             { name: '👥 Members with CC', value: `\`${holders.toLocaleString('en-US')}\``, inline: true },
             { name: '📊 Average', value: `\`${(holders ? Math.floor(total / holders) : 0).toLocaleString('en-US')} ${CC.short}\``, inline: true },
-            { name: '🍀 Clover group win / answer win / daily cap', value: `\`${CC.gamesBot.win} / ${CC.gamesBot.answer} / ${Number.isFinite(gamesBotDailyCap()) ? `${gamesBotDailyCap()} ${CC.short}` : 'no cap'}\``, inline: true },
-            { name: '🙋 Solo win / daily cap', value: `\`${CC.solo.win} / ${CC.solo.dailyCap} ${CC.short}\``, inline: true },
+            { name: '🍀 Clover group win / answer win / daily cap', value: `\`${CC.gamesBot.win} / ${CC.gamesBot.answer} / ${capText(gamesBotDailyCap())}\``, inline: true },
+            { name: '🙋 Solo win / daily cap', value: `\`${CC.solo.win} / ${capText(soloDailyCap())}\``, inline: true },
         );
 }
 

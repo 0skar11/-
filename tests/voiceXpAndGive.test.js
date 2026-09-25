@@ -157,14 +157,33 @@ describe('CC event (boost)', () => {
             assert.deepEqual(groupRewards(10, { now: during }), [250, 150, 100]);
             assert.deepEqual(groupRewards(10, { now: after }), [50, 30, 20]);
             assert.equal(soloRewardLeft(0, { now: during }), CC.solo.win * 5);
-            assert.equal(soloRewardLeft(CC.solo.dailyCap, { now: during }), CC.solo.win * 5);
-            assert.equal(soloRewardLeft(CC.solo.dailyCap * 5, { now: during }), 0);
+            assert.equal(soloRewardLeft(CC.solo.boostDailyCap - 2, { now: during }), 2);
+            assert.equal(soloRewardLeft(CC.solo.boostDailyCap, { now: during }), 0);
+            assert.equal(soloRewardLeft(CC.solo.boostDailyCap, { now: after }), CC.solo.win);
 
             const client = fakeClient();
             const win = await awardGamesBotWin(client, GUILD, A, { now: during });
             assert.deepEqual([win.amount, win.boost], [CC.gamesBot.win * 5, 5]);
             const normal = await awardGamesBotWin(client, GUILD, B, { now: after });
             assert.deepEqual([normal.amount, normal.boost], [CC.gamesBot.win, 1]);
+        } finally {
+            CC.boost = saved;
+        }
+    });
+
+    test('solo wins stop at the flat event cap and reset the next day', async () => {
+        const { CC } = await import('../src/config/cc.js');
+        const { awardSoloWin } = await import('../src/services/cc/ccService.js');
+        const saved = CC.boost;
+        CC.boost = { multiplier: 5, until: '2026-09-30T08:15:00Z' };
+        try {
+            const client = fakeClient();
+            const day = Date.parse('2026-09-27T12:00:00Z');
+            let total = 0;
+            for (let i = 0; i < 70; i += 1) total += (await awardSoloWin(client, GUILD, A, 'slots', { now: day })).amount;
+            assert.equal(total, CC.solo.boostDailyCap);
+            const tomorrow = await awardSoloWin(client, GUILD, A, 'slots', { now: day + 24 * 60 * 60 * 1000 });
+            assert.equal(tomorrow.amount, CC.solo.win * 5);
         } finally {
             CC.boost = saved;
         }
