@@ -44,36 +44,42 @@ async function listLevelUserIds(client, guildId) {
 }
 
 /**
- * Which level roles a member at `level` should gain and lose. A member holds every reward role at or
- * below their level (Level 5, Level 10, ... stack). With `removeAbove`, rewards above their level are
- * taken away, for when an admin lowers someone's level.
+ * Which level roles a member at `level` should gain and lose. A member holds only the highest level
+ * role they've reached: reaching a new one takes the one before it away. With `removeAbove`, rewards
+ * above their level are taken away too, for when an admin lowers someone's level. `extra` roles (media)
+ * are given from their level and never taken away.
  */
 export function levelRoleChanges(level, roleRewards = {}, heldRoleIds = new Set(), { removeAbove = false, extra = [] } = {}) {
     const add = [];
     const remove = [];
-    // `extra` roles are given like rewards but never removed.
-    const keep = new Set(extra.map((entry) => entry.roleId));
-    const entries = [
-        ...Object.entries(roleRewards).map(([levelStr, roleId]) => [Number(levelStr), roleId]),
-        ...extra.map((entry) => [Number(entry.level), entry.roleId]),
-    ]
-        .filter(([requiredLevel, roleId]) => Number.isFinite(requiredLevel) && roleId)
-        .sort((a, b) => a[0] - b[0]);
-    const earned = new Set(entries.filter(([requiredLevel]) => level >= requiredLevel).map(([, roleId]) => roleId));
+    const byLevel = (a, b) => a[0] - b[0];
+    const valid = ([requiredLevel, roleId]) => Number.isFinite(requiredLevel) && roleId;
+    const rewards = Object.entries(roleRewards).map(([levelStr, roleId]) => [Number(levelStr), roleId]).filter(valid).sort(byLevel);
+    const extras = extra.map((entry) => [Number(entry.level), entry.roleId]).filter(valid).sort(byLevel);
+    const keep = new Set(extras.map(([, roleId]) => roleId));
 
-    for (const [requiredLevel, roleId] of entries) {
-        if (earned.has(roleId)) {
-            if (!heldRoleIds.has(roleId) && !add.some((entry) => entry.roleId === roleId)) add.push({ level: requiredLevel, roleId });
-        } else if (removeAbove && !keep.has(roleId) && heldRoleIds.has(roleId) && !remove.some((entry) => entry.roleId === roleId)) {
-            remove.push({ level: requiredLevel, roleId });
-        }
+    // The reward for the highest level reached is the only level role the member should hold.
+    const current = rewards.filter(([requiredLevel]) => level >= requiredLevel).at(-1) || null;
+    const wanted = new Map(current ? [[current[1], current[0]]] : []);
+    for (const [requiredLevel, roleId] of extras) {
+        if (level >= requiredLevel && !wanted.has(roleId)) wanted.set(roleId, requiredLevel);
+    }
+
+    for (const [roleId, requiredLevel] of wanted) {
+        if (!heldRoleIds.has(roleId)) add.push({ level: requiredLevel, roleId });
+    }
+    for (const [requiredLevel, roleId] of rewards) {
+        if (wanted.has(roleId) || keep.has(roleId) || !heldRoleIds.has(roleId)) continue;
+        if (requiredLevel > level && !removeAbove) continue;
+        if (!remove.some((entry) => entry.roleId === roleId)) remove.push({ level: requiredLevel, roleId });
     }
     return { add, remove };
 }
 
 /**
- * Gives a member every level role they've reached (and, with `removeAbove`, takes the ones above their
- * level). Returns the IDs of the roles that were added and removed. Never throws.
+ * Gives a member the level role for their level (and media from level 5), and takes the lower level
+ * roles away (with `removeAbove`, the ones above their level too). Returns the IDs of the roles that
+ * were added and removed. Never throws.
  */
 export async function syncMemberLevelRoles(guild, member, level, roleRewards, { removeAbove = false, reason = 'Level role' } = {}) {
     const result = { added: [], removed: [] };
@@ -99,7 +105,7 @@ export async function syncMemberLevelRoles(guild, member, level, roleRewards, { 
         try {
             const role = await findRole(roleId);
             if (!role) continue;
-            await member.roles.remove(role, `${reason}: now below level ${requiredLevel}`);
+            await member.roles.remove(role, `${reason}: level ${requiredLevel} role replaced`);
             result.removed.push(roleId);
         } catch (error) {
             logger.warn(`Could not remove level ${requiredLevel} role from ${member.id} in guild ${guild.id}: ${error.message}`);
@@ -126,6 +132,7 @@ export async function reconcileLevelRoles(client, guildId = null) {
         scannedGuilds: 0,
         prunedRewardEntries: 0,
         rolesReAwarded: 0,
+        rolesRemoved: 0,
         errors: 0,
     };
 
@@ -171,8 +178,9 @@ export async function reconcileLevelRoles(client, guildId = null) {
                 const member = await guild.members.fetch(userId).catch(() => null);
                 if (!member) continue;
 
-                const { added } = await syncMemberLevelRoles(guild, member, levelData.level, rewards, { reason: 'Level reward (startup sync)' });
+                const { added, removed } = await syncMemberLevelRoles(guild, member, levelData.level, rewards, { reason: 'Level reward (startup sync)' });
                 summary.rolesReAwarded += added.length;
+                summary.rolesRemoved += removed.length;
             }
         } catch (error) {
             summary.errors += 1;

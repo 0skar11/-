@@ -65,7 +65,7 @@ export default {
         }
       }
       const levelRoleSummary = await reconcileLevelRoles(client);
-      startupLog(`Level role sync: scanned ${levelRoleSummary.scannedGuilds}, pruned ${levelRoleSummary.prunedRewardEntries}, re-awarded ${levelRoleSummary.rolesReAwarded}, errors ${levelRoleSummary.errors}`);
+      startupLog(`Level role sync: scanned ${levelRoleSummary.scannedGuilds}, pruned ${levelRoleSummary.prunedRewardEntries}, re-awarded ${levelRoleSummary.rolesReAwarded}, replaced ${levelRoleSummary.rolesRemoved}, errors ${levelRoleSummary.errors}`);
     } catch (error) {
       logger.error("Error in ready event:", error);
     }

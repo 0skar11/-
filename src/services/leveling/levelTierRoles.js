@@ -7,6 +7,7 @@ import { getLevelingConfig, saveLevelingConfig } from './leveling.js';
 // levels, through blue and purple, up to gold at level 100. They carry no permissions, only a colour.
 // Each tier is saved in the leveling config's roleRewards, so the level-up message gives the role
 // (and names it) and the startup level role sync hands it to members who already passed that level.
+// A member only holds the highest tier they've reached: the new one replaces the one before it.
 // The owner asked for the level roles to sit right above this role.
 export const LEVEL_ROLES_ABOVE_ROLE_ID = '1551151228833234985';
 

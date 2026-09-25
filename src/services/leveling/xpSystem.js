@@ -45,7 +45,7 @@ export const addXp = wrapServiceBoundary(async function addXp(client, guild, mem
       logger.info(`🎉 ${member.user.tag} leveled up to level ${levelData.level} in ${guild.name}`);
     }
 
-    // Every level role the member has reached (and media from level 5) is given right away, including any they missed before.
+    // The level role for the new level (and media from level 5) is given right away; the lower level role is taken away.
     if (didLevelUp) {
       const { added } = await syncMemberLevelRoles(guild, member, levelData.level, config.roleRewards, { reason: 'Level reward' });
       rewardRoleIds.push(...added);

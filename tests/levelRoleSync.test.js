@@ -22,10 +22,16 @@ const guild = {
 };
 
 describe('level roles are given automatically', () => {
-  test('a member gets every level role they have reached, including missed ones', () => {
-    const { add, remove } = levelRoleChanges(12, rewards, new Set(['r10']));
-    assert.deepEqual(add.map((entry) => entry.roleId), ['r5']);
+  test('a member only gets the role for the highest level reached', () => {
+    const { add, remove } = levelRoleChanges(12, rewards, new Set());
+    assert.deepEqual(add.map((entry) => entry.roleId), ['r10']);
     assert.deepEqual(remove, []);
+  });
+
+  test('the new level role takes the one before it away', () => {
+    const { add, remove } = levelRoleChanges(15, rewards, new Set(['r5', 'r10']));
+    assert.deepEqual(add.map((entry) => entry.roleId), ['r15']);
+    assert.deepEqual(remove.map((entry) => entry.roleId), ['r5', 'r10']);
   });
 
   test('roles above the level are only removed when asked', () => {
@@ -33,25 +39,32 @@ describe('level roles are given automatically', () => {
     assert.deepEqual(levelRoleChanges(7, rewards, new Set(['r5', 'r15']), { removeAbove: true }).remove.map((entry) => entry.roleId), ['r15']);
   });
 
-  test('reaching level 10 gives Level 5 and Level 10', async () => {
-    const member = mockMember();
-    const { added } = await syncMemberLevelRoles(guild, member, 10, rewards);
-    assert.deepEqual(added, ['r5', 'r10']);
-    assert.ok(member.roles.cache.has('r10'));
-    assert.ok(!member.roles.cache.has('r15'));
+  test('reaching level 10 swaps Level 5 for Level 10', async () => {
+    const member = mockMember(['r5']);
+    const { added, removed } = await syncMemberLevelRoles(guild, member, 10, rewards);
+    assert.deepEqual(added, ['r10']);
+    assert.deepEqual(removed, ['r5']);
+    assert.deepEqual([...member.roles.cache.keys()], ['r10']);
   });
 
-  test('lowering the level takes the higher roles away', async () => {
-    const member = mockMember(['r5', 'r10', 'r15', 'r20']);
-    const { removed } = await syncMemberLevelRoles(guild, member, 11, rewards, { removeAbove: true });
-    assert.deepEqual(removed, ['r15', 'r20']);
-    assert.deepEqual([...member.roles.cache.keys()].sort(), ['r10', 'r5']);
+  test('lowering the level gives back the lower role', async () => {
+    const member = mockMember(['r20']);
+    const { added, removed } = await syncMemberLevelRoles(guild, member, 11, rewards, { removeAbove: true });
+    assert.deepEqual(added, ['r10']);
+    assert.deepEqual(removed, ['r20']);
+    assert.deepEqual([...member.roles.cache.keys()], ['r10']);
+  });
+
+  test('below the first level role there is nothing to give', async () => {
+    const member = mockMember();
+    assert.deepEqual(await syncMemberLevelRoles(guild, member, 3, rewards), { added: [], removed: [] });
   });
 
   test('a missing role does not stop the others', async () => {
-    const member = mockMember();
-    const { added } = await syncMemberLevelRoles(guild, member, 10, { 5: 'gone', 10: 'r10' });
-    assert.deepEqual(added, ['r10']);
+    const member = mockMember(['r5']);
+    const { added, removed } = await syncMemberLevelRoles(guild, member, 10, { 5: 'r5', 10: 'gone' });
+    assert.deepEqual(added, []);
+    assert.deepEqual(removed, ['r5']);
   });
 });
 
@@ -72,7 +85,18 @@ describe('the media role comes by itself at level 5', () => {
     assert.deepEqual(added.sort(), ['media-id', 'r5']);
 
     const high = mockMember(['r5', 'r10', 'r15', 'r20']);
-    assert.deepEqual((await syncMemberLevelRoles(mediaGuild, high, 30, rewards)).added, ['media-id']);
+    const result = await syncMemberLevelRoles(mediaGuild, high, 30, rewards);
+    assert.deepEqual(result.added, ['media-id']);
+    assert.deepEqual(result.removed, ['r5', 'r10', 'r15']);
+    assert.deepEqual([...high.roles.cache.keys()].sort(), ['media-id', 'r20']);
+  });
+
+  test('media stays when the level role is swapped', async () => {
+    const member = mockMember(['r5', 'media-id']);
+    const { added, removed } = await syncMemberLevelRoles(mediaGuild, member, 10, rewards);
+    assert.deepEqual(added, ['r10']);
+    assert.deepEqual(removed, ['r5']);
+    assert.ok(member.roles.cache.has('media-id'));
   });
 
   test('media is never taken away when a level goes down', async () => {
