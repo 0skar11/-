@@ -28,33 +28,27 @@ function signedCC(amount) {
     return '⚪ لا مكسب ولا خسارة';
 }
 
-/** `اسعار`: every asset with its price of the hour, the move since last hour and its range. */
+/**
+ * `اسعار`: a grid of cards (3 per row on a computer), one per asset with its price and its move since
+ * last hour, then a card with how to buy and sell. The rules are in the small footer.
+ */
 export function pricesEmbed({ quotes, nextChangeAt }) {
     const next = Math.floor(nextChangeAt / 1000);
-    const lines = quotes.map(({ asset, price, changePercent, ceiling, raised }, index) => [
-        `**${index + 1}.** ${asset.emoji} **${asset.name}**`,
-        `> السعر: **${number(price)}** ${CC.emoji} ・ ${changeArrow(changePercent)}`,
-        `> من ${number(asset.min)} لـ ${number(raised ? ceiling : asset.max)}${raised ? ' ・ 🔥 الطلب عالي' : ''}`,
-    ].join('\n'));
-    return ccEmbed('📈 البورصة', [
-        `⏰ الأسعار بتتغير كل ساعة، الجاية <t:${next}:R>`,
-        '',
-        lines.join('\n'),
-    ].join('\n'), {
+    const cards = quotes.map(({ asset, price, changePercent, raised }) => ({
+        name: `${asset.emoji} ${asset.name}`,
+        value: [`**${number(price)}** ${CC.emoji}`, `${changeArrow(changePercent)}${raised ? ' 🔥' : ''}`].join('\n'),
+        inline: true,
+    }));
+    const embed = ccEmbed('📈 البورصة', `⏰ الأسعار الجاية <t:${next}:R>`, {
         fields: [
-            { name: '💰 استثمار 3', value: 'تشتري المنتج رقم 3', inline: true },
-            { name: '💸 بيع 3', value: 'تبيعه بسعر الساعة', inline: true },
-            { name: '💼 ممتلكاتي', value: 'اللي معاك وقيمته', inline: true },
-            {
-                name: '📜 القواعد',
-                value: [
-                    `• رسوم البيع ${bourseSettings.sellFeePercent}%`,
-                    `• أقصى حاجة ${bourseSettings.maxOwnedPerAsset} قطع من كل منتج`,
-                    '• لما ناس كتير تشتري حاجة بتغلى، ولما يبيعوا بترخص',
-                ].join('\n'),
-            },
+            ...cards,
+            { name: '🛒 ازاي تشتري', value: '`استثمار عربية`\n`بيع عربية`\n`ممتلكاتي`', inline: true },
         ],
     });
+    embed.footer = {
+        text: `رسوم البيع ${bourseSettings.sellFeePercent}% ・ أقصى ${bourseSettings.maxOwnedPerAsset} قطع من كل حاجة ・ 🔥 = عليها طلب`,
+    };
+    return embed;
 }
 
 /** `ممتلكاتي`: what the member owns, what they paid and what they'd get selling now. */
@@ -144,7 +138,7 @@ export function investReceiptEmbed(user, result) {
         `🏷️ سعر القطعة: ${formatCC(result.price)}`,
         `💵 اتخصم: ${formatCC(result.cost)}`,
         `💼 معاك دلوقتي: ${result.owned}`,
-        `💰 رصيدك: ${formatCC(result.balance)}`,
+        `💰 رصيدك: ${formatCC(result.before)} ⬅️ ${formatCC(result.balance)}`,
     ].join('\n'), { color: 'success' });
 }
 
@@ -158,7 +152,7 @@ export function sellReceiptEmbed(user, result) {
         `✅ وصلك: ${formatCC(result.received)}`,
         `📊 ${signedCC(result.profit)}`,
         `💼 فاضل معاك: ${result.owned}`,
-        `💰 رصيدك: ${formatCC(result.balance)}`,
+        `💰 رصيدك: ${formatCC(result.before)} ⬅️ ${formatCC(result.balance)}`,
     ].join('\n'), { color: 'success' });
 }
 

@@ -1,4 +1,6 @@
 /** Command aliases configuration. */
+import { findAsset } from '../store/bourse.js';
+
 export const commandAliases = {
   bal: 'cc', balance: 'cc', money: 'cc', cash: 'cc', credits: 'cc', h: 'help', info: 'help',
   رصيد: 'cc', رصيدي: 'cc', رصيدى: 'cc', فلوس: 'cc', كريدت: 'cc',
@@ -121,6 +123,18 @@ export function isStandaloneInvocation(args) {
 }
 
 /**
+ * `استثمار عربية`, `بيع سبيكة دهب 2`: the bourse words also run without the prefix when the words
+ * after them are exactly a bourse asset's name (optionally followed by a number), so a sentence like
+ * `بيع العربية دي` is still left alone.
+ */
+export function isBourseNameInvocation(typedCommand, args) {
+  const target = commandArgAliases[typedCommand];
+  if (target !== 'bourse invest' && target !== 'bourse sell') return false;
+  const words = /^\d+$/u.test(args[args.length - 1] || '') ? args.slice(0, -1) : args;
+  return words.length > 0 && Boolean(findAsset(words.join(' ')));
+}
+
+/**
  * Applies the two-word and word-with-arguments aliases to a typed command (`top cc` → `cctop`,
  * `روليت` → `game roulette`). Returns null when an everyday word was typed without the prefix as
  * part of a normal sentence, i.e. it is not a command.
@@ -133,7 +147,7 @@ export function applyWordAliases(typedCommand, args, prefixed) {
   }
   let commandName = typedCommand;
   let rest = args;
-  if (!prefixed && standaloneOnlyAliases.has(typedCommand) && !isStandaloneInvocation(rest)) return null;
+  if (!prefixed && standaloneOnlyAliases.has(typedCommand) && !isStandaloneInvocation(rest) && !isBourseNameInvocation(typedCommand, rest)) return null;
   const argAlias = commandArgAliases[typedCommand];
   if (argAlias) {
     const [aliasCommand, ...aliasArgs] = argAlias.split(' ');
