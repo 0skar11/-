@@ -54,3 +54,36 @@ describe('level roles are given automatically', () => {
     assert.deepEqual(added, ['r10']);
   });
 });
+
+describe('the media role comes by itself at level 5', () => {
+  const media = { id: 'media-id', name: 'media', managed: false };
+  const mediaGuild = {
+    id: 'g2',
+    roles: { cache: new Map([...Object.values(rewards).map((id) => [id, { id, name: id }]), [media.id, media]]), fetch: async () => null },
+  };
+
+  test('level 4 does not get media, level 5 and above do', async () => {
+    const low = mockMember();
+    await syncMemberLevelRoles(mediaGuild, low, 4, rewards);
+    assert.ok(!low.roles.cache.has('media-id'));
+
+    const five = mockMember();
+    const { added } = await syncMemberLevelRoles(mediaGuild, five, 5, rewards);
+    assert.deepEqual(added.sort(), ['media-id', 'r5']);
+
+    const high = mockMember(['r5', 'r10', 'r15', 'r20']);
+    assert.deepEqual((await syncMemberLevelRoles(mediaGuild, high, 30, rewards)).added, ['media-id']);
+  });
+
+  test('media is never taken away when a level goes down', async () => {
+    const member = mockMember(['r5', 'media-id']);
+    const { removed } = await syncMemberLevelRoles(mediaGuild, member, 2, rewards, { removeAbove: true });
+    assert.deepEqual(removed, ['r5']);
+    assert.ok(member.roles.cache.has('media-id'));
+  });
+
+  test('media still comes with no level rewards set', async () => {
+    const member = mockMember();
+    assert.deepEqual((await syncMemberLevelRoles(mediaGuild, member, 6, {})).added, ['media-id']);
+  });
+});

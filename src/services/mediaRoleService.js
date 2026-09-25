@@ -8,6 +8,7 @@ import { logger } from '../utils/logger.js';
 // The role holds Attach Files + Embed Links and sits right below the chaos (member) role;
 // both permissions are taken off @everyone and chaos. Discord permissions can't stop a
 // plain link or a GIF-picker link from being sent, so the message guard below deletes those.
+// Members get the media role by themselves at level 5 (MEDIA_ROLE_LEVEL in leveling/levelRoleSyncService.js).
 const MEDIA_ROLE_NAME = 'media';
 const MEDIA_ROLE_COLOR = '#9b59b6';
 const CHAOS_ROLE_ID = '1155238281861156955';
