@@ -219,7 +219,7 @@ hour (5:00, 6:00, 7:00...). The commands work in any channel (the store and game
 
 | Chat word | Slash | What it does |
 |---|---|---|
-| `اسعار` / `بورصة` | `/bourse prices` | A card per asset with its price and move since last hour (🟢 ▲ / 🔴 ▼, 🔥 when in demand); the rules in the footer |
+| `اسعار` / `بورصة` | `/bourse prices` | A card per asset with its price and move since last hour (🟢 ▲ / 🔴 ▼, nothing when it didn't move; 🔥 when in demand); the rules in the footer |
 | `استثمار عربية` / `استثمار 3 2` | `/bourse invest asset [quantity]` | Buy by name or number (2 of it) |
 | `بيع عربية` / `بيع 3 2` | `/bourse sell asset [quantity]` | Sell at the price of the hour |
 | `ممتلكاتي` | `/bourse holdings` | What the member owns, what they paid and what they'd get selling now |

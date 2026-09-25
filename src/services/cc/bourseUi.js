@@ -15,11 +15,11 @@ function assetLabel(asset) {
     return `${asset.emoji} ${asset.name}`;
 }
 
-/** `🟢 ▲ 6.1%`, `🔴 ▼ 1.2%` or `⚪ ▬ 0%`. */
+/** `🟢 ▲ 6.1%`, `🔴 ▼ 1.2%`, or '' when the price didn't move. */
 export function changeArrow(changePercent) {
     if (changePercent > 0) return `🟢 ▲ ${changePercent}%`;
     if (changePercent < 0) return `🔴 ▼ ${Math.abs(changePercent)}%`;
-    return '⚪ ▬ 0%';
+    return '';
 }
 
 function signedCC(amount) {
@@ -36,7 +36,7 @@ export function pricesEmbed({ quotes, nextChangeAt }) {
     const next = Math.floor(nextChangeAt / 1000);
     const cards = quotes.map(({ asset, price, changePercent, raised }) => ({
         name: `${asset.emoji} ${asset.name}`,
-        value: [`**${number(price)}** ${CC.emoji}`, `${changeArrow(changePercent)}${raised ? ' 🔥' : ''}`].join('\n'),
+        value: [`**${number(price)}** ${CC.emoji}`, [changeArrow(changePercent), raised ? '🔥' : ''].filter(Boolean).join(' ')].filter(Boolean).join('\n'),
         inline: true,
     }));
     const embed = ccEmbed('📈 البورصة', `⏰ الأسعار الجاية <t:${next}:R>`, {

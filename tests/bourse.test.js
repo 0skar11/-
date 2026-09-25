@@ -231,7 +231,7 @@ describe('bourse messages', () => {
     test('show the move with an arrow', () => {
         assert.equal(changeArrow(6.1), '🟢 ▲ 6.1%');
         assert.equal(changeArrow(-1.2), '🔴 ▼ 1.2%');
-        assert.equal(changeArrow(0), '⚪ ▬ 0%');
+        assert.equal(changeArrow(0), '');
     });
 
     test('the prices embed lists every asset', async () => {
