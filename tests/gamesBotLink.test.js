@@ -234,7 +234,10 @@ describe('games bot (Clover) wins', async () => {
         assert.deepEqual(parseWin(answer), { userId: A, kind: 'answer' });
         assert.deepEqual(parseWin(`✅ | قام <@!${A}> بكتابة الإجابة الصحيحة خلال 2 ثانية`), { userId: A, kind: 'answer' });
         assert.deepEqual(parseWin(`👑 | <@${A}>`), { userId: A, kind: 'group' });
-        assert.equal(parseWin(`قام <@${A}> بكتابة الاجابة الصحيحة`), null);
+        // The leading emoji can be a custom one or missing; the sentence itself has to start the text.
+        assert.deepEqual(parseWin(`قام <@${A}> بكتابة الاجابة الصحيحة`), { userId: A, kind: 'answer' });
+        assert.equal(parseWin(`مبروك قام <@${A}> بكتابة الاجابة الصحيحة`), null);
+        assert.equal(parseWin(`✅ | قام <@${A}> بكتابة اجابة غلط`), null);
         assert.equal(CC.gamesBot.win, 50);
         assert.equal(CC.gamesBot.answer, 10);
 
@@ -263,6 +266,35 @@ describe('games bot (Clover) wins', async () => {
         } finally {
             CC.boost = saved;
         }
+    });
+
+    test('reads a win shown in an embed or a components v2 box, like Clover does', async () => {
+        const { parseWinMessage } = await import('../src/services/cc/gamesBotWins.js');
+        const text = `✅ | قام <@${A}> بكتابة الاجابة الصحيحة خلال **5.61** ثانية`;
+        assert.deepEqual(parseWinMessage({ content: '', embeds: [{ data: { description: text } }] }), { userId: A, kind: 'answer' });
+        const container = { type: 17, accent_color: 0x57f287, components: [{ type: 10, content: text }] };
+        assert.deepEqual(parseWinMessage({ content: '', components: [{ toJSON: () => container }] }), { userId: A, kind: 'answer' });
+        const section = { type: 9, components: [{ type: 10, content: `👑 | <@${B}>` }], accessory: { type: 11 } };
+        assert.deepEqual(parseWinMessage({ content: '', components: [{ type: 17, components: [section] }] }), { userId: B, kind: 'group' });
+        assert.deepEqual(parseWinMessage({ content: `<:check:123456789012345678> | قام <@${A}> بكتابة الاجابة الصحيحة` }), { userId: A, kind: 'answer' });
+        assert.equal(parseWinMessage({ content: '', embeds: [{ data: { description: 'اللعبة بدأت!' } }] }), null);
+
+        const client = { db: memoryDb() };
+        const embedWin = { ...winMessage(''), embeds: [{ data: { description: text } }] };
+        assert.equal(await handleGamesBotWin(embedWin, client), true);
+        assert.equal((await getProfile(client, GUILD, A)).cc, CC.gamesBot.answer);
+        assert.equal(embedWin.replies.length, 1);
+    });
+
+    test('a Clover message edited into a win pays once', async () => {
+        const { default: messageUpdate } = await import('../src/events/messageUpdate.js');
+        const client = { db: memoryDb() };
+        const text = `✅ | قام <@${C}> بكتابة الاجابة الصحيحة خلال **2.1** ثانية`;
+        const edited = { ...winMessage(''), embeds: [{ data: { description: text } }], client, partial: false };
+        edited.author.bot = true;
+        await messageUpdate.execute({ content: '' }, edited);
+        await messageUpdate.execute({ content: '' }, edited);
+        assert.equal((await getProfile(client, GUILD, C)).cc, CC.gamesBot.answer);
     });
 
     test('no daily cap outside the CC event', async () => {

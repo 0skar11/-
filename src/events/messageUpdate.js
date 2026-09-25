@@ -4,6 +4,7 @@ import { logger } from '../utils/logger.js';
 import { formatLogLine } from '../utils/logging/logEmbeds.js';
 import { handleForeignInviteLink } from '../services/inviteLinkGuardService.js';
 import { handleMediaMessage } from '../services/mediaRoleService.js';
+import { handleGamesBotWin } from '../services/cc/gamesBotWins.js';
 
 const MAX_LOGGED_EDIT_CONTENT_LENGTH = 512;
 
@@ -13,6 +14,11 @@ export default {
 
   async execute(oldMessage, newMessage) {
     try {
+      // A games bot (Clover) message edited into a win result pays CC (once per message).
+      if (newMessage.guild && newMessage.author?.bot && !newMessage.partial) {
+        await handleGamesBotWin(newMessage, newMessage.client);
+        return;
+      }
       if (!newMessage.guild || newMessage.author?.bot) return;
 
       if (oldMessage.content === newMessage.content) return;

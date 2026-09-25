@@ -37,7 +37,27 @@ async function allowGifEmbeds(everyone) {
   return true;
 }
 
-/** Creates/updates the media role, places it right below chaos and locks media for everyone else. */
+// The media role's ID per server, so a media role the owner renamed is still the media role.
+const MEDIA_ROLE_ID_KEY = 'mediaRoleId';
+const mediaRoleIds = new Map(); // guildId -> roleId
+
+/** Whether `role` is the server's media role (the saved one, or one named `media`). */
+export function isMediaRole(role, guildId = role?.guild?.id) {
+  if (!role || role.managed) return false;
+  return role.id === mediaRoleIds.get(guildId) || role.name === MEDIA_ROLE_NAME;
+}
+
+async function savedMediaRoleId(guild) {
+  if (!guild.client?.db) return mediaRoleIds.get(guild.id) || null;
+  const config = await getGuildConfig(guild.client, guild.id).catch(() => null);
+  return config?.[MEDIA_ROLE_ID_KEY] || mediaRoleIds.get(guild.id) || null;
+}
+
+/**
+ * Creates the media role when it is missing: with its permissions, right below chaos, and locks files for
+ * @everyone and chaos (GIF embeds stay open). All of that happens only when the role is created. A media
+ * role that already exists, and @everyone / chaos, are never changed again, so the owner's edits stay.
+ */
 export async function ensureMediaRole(guild) {
   const botMember = guild.members.me || await guild.members.fetchMe().catch(() => null);
   if (!botMember?.permissions.has(PermissionFlagsBits.ManageRoles)) {
@@ -46,33 +66,34 @@ export async function ensureMediaRole(guild) {
   }
 
   const roles = await guild.roles.fetch();
-  const chaos = roles.get(CHAOS_ROLE_ID);
-  let media = roles.find((role) => role.name === MEDIA_ROLE_NAME && !role.managed);
+  const savedId = await savedMediaRoleId(guild);
+  let media = (savedId && roles.get(savedId)) || roles.find((role) => role.name === MEDIA_ROLE_NAME && !role.managed);
   const created = !media;
-  if (!media) {
-    media = await guild.roles.create({ name: MEDIA_ROLE_NAME, color: MEDIA_ROLE_COLOR, mentionable: false, permissions: MEDIA_PERMISSIONS, reason: 'Role that may send images, links and GIFs' });
-  } else if (media.editable && !media.permissions.has(MEDIA_PERMISSIONS)) {
-    await media.setPermissions(media.permissions.add(MEDIA_PERMISSIONS), 'Role that may send images, links and GIFs');
-  }
-
   let positioned = false;
-  if (chaos && media.editable && media.position !== chaos.position - 1) {
-    if (chaos.position < botMember.roles.highest.position) {
+  let locked = 0;
+
+  if (created) {
+    media = await guild.roles.create({ name: MEDIA_ROLE_NAME, color: MEDIA_ROLE_COLOR, mentionable: false, permissions: MEDIA_PERMISSIONS, reason: 'Role that may send images, links and GIFs' });
+    const chaos = roles.get(CHAOS_ROLE_ID);
+    if (chaos && media.editable && chaos.position < botMember.roles.highest.position) {
       // setPosition works on the sorted index: moving down from above takes chaos's slot, moving up lands one below it.
-      await media.setPosition(media.position > chaos.position ? chaos.position : chaos.position - 1, { reason: `Keep ${MEDIA_ROLE_NAME} right below chaos` });
+      await media.setPosition(media.position > chaos.position ? chaos.position : chaos.position - 1, { reason: `Place ${MEDIA_ROLE_NAME} right below chaos` });
       positioned = true;
+    } else if (!chaos) {
+      logger.warn(`Media role in ${guild.name}: chaos role ${CHAOS_ROLE_ID} was not found.`);
     } else {
       logger.warn(`Media role in ${guild.name} can't be moved next to chaos: the bot's highest role must be higher.`);
     }
-  } else if (!chaos) {
-    logger.warn(`Media role in ${guild.name}: chaos role ${CHAOS_ROLE_ID} was not found.`);
+    for (const role of [guild.roles.everyone, chaos]) {
+      if (await stripMediaPermissions(role)) locked += 1;
+    }
+    await allowGifEmbeds(guild.roles.everyone);
   }
 
-  let locked = 0;
-  for (const role of [guild.roles.everyone, chaos]) {
-    if (await stripMediaPermissions(role)) locked += 1;
+  mediaRoleIds.set(guild.id, media.id);
+  if (guild.client?.db && savedId !== media.id) {
+    await updateGuildConfig(guild.client, guild.id, { [MEDIA_ROLE_ID_KEY]: media.id }).catch(() => {});
   }
-  await allowGifEmbeds(guild.roles.everyone);
   return { created, positioned, locked };
 }
 
@@ -91,7 +112,7 @@ export async function grantMediaRoleToAllMembers(guild) {
   const config = await getGuildConfig(guild.client, guild.id);
   if (config?.[GRANTED_TO_ALL_KEY]) return { skipped: true, granted: 0, failed: 0 };
 
-  const media = guild.roles.cache.find((role) => role.name === MEDIA_ROLE_NAME && !role.managed);
+  const media = guild.roles.cache.find((role) => isMediaRole(role, guild.id));
   if (!media?.editable) {
     logger.warn(`Media role grant skipped for ${guild.name}: the role is missing or above the bot's highest role.`);
     return { skipped: true, granted: 0, failed: 0 };
@@ -130,7 +151,7 @@ export function isPlayCommand(message) {
 async function canSendMedia(message) {
   if (isServerOwner(message.author.id)) return true;
   const member = message.member || await message.guild.members.fetch(message.author.id).catch(() => null);
-  if (member?.roles.cache.some((role) => role.name === MEDIA_ROLE_NAME && !role.managed)) return true;
+  if (member?.roles.cache.some((role) => isMediaRole(role, message.guild.id))) return true;
   if (member?.permissions.has(PermissionFlagsBits.Administrator)) return true;
   return canLiftHardBan(message.guild, message.author.id);
 }

@@ -95,19 +95,27 @@ describe('level roles above role 1551151228833234985', () => {
     assert.deepEqual(again, { created: 0, moved: 0, rewardsSaved: false });
   });
 
-  test('puts a tier that was moved out of place back in order', async () => {
+  test('an existing level role the owner edited (moved, recoloured, renamed) is left as it is', async () => {
     const guild = mockGuild([
       { id: '100000000000000000', name: '@everyone', position: 0 },
       { id: LEVEL_ROLES_ABOVE_ROLE_ID, name: 'anchor', position: 1 },
       { id: '100000000000000004', name: 'Bot', position: 2 },
     ]);
+    guild.id = 'g-owner-edits';
     await ensureLevelTierRoles(client, guild);
     const level50 = [...guild.roles.cache.values()].find((role) => role.name === '🔥 Level 50');
     await level50.setPosition(-level50.position + 1, { relative: true }); // dragged below the anchor role
+    level50.color = 0x123456;
+    level50.name = 'Legend';
+    const before = sortRolesBottomUp(guild.roles.cache.values()).map((role) => role.id);
+    const rolesBefore = guild.roles.cache.size;
+
     const summary = await ensureLevelTierRoles(client, guild);
-    assert.equal(summary.moved >= 1, true);
-    const names = sortRolesBottomUp(guild.roles.cache.values()).map((role) => role.name);
-    assert.deepEqual(names, ['@everyone', 'anchor', ...LEVEL_TIERS.map((tier) => tier.name), 'Bot']);
+    assert.deepEqual(summary, { created: 0, moved: 0, rewardsSaved: false });
+    assert.equal(guild.roles.cache.size, rolesBefore); // the renamed role is still the Level 50 role, no copy
+    assert.deepEqual(sortRolesBottomUp(guild.roles.cache.values()).map((role) => role.id), before);
+    assert.equal(level50.color, 0x123456);
+    assert.equal(level50.name, 'Legend');
   });
 });
 
