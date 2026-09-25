@@ -201,6 +201,21 @@ describe('games bot (Clover) wins', async () => {
         assert.equal((await getProfile(client, GUILD, B)).cc, 0);
     });
 
+    test('during a CC event a win pays ×5 and the notice says so and when it ends', async () => {
+        const client = { db: memoryDb() };
+        const saved = CC.boost;
+        CC.boost = { multiplier: 5, until: '2999-01-01T00:00:00Z' };
+        try {
+            const win = winMessage(`👑 | <@${A}>`);
+            await handleGamesBotWin(win, client);
+            assert.equal((await getProfile(client, GUILD, A)).cc, CC.gamesBot.win * 5);
+            assert.match(win.replies[0].content, new RegExp(`\\+\\*\\*${CC.gamesBot.win * 5}\\*\\*`, 'u'));
+            assert.match(win.replies[0].content, /🔥 \*\*CC ×5\*\*.*<t:\d+:R>/u);
+        } finally {
+            CC.boost = saved;
+        }
+    });
+
     test('GAMES_BOT_IDS switches to a premium copy of the bot', async () => {
         const client = { db: memoryDb() };
         process.env.GAMES_BOT_IDS = '300000000000000001';

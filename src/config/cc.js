@@ -70,11 +70,12 @@ export function ccBoost(now = Date.now()) {
     return Number.isInteger(multiplier) && multiplier > 1 && Number.isFinite(end) && now < end ? multiplier : 1;
 }
 
-/** `🔥 CC ×5 لحد <time>` while the event runs, otherwise ''. Discord shows the time in each member's timezone. */
+/** `🔥 CC ×5 — بيخلص in 4 days (date)` while the event runs, otherwise ''. Discord shows the time in each member's timezone. */
 export function ccBoostLine(now = Date.now()) {
     const multiplier = ccBoost(now);
     if (multiplier === 1) return '';
-    return `🔥 **CC ×${multiplier}** — بيخلص <t:${Math.floor(Date.parse(CC.boost.until) / 1000)}:R>`;
+    const end = Math.floor(Date.parse(CC.boost.until) / 1000);
+    return `🔥 **CC ×${multiplier}** — بيخلص <t:${end}:R> (<t:${end}:f>)`;
 }
 
 /**
