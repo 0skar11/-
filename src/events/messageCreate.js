@@ -45,7 +45,7 @@ export default {
       if (await handleEveryoneMention(message)) return;
       if (await handleForeignInviteLink(message)) return;
       if (await handleMediaMessage(message)) return;
-      if (await handleReportChannelMessage(message)) return;
+      if (await handleReportChannelMessage(message, { isCommand: (msg) => isBotCommand(msg, client) })) return;
       // Chat XP (runs in the background; the cooldown keeps it from being farmed with commands or spam).
       handleMessageXp(message, client);
       countMessage(client, message.guild.id, message.author.id);
@@ -75,6 +75,17 @@ async function applyReplyTarget(message, commandData, args) {
   const referenced = await message.fetchReference().catch(() => null);
   if (!referenced?.author || referenced.author.bot) return args;
   return [referenced.author.id, ...args];
+}
+
+/** Whether the message would run one of the bot's commands (same parsing as handlePrefixCommand). */
+async function isBotCommand(message, client) {
+  const guildConfig = await getGuildConfig(client, message.guild.id);
+  const parsed = parseTypedCommand(message.content, guildConfig?.prefix || getCommandPrefix());
+  if (!parsed) return false;
+  const typedCommand = parsed.commandName.toLowerCase();
+  if (['trusted', 'purge'].includes(typedCommand)) return true;
+  const aliased = applyWordAliases(typedCommand, parsed.args, parsed.prefixed);
+  return Boolean(aliased && client.commands.get(resolveCommandAlias(aliased.commandName)));
 }
 
 async function handlePrefixCommand(message, client, gamesOnly = false) {

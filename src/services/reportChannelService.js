@@ -1,6 +1,7 @@
 import { PermissionFlagsBits } from 'discord.js';
 import { logger } from '../utils/logger.js';
 import { openReportIssue } from './reportIssueService.js';
+import { isServerOwner } from '../config/serverOwners.js';
 
 // Any message posted in this channel is turned into a report; no command needed.
 // `/report file` sends its reports here as well.
@@ -65,12 +66,21 @@ export async function sendReport(guild, { reporter, reportedUser, reason, source
   return true;
 }
 
+// Owners and staff (Manage Messages) can run commands here, e.g. `say` to post an announcement;
+// for anyone else every message is a report, even one that starts with a command word.
+function canRunCommandsHere(message) {
+  if (isServerOwner(message.author.id) || message.guild.ownerId === message.author.id) return true;
+  return Boolean(message.member?.permissionsIn?.(message.channel)?.has(PermissionFlagsBits.ManageMessages));
+}
+
 // Turns a plain message in the report channel into a report embed and removes the original.
 // Replies are left alone so staff and the reporter can talk under a report.
+// `isCommand(message)` tells whether the message is a bot command; staff commands run instead of becoming reports.
 // Returns true when the message belonged to the report channel (handled), false otherwise.
-export async function handleReportChannelMessage(message) {
+export async function handleReportChannelMessage(message, { isCommand = async () => false } = {}) {
   if (message.channelId !== REPORT_CHANNEL_ID) return false;
   if (message.reference?.messageId) return true;
+  if (canRunCommandsHere(message) && await isCommand(message)) return false;
 
   const permissions = message.guild.members.me ? message.channel.permissionsFor(message.guild.members.me) : null;
   if (!permissions?.has([PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.EmbedLinks])) {
