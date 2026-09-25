@@ -25,7 +25,7 @@ export const ccStoreDemoItems = [
     { id: 'demo_vip', name: 'رتبة VIP', emoji: '💎', description: 'رتبة مميزة بلون خاص فوق الأعضاء', price: 5000, type: 'item', maxOwned: 1 },
     { id: 'demo_color', name: 'لون مميز للاسم', emoji: '🎨', description: 'تختار لون اسمك في السيرفر', price: 1500, type: 'item', maxOwned: 1 },
     { id: 'demo_xp_boost', name: 'بوست XP ×2', emoji: '⚡', description: 'ضعف الـ XP لمدة ساعة', price: 800, type: 'item', maxOwned: 5 },
-    { id: 'demo_box', name: 'صندوق حظ', emoji: '🎁', description: 'جواه CC أو XP بشكل عشوائي', price: 300, type: 'item', maxOwned: 10 },
+    { id: 'demo_box', name: 'صندوق حظ', emoji: '🎁', description: 'جواه جايزة عشوائية', price: 300, type: 'item', maxOwned: 10 },
 ];
 
 export const ccStoreSettings = {

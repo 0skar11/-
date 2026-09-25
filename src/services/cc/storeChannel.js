@@ -14,7 +14,7 @@ import { isServerOwner } from '../../config/serverOwners.js';
 import { STORE_CATEGORY_ID, STORE_CHANNEL_NAME, storeRoomSettings } from '../../config/store/ccStoreItems.js';
 import { findBoardMessage, rememberBoardMessage } from '../../utils/boardMessage.js';
 import { typedCommandName } from '../games/gamesChannel.js';
-import { buildStorePanel, STORE_PANEL_FOOTER } from './storeUi.js';
+import { buildStorePanel, isStorePanelFooter } from './storeUi.js';
 import { logger } from '../../utils/logger.js';
 
 export const STORE_COMMAND_NAMES = new Set(['store', 'cc', 'cctop']);
@@ -42,7 +42,7 @@ export function setStoreChannel(guildId, channelId) {
 }
 
 export function isStorePanel(message) {
-    return message.embeds?.[0]?.footer?.text === STORE_PANEL_FOOTER;
+    return Boolean(message.embeds?.some((embed) => isStorePanelFooter(embed?.footer?.text)));
 }
 
 export function isStoreCommandMessage(content, prefixes) {

@@ -3,12 +3,16 @@
 // (src/interactions/buttons/store/storePanel.js). Plain embed objects so the emojis stay.
 
 import { ActionRowBuilder, ButtonBuilder, ButtonStyle, StringSelectMenuBuilder } from 'discord.js';
-import { CC, ccEmbed, formatCC, ccBoostLine } from '../../config/cc.js';
+import { CC, ccEmbed, formatCC } from '../../config/cc.js';
 import { ccStoreItems, ccStoreDemoItems, ccStoreSettings, storeRoomSettings } from '../../config/store/ccStoreItems.js';
 import { storeMode, storeCatalog, buyItem } from './ccStoreService.js';
 
 export const STORE_BUTTON_PREFIX = 'storepanel';
-export const STORE_PANEL_FOOTER = `🛒 متجر ${CC.short} • الرسالة دي بتنزل تاني كل ${storeRoomSettings.repostEvery} رسايل`;
+// The footer of the panel's commands card; it marks the panel so a restart edits it instead of posting a new one.
+export const STORE_PANEL_FOOTER = '📌 أوامر المتجر بس هنا ・ أي رسالة تانية بتتمسح';
+// Footers of older panels, so they are still found and edited.
+const OLD_PANEL_FOOTERS = [`🛒 متجر ${CC.short} • الرسالة دي بتنزل تاني كل ${storeRoomSettings.repostEvery} رسايل`];
+const PANEL_COMMANDS_COLOR = 0x80848e;
 const TRIAL_LINE = '🧪 **المتجر تجريبي دلوقتي**: الشراء بيتجرب بس، ومفيش CC بيتخصم ولا حاجة بتتسلم.';
 const CLOSED_LINE = '🔒 **المتجر مقفول دلوقتي**، هيفتح قريب.';
 
@@ -22,6 +26,17 @@ export const STORE_COMMANDS = [
     ['🏆 توب cc', 'ترتيب السيرفر'],
     ['🔢 شراء 1 3', 'تشتري 3 قطع مرة واحدة'],
 ];
+
+// The short commands card under the panel (the full list is in ❓ المساعدة).
+const PANEL_COMMANDS = [
+    ['متجر', 'المنتجات'],
+    ['شراء 1', 'تشتري منتج'],
+    ['مخزني', 'مشترياتك'],
+];
+
+export function isStorePanelFooter(text) {
+    return text === STORE_PANEL_FOOTER || OLD_PANEL_FOOTERS.includes(text);
+}
 
 /** The commands as a header field plus one card (inline field) per command. */
 export function commandFields(header = 'اكتب الأمر هنا في الروم 👇') {
@@ -49,34 +64,37 @@ export function itemLines(items) {
     ].join('\n'));
 }
 
-function itemsField(items) {
-    const value = itemLines(items).join('\n').slice(0, 1024);
-    return { name: '🛍️ المنتجات', value: value || '> لسه مفيش منتجات، هتتضاف قريب.' };
+/** One full-width field per item: `1 ・ 💎 رتبة VIP`, then its price and description on their own lines. */
+function itemFields(items) {
+    if (!items.length) return [{ name: '🛍️ المنتجات', value: '> لسه مفيش منتجات، هتتضاف قريب.' }];
+    return items.slice(0, 20).map((item, index) => ({
+        name: `${index + 1} ・ ${itemLabel(item)}`.slice(0, 256),
+        value: [`> السعر: ${CC.emoji} ${item.price.toLocaleString('en-US')}`, `> ${item.description || '—'}`].join('\n').slice(0, 1024),
+    }));
 }
 
-/** The pinned panel of the store room: what the store sells, the commands and the buttons. */
+function modeTag(mode) {
+    if (mode === 'trial') return '🧪 **تجريبي** ・ الشراء بيتجرب بس ومفيش CC بيتخصم';
+    return mode === 'closed' ? CLOSED_LINE : '';
+}
+
+/**
+ * The pinned panel of the store room: a card with the items, a small grey card with the main
+ * commands under it, then the buy menu and the buttons.
+ */
 export function buildStorePanel(guild, { settings = ccStoreSettings } = {}) {
     const mode = storeMode(settings);
     const items = storeCatalog(settings);
-    const boost = ccBoostLine();
-    const embed = ccEmbed(`🛒 متجر ${CC.name}`, [
-        `اصرف الـ ${CC.emoji} ${CC.short} بتاعتك على حاجات مميزة في **${guild.name}** ✨`,
-        ...(modeLine(mode) ? ['', modeLine(mode)] : []),
-        ...(boost ? ['', boost] : []),
-    ].join('\n'), {
-        thumbnail: guild.iconURL?.({ size: 256 }) || null,
-        fields: [
-            itemsField(items),
-            ...commandFields(),
-            { name: `💡 ازاي تكسب ${CC.short}`, value: '🎮 تكسب في الألعاب\n📈 لما تعلى لفل\n🔁 لما حد يحوّلك' },
-            { name: '📌 قواعد الروم', value: 'الروم ده لأوامر المتجر بس، وأي رسالة تانية بتتمسح لوحدها.' },
-        ],
+    const itemsEmbed = ccEmbed(`🛒 متجر ${CC.name}`, modeTag(mode), { fields: itemFields(items) });
+    const commandsEmbed = ccEmbed('⌨️ الأوامر', '', {
+        color: PANEL_COMMANDS_COLOR,
+        fields: PANEL_COMMANDS.map(([name, value]) => ({ name, value, inline: true })),
     });
-    embed.footer = { text: STORE_PANEL_FOOTER };
+    commandsEmbed.footer = { text: STORE_PANEL_FOOTER };
 
     return {
         content: '',
-        embeds: [embed],
+        embeds: [itemsEmbed, commandsEmbed],
         components: storePanelComponents(items, mode),
         allowedMentions: { parse: [] },
     };
@@ -122,7 +140,12 @@ export function storeHelpEmbed() {
     return ccEmbed('❓ ازاي تستخدم المتجر', [
         '🛒 تقدر تشتري من القايمة اللي في الرسالة المثبتة، وبعدها تأكد بزرار ✅.',
         ...(modeLine() ? ['', modeLine()] : []),
-    ].join('\n'), { fields: commandFields('ودي الأوامر اللي تقدر تكتبها 👇') });
+    ].join('\n'), {
+        fields: [
+            ...commandFields('ودي الأوامر اللي تقدر تكتبها 👇'),
+            { name: `💡 ازاي تكسب ${CC.short}`, value: '🎮 تكسب في الألعاب\n📈 لما تعلى لفل\n🔁 لما حد يحوّلك' },
+        ],
+    });
 }
 
 /** `مخزني`: what the member owns (real and demo item names are both known). */

@@ -118,23 +118,34 @@ describe('store room', () => {
             globalThis.setTimeout = originalSetTimeout;
         }
         assert.equal(sends.length, 1);
-        assert.equal(sends[0].embeds[0].footer.text, STORE_PANEL_FOOTER);
+        assert.ok(isStorePanel(sends[0]));
     });
 });
 
 describe('store panel', () => {
-    test('shows the demo items with a buy menu and the buttons', () => {
+    test('shows the demo items, a commands card, a buy menu and the buttons', () => {
         const guild = { name: 'Void', iconURL: () => null };
         const panel = buildStorePanel(guild);
-        const embed = panel.embeds[0];
-        assert.ok(isStorePanel({ embeds: [embed] }));
-        assert.match(embed.description, /تجريبي/u);
-        assert.ok(embed.fields[0].value.includes(ccStoreDemoItems[0].name));
+        const [items, commands] = panel.embeds;
+        assert.ok(isStorePanel(panel));
+        assert.match(items.description, /تجريبي/u);
+        assert.equal(items.fields.length, ccStoreDemoItems.length);
+        assert.ok(items.fields[0].name.includes(ccStoreDemoItems[0].name));
+        assert.match(items.fields[0].value, /السعر/u);
+        assert.equal(commands.footer.text, STORE_PANEL_FOOTER);
+        assert.deepEqual(commands.fields.map((field) => field.name), ['متجر', 'شراء 1', 'مخزني']);
+        assert.ok(commands.fields.every((field) => field.inline));
         const [menuRow, buttonRow] = panel.components.map((row) => row.toJSON());
         assert.equal(menuRow.components[0].custom_id, 'storepanel:buy');
         assert.equal(menuRow.components[0].options.length, ccStoreDemoItems.length);
         assert.deepEqual(buttonRow.components.map((button) => button.custom_id),
             ['storepanel:balance', 'storepanel:inventory', 'storepanel:top', 'storepanel:help']);
+    });
+
+    test('panels posted before the redesign are still recognised', () => {
+        const old = { embeds: [{ footer: { text: '🛒 متجر CC • الرسالة دي بتنزل تاني كل 5 رسايل' } }] };
+        assert.ok(isStorePanel(old));
+        assert.ok(!isStorePanel({ embeds: [{ footer: { text: 'something else' } }] }));
     });
 
     test('the confirmation is only for the buyer and is disabled without enough CC', () => {
