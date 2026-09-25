@@ -14,7 +14,7 @@ import { logger } from '../../utils/logger.js';
 // `👑 | <@id>`: the crown, an optional bar, one mention and nothing else.
 const WIN_MESSAGE = /^\s*👑️?\s*\|?\s*<@!?(\d{17,20})>\s*$/u;
 // `✅ | قام <@id> بكتابة الاجابة الصحيحة خلال **__4.12__** ثانية`: the first member to type the answer.
-const ANSWER_MESSAGE = /^\s*✅️?\s*\|?\s*قام\s+<@!?(\d{17,20})>\s+بكتابة\s+ال[اإأ]جابة\s+الصحيحة/u;
+const ANSWER_MESSAGE = /^\s*(?:✅️?|<a?:\w+:\d+>)?\s*\|?\s*قام\s+<@!?(\d{17,20})>\s+بكتابة\s+ال[اإأ]جابة\s+الصحيحة/u;
 const NOTICE_DELETE_MS = 15_000;
 const PAID_MEMORY = 500;
 const paidMessages = new Set();
@@ -26,6 +26,41 @@ export function parseWin(content) {
     if (group) return { userId: group, kind: 'group' };
     const answer = ANSWER_MESSAGE.exec(text)?.[1];
     return answer ? { userId: answer, kind: 'answer' } : null;
+}
+
+// Clover often puts the result in an embed or a components v2 box (the coloured box under the answer),
+// not in the message text, so every text in the message is read: content, embed title / description /
+// fields, and the text of its components.
+function componentTexts(component, texts) {
+    if (!component || typeof component !== 'object') return;
+    if (Array.isArray(component)) {
+        for (const child of component) componentTexts(child, texts);
+        return;
+    }
+    if (typeof component.content === 'string') texts.push(component.content);
+    componentTexts(component.components, texts);
+    componentTexts(component.component, texts);
+    componentTexts(component.accessory, texts);
+}
+
+export function messageTexts(message) {
+    const texts = [message.content];
+    for (const embed of message.embeds || []) {
+        const data = embed.data || embed;
+        texts.push(data.title, data.description, data.author?.name);
+        for (const field of data.fields || []) texts.push(field.name, field.value);
+    }
+    componentTexts((message.components || []).map((component) => component.toJSON?.() || component), texts);
+    return texts.filter((text) => typeof text === 'string' && text.trim());
+}
+
+/** The first win found in any of the message's texts (see messageTexts), otherwise null. */
+export function parseWinMessage(message) {
+    for (const text of messageTexts(message)) {
+        const win = parseWin(text);
+        if (win) return win;
+    }
+    return null;
 }
 
 /** The winner's user ID when `content` is a games bot win message, otherwise null. */
@@ -40,11 +75,12 @@ function rememberPaid(messageId) {
 
 /**
  * Pays the winner of a games bot win message. Returns true when `message` was one (paid or not),
- * so the caller can stop handling it.
+ * so the caller can stop handling it. Also called on edits (Clover may fill the result in later);
+ * a message pays once either way.
  */
 export async function handleGamesBotWin(message, client) {
     if (!message.guild || !message.author?.bot || !gamesBotIds().has(message.author.id)) return false;
-    const win = parseWin(message.content);
+    const win = parseWinMessage(message);
     if (!win) return false;
     const winnerId = win.userId;
     if (paidMessages.has(message.id)) return true;
