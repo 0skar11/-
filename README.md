@@ -33,7 +33,7 @@ TitanBot offers a complete suite of tools for Discord server management and comm
 - **Clover wins** - Wins in the Clover games bot pay CC
 - **Group Games** - Roulette, musical chairs, mafia, trivia and more; the top 3 win CC
 - **Top CC** - Server leaderboard (see [docs/cc-and-games.md](docs/cc-and-games.md))
-- **Invite Rewards** - 1000 CC for every invited member who reaches level 5, `top invites` and invite roles
+- **Invite Rewards** - 1000 CC for every invited member who reaches level 5, `top invites`, `انفايت @member` and invite roles
 - **Give** - Send CC to a member, with a tax that grows for frequent senders
 
 ### Fun & Entertainment

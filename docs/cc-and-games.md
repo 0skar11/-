@@ -144,6 +144,10 @@ member only keeps the role of their highest tier.
 `top invites` / `توب دعوات` / `دعواتي` (`/invitetop`) shows the top inviters, your own paid and
 pending invites and the rules.
 
+`انفايت` / `انفايت @member` (`/invite`) shows a member's invites: paid, pending, left and fake counts,
+their rank, the CC they earned from invites, their invite role and how many more they need for the
+next one, who invited them, and the members they invited (newest first) with each one's status.
+
 ## CC events (`CC.boost`)
 
 `CC.boost` in `src/config/cc.js` multiplies every CC earned from games (group games, solo wins,
