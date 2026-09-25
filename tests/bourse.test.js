@@ -2,11 +2,12 @@ import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import { bourseAssets, bourseSettings } from '../src/config/store/bourse.js';
 import {
-    HOUR_MS, hourOf, nextChangeAt, assetCeiling, normalizeMarket, demandMove, tickAsset, advanceMarket,
+    HOUR_MS, hourOf, nextChangeAt, assetCeiling, keepInside, normalizeMarket, demandMove, tickAsset, advanceMarket,
     findAsset, sellFee, getMarket, invest, sell, getHoldings,
 } from '../src/services/cc/bourseService.js';
 import { adjustCC, getProfile } from '../src/services/cc/ccService.js';
 import { changeArrow, pricesEmbed } from '../src/services/cc/bourseUi.js';
+import { applyWordAliases } from '../src/config/commands/commandAliases.js';
 
 const GUILD = '100000000000000009';
 const A = '200000000000000001';
@@ -53,16 +54,38 @@ describe('bourse prices', () => {
         assert.equal(nextChangeAt(NOW), Date.UTC(2026, 8, 25, 18, 0));
     });
 
-    test('a new market starts at the start prices', () => {
-        const market = normalizeMarket(null, { hour: 10 });
+    test('a new market starts at random prices around the start prices', () => {
+        const market = normalizeMarket(null, { hour: 10, rng: seeded(5) });
         assert.equal(market.hour, 10);
-        for (const asset of bourseAssets) assert.equal(market.assets[asset.id].price, asset.start);
+        for (const asset of bourseAssets) {
+            const { price } = market.assets[asset.id];
+            assert.ok(Math.abs(price - asset.start) <= Math.ceil(asset.start * asset.volatility), asset.id);
+        }
+        assert.ok(bourseAssets.some((asset) => market.assets[asset.id].price !== asset.start));
+        // A middle draw is the start price itself.
+        assert.equal(normalizeMarket(null, { rng: () => 0.5 }).assets.car.price, 1300);
+    });
+
+    test('prices never land on a round limit', () => {
+        assert.equal(keepInside(1500, 800, 2000), 1500);
+        const top = keepInside(2400, 800, 2000, () => 0.99);
+        assert.ok(top < 2000 && top >= 2000 - 1 - 24, String(top));
+        const bottom = keepInside(700, 800, 2000, () => 0);
+        assert.equal(bottom, 801);
+        const rng = seeded(9);
+        for (const asset of bourseAssets) {
+            let entry = normalizeMarket(null, { rng }).assets[asset.id];
+            for (let hour = 0; hour < 500; hour += 1) {
+                entry = tickAsset(asset, entry, { rng });
+                assert.ok(entry.price !== asset.min && entry.price !== asset.max, `${asset.id} ${entry.price}`);
+            }
+        }
     });
 
     test('random moves stay between min and max without demand', () => {
         const rng = seeded(7);
         for (const asset of bourseAssets) {
-            let entry = normalizeMarket(null).assets[asset.id];
+            let entry = normalizeMarket(null, { rng }).assets[asset.id];
             for (let hour = 0; hour < 2000; hour += 1) {
                 const next = tickAsset(asset, entry, { rng });
                 assert.ok(next.price >= asset.min && next.price <= asset.max, `${asset.id} ${next.price}`);
@@ -143,7 +166,7 @@ describe('bourse trading', () => {
 
         const { quotes } = await getMarket(client, GUILD, options);
         const car = quotes.find((entry) => entry.asset.id === 'car');
-        assert.equal(car.price, byId('car').start);
+        assert.ok(car.price > byId('car').min && car.price < byId('car').max);
 
         assert.equal((await invest(client, GUILD, A, 'nothing', 1, options)).reason, 'not_found');
         assert.equal((await invest(client, GUILD, A, 'car', 0, options)).reason, 'bad_quantity');
@@ -152,7 +175,7 @@ describe('bourse trading', () => {
         assert.equal((await invest(client, GUILD, A, 'plane', 1, options)).reason, 'no_cc');
 
         const bought = await invest(client, GUILD, A, '3', 2, { ...options, expectedPrice: car.price });
-        assert.deepEqual([bought.ok, bought.cost, bought.owned, bought.balance], [true, car.price * 2, 2, 5000 - car.price * 2]);
+        assert.deepEqual([bought.ok, bought.cost, bought.owned, bought.before, bought.balance], [true, car.price * 2, 2, 5000, 5000 - car.price * 2]);
         assert.equal((await getProfile(client, GUILD, A)).cc, 5000 - car.price * 2);
 
         // The purchase counts as demand for the next hour.
@@ -165,6 +188,7 @@ describe('bourse trading', () => {
         const fee = sellFee(car.price);
         assert.deepEqual([sold.ok, sold.fee, sold.received, sold.paid, sold.profit, sold.owned], [true, fee, car.price - fee, car.price, -fee, 1]);
         assert.equal((await getProfile(client, GUILD, A)).cc, 5000 - car.price - fee);
+        assert.deepEqual([sold.before, sold.balance], [5000 - car.price * 2, 5000 - car.price - fee]);
         assert.equal(client.store.get(`guild:${GUILD}:bourse`).assets.car.flow[A], 1);
 
         const holdings = await getHoldings(client, GUILD, A, options);
@@ -213,7 +237,29 @@ describe('bourse messages', () => {
     test('the prices embed lists every asset', async () => {
         const market = await getMarket(fakeClient(), GUILD, { now: NOW });
         const embed = pricesEmbed(market);
-        for (const asset of bourseAssets) assert.ok(embed.description.includes(asset.name), asset.id);
-        assert.ok(embed.description.length <= 4096);
+        for (const asset of bourseAssets) assert.ok(embed.fields.some((field) => field.name.includes(asset.name) && field.inline), asset.id);
+        assert.ok(embed.fields.length <= 25);
+        assert.ok(embed.footer.text.includes('1.5%'));
+    });
+});
+
+describe('bourse balance', () => {
+    test('buying takes exactly the price from the balance', async () => {
+        const client = fakeClient();
+        client.store.set(`guild:${GUILD}:economy:${A}`, { wallet: 999, bank: 5, cc: 710 });
+        const result = await invest(client, GUILD, A, 'gold', 1, { now: NOW, rng: () => 0.5 });
+        assert.deepEqual([result.price, result.before, result.balance], [600, 710, 110]);
+        assert.equal((await getProfile(client, GUILD, A)).cc, 110);
+    });
+});
+
+describe('bourse words', () => {
+    test('run with an asset name without the prefix, but not in a normal sentence', () => {
+        assert.deepEqual(applyWordAliases('استثمار', ['عربية'], false), { commandName: 'bourse', args: ['invest', 'عربية'] });
+        assert.deepEqual(applyWordAliases('بيع', ['سبيكة', 'دهب', '2'], false), { commandName: 'bourse', args: ['sell', 'سبيكة', 'دهب', '2'] });
+        assert.deepEqual(applyWordAliases('بيع', ['3'], false), { commandName: 'bourse', args: ['sell', '3'] });
+        assert.equal(applyWordAliases('بيع', ['العربية', 'دي'], false), null);
+        assert.equal(applyWordAliases('استثمار', ['في', 'الدهب', 'حلو'], false), null);
+        assert.equal(applyWordAliases('اسعار', ['الدهب'], false), null);
     });
 });

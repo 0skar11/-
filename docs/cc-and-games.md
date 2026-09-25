@@ -204,7 +204,9 @@ hour (5:00, 6:00, 7:00...). The commands work in any channel (the store and game
 | ✈️ طيارة | 8,000 | 18,000 | 12,000 | up to ±10% |
 
 - Each hour an asset moves by a random amount up to its volatility and never leaves its range.
-  Near a limit the move leans back towards the middle.
+  Near a limit the move leans back towards the middle. Prices always look random (1,325, not
+  2,000): the first price is random around `start`, and a price past a limit ends a random step
+  inside it instead of on the limit.
 - **Demand:** every member who bought an asset during the hour (more than they sold) adds +1% to
   its next move and every net seller −1% (together at most ±15%). Buying also lifts the asset's
   ceiling above its max by the same percent (up to +50%); each hour without buying demand lowers it
@@ -217,13 +219,14 @@ hour (5:00, 6:00, 7:00...). The commands work in any channel (the store and game
 
 | Chat word | Slash | What it does |
 |---|---|---|
-| `اسعار` / `بورصة` | `/bourse prices` | The prices of the hour, the move since last hour (🟢 ▲ / 🔴 ▼) and each range |
-| `استثمار 3` / `استثمار 3 2` | `/bourse invest asset [quantity]` | Buy asset 3 (or 2 of it) |
-| `بيع 3` / `بيع 3 2` | `/bourse sell asset [quantity]` | Sell at the price of the hour |
+| `اسعار` / `بورصة` | `/bourse prices` | A card per asset with its price and move since last hour (🟢 ▲ / 🔴 ▼, 🔥 when in demand); the rules in the footer |
+| `استثمار عربية` / `استثمار 3 2` | `/bourse invest asset [quantity]` | Buy by name or number (2 of it) |
+| `بيع عربية` / `بيع 3 2` | `/bourse sell asset [quantity]` | Sell at the price of the hour |
 | `ممتلكاتي` | `/bourse holdings` | What the member owns, what they paid and what they'd get selling now |
 
-Without the prefix the words only run with a number (`بيع 3`); with the prefix an asset name works
-too (`!بيع عربية`).
+Without the prefix `استثمار` / `بيع` run only when what follows is a number or exactly an asset's
+name, optionally with a number (`بيع سبيكة دهب 2`, `استثمار العربية`), so a sentence like `بيع
+العربية دي` is left alone. Receipts show the balance before and after, read in the same save.
 
 - Assets and rules: `src/config/store/bourse.js`. Changing a price range takes effect at the next
   read; never change an asset's `id` (it is the key in members' holdings).

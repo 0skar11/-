@@ -8,7 +8,9 @@
 // restart changes nothing. A member's holdings are `ccBourse: { <assetId>: { qty, cost } }` in their
 // economy record (`cost` is what they paid for the pieces they still have).
 
-import { bourseAssets, bourseSettings } from '../../config/store/bourse.js';
+import { bourseAssets, bourseSettings, findAsset } from '../../config/store/bourse.js';
+
+export { findAsset };
 import { getBourseKey, getEconomyKey } from '../../utils/database/keys.js';
 import { Mutex } from '../../utils/mutex.js';
 import { logger } from '../../utils/logger.js';
@@ -34,28 +36,42 @@ function clamp(value, low, high) {
     return Math.min(high, Math.max(low, value));
 }
 
-function freshEntry(asset) {
-    return { price: asset.start, previous: asset.start, raise: 0, flow: {} };
+/**
+ * Keeps a price inside [low, high] without landing on a round limit: a price past a limit ends a
+ * random step (up to 2% of the range) inside it, so prices always look random (1,325, not 2,000).
+ */
+export function keepInside(price, low, high, rng = Math.random) {
+    const step = Math.max(1, Math.round((high - low) * 0.02));
+    if (price >= high) return high - 1 - Math.floor(rng() * step);
+    if (price <= low) return low + 1 + Math.floor(rng() * step);
+    return price;
+}
+
+/** A new asset starts at a random price around `start` (up to its volatility away). */
+function freshEntry(asset, rng = Math.random) {
+    const price = keepInside(Math.round(asset.start * (1 + (rng() * 2 - 1) * asset.volatility)), asset.min, asset.max, rng);
+    return { price, previous: price, raise: 0, flow: {} };
 }
 
 /** Repairs a saved market (or makes a new one) so every asset has a valid entry. */
-export function normalizeMarket(raw, { assets = bourseAssets, hour = hourOf() } = {}) {
+export function normalizeMarket(raw, { assets = bourseAssets, hour = hourOf(), rng = Math.random } = {}) {
     const market = {
         hour: Number.isSafeInteger(raw?.hour) ? raw.hour : hour,
         assets: {},
     };
     for (const asset of assets) {
         const saved = raw?.assets?.[asset.id];
-        const entry = freshEntry(asset);
-        if (saved && typeof saved === 'object') {
-            entry.raise = clamp(Number(saved.raise) || 0, 0, bourseSettings.demand.maxRaisePercent);
-            const ceiling = assetCeiling(asset, entry.raise);
-            if (Number.isSafeInteger(saved.price)) entry.price = clamp(saved.price, asset.min, ceiling);
-            entry.previous = Number.isSafeInteger(saved.previous) ? saved.previous : entry.price;
-            if (saved.flow && typeof saved.flow === 'object') {
-                for (const [userId, net] of Object.entries(saved.flow)) {
-                    if (Number.isSafeInteger(net) && net !== 0) entry.flow[userId] = net;
-                }
+        if (!saved || typeof saved !== 'object' || !Number.isSafeInteger(saved.price)) {
+            market.assets[asset.id] = freshEntry(asset, rng);
+            continue;
+        }
+        const raise = clamp(Number(saved.raise) || 0, 0, bourseSettings.demand.maxRaisePercent);
+        // A price outside the range (after the range was changed in the config) is moved inside it.
+        const price = keepInside(saved.price, asset.min, assetCeiling(asset, raise), rng);
+        const entry = { price, previous: Number.isSafeInteger(saved.previous) ? saved.previous : price, raise, flow: {} };
+        if (saved.flow && typeof saved.flow === 'object') {
+            for (const [userId, net] of Object.entries(saved.flow)) {
+                if (Number.isSafeInteger(net) && net !== 0) entry.flow[userId] = net;
             }
         }
         market.assets[asset.id] = entry;
@@ -91,7 +107,7 @@ export function tickAsset(asset, entry, { settings = bourseSettings, rng = Math.
         : Math.max(0, entry.raise - settings.demand.raiseDecayPercent);
 
     const move = (rng() * 2 - 1) * volatility + lean + demand;
-    const price = clamp(Math.round(entry.price * (1 + move)), min, assetCeiling(asset, raise));
+    const price = keepInside(Math.round(entry.price * (1 + move)), min, assetCeiling(asset, raise), rng);
     return { price, previous: entry.price, raise: Math.round(raise * 100) / 100, flow: {} };
 }
 
@@ -117,7 +133,7 @@ async function withMarket(client, guildId, change, { now = Date.now(), rng = Mat
     return Mutex.runExclusive(`bourse:${guildId}`, async () => {
         const key = getBourseKey(guildId);
         const raw = await client.db.get(key, null);
-        const market = normalizeMarket(raw, { assets, hour: hourOf(now) });
+        const market = normalizeMarket(raw, { assets, hour: hourOf(now), rng });
         const before = JSON.stringify(market);
         advanceMarket(market, hourOf(now), { assets, rng });
         const result = await change(market);
@@ -148,30 +164,6 @@ export async function getMarket(client, guildId, options = {}) {
     return { quotes, nextChangeAt: nextChangeAt(options.now) };
 }
 
-function normalizeName(text) {
-    return String(text || '')
-        .trim()
-        .toLowerCase()
-        .replace(/[ً-ْـ]/gu, '')
-        .replace(/[أإآ]/gu, 'ا')
-        .replace(/ة/gu, 'ه')
-        .replace(/ى/gu, 'ي')
-        .replace(/^ال/u, '')
-        .replace(/\s+/gu, ' ');
-}
-
-/** Finds an asset by its number in the list (`1` is the first), its id or its name (`عربية`، `العربيه`). */
-export function findAsset(query, assets = bourseAssets) {
-    const text = String(query || '').trim();
-    if (/^\d{1,2}$/u.test(text)) return assets[Number(text) - 1] || null;
-    const wanted = normalizeName(text);
-    if (!wanted) return null;
-    return assets.find((asset) => asset.id === text.toLowerCase())
-        || assets.find((asset) => normalizeName(asset.name) === wanted)
-        || assets.find((asset) => normalizeName(asset.name).split(/[\s()]+/u).includes(wanted))
-        || null;
-}
-
 /** The sell fee on `gross` CC: sellFeePercent, rounded up, at least 1 CC. */
 export function sellFee(gross, percent = bourseSettings.sellFeePercent) {
     return percent > 0 && gross > 0 ? Math.max(1, Math.ceil((gross * percent) / 100)) : 0;
@@ -193,7 +185,8 @@ function validQuantity(quantity) {
 /**
  * `استثمار`: buys `quantity` pieces of an asset at the price of the hour. With `expectedPrice` (the
  * price the member confirmed) the purchase stops if the price changed since.
- * Returns `{ ok: true, asset, quantity, price, cost, balance, owned }` or `{ ok: false, reason }` with
+ * Returns `{ ok: true, asset, quantity, price, cost, before, balance, owned }` (`before` and `balance`
+ * are the CC before and after, read in the same save) or `{ ok: false, reason }` with
  * reason one of: not_found, bad_quantity, price_changed (with `price`), max_owned (with `owned`), no_cc (with `balance`).
  */
 export async function invest(client, guildId, userId, assetQuery, quantity = 1, { expectedPrice = null, ...options } = {}) {
@@ -212,22 +205,23 @@ export async function invest(client, guildId, userId, assetQuery, quantity = 1, 
             const held = holdings[asset.id] || { qty: 0, cost: 0 };
             if (held.qty + quantity > bourseSettings.maxOwnedPerAsset) return { ok: false, reason: 'max_owned', owned: held.qty, skipSave: true };
             if (state.cc < cost) return { ok: false, reason: 'no_cc', balance: state.cc, skipSave: true };
+            const before = state.cc;
             state.cc -= cost;
             holdings[asset.id] = { qty: held.qty + quantity, cost: held.cost + cost };
             record.ccBourse = holdings;
-            return { ok: true, owned: held.qty + quantity };
+            return { ok: true, owned: held.qty + quantity, before };
         });
         if (!result.ok) return { ...result, asset, quantity, price };
 
         entry.flow[userId] = (entry.flow[userId] || 0) + quantity;
         logger.info('[BOURSE] Bought', { guildId, userId, assetId: asset.id, quantity, price, cost });
-        return { ok: true, asset, quantity, price, cost, balance: result.balance, owned: result.owned };
+        return { ok: true, asset, quantity, price, cost, before: result.before, balance: result.balance, owned: result.owned };
     }, options);
 }
 
 /**
  * `بيع`: sells `quantity` pieces at the price of the hour, minus the sell fee.
- * Returns `{ ok: true, asset, quantity, price, gross, fee, received, paid, profit, balance, owned }` or
+ * Returns `{ ok: true, asset, quantity, price, gross, fee, received, paid, profit, before, balance, owned }` or
  * `{ ok: false, reason }` with reason one of: not_found, bad_quantity, price_changed (with `price`), not_owned (with `owned`).
  */
 export async function sell(client, guildId, userId, assetQuery, quantity = 1, { expectedPrice = null, ...options } = {}) {
@@ -247,6 +241,7 @@ export async function sell(client, guildId, userId, assetQuery, quantity = 1, { 
             const holdings = readHoldings(record);
             const held = holdings[asset.id] || { qty: 0, cost: 0 };
             if (held.qty < quantity) return { ok: false, reason: 'not_owned', owned: held.qty, skipSave: true };
+            const before = state.cc;
             const next = state.cc + received;
             if (!Number.isSafeInteger(next)) throw new Error('CC balance overflow');
             state.cc = next;
@@ -256,7 +251,7 @@ export async function sell(client, guildId, userId, assetQuery, quantity = 1, { 
             if (left > 0) holdings[asset.id] = { qty: left, cost: held.cost - paid };
             else delete holdings[asset.id];
             record.ccBourse = holdings;
-            return { ok: true, owned: left, paid };
+            return { ok: true, owned: left, paid, before };
         });
         if (!result.ok) return { ...result, asset, quantity, price };
 
@@ -264,7 +259,7 @@ export async function sell(client, guildId, userId, assetQuery, quantity = 1, { 
         logger.info('[BOURSE] Sold', { guildId, userId, assetId: asset.id, quantity, price, fee });
         return {
             ok: true, asset, quantity, price, gross, fee, received,
-            paid: result.paid, profit: received - result.paid, balance: result.balance, owned: result.owned,
+            paid: result.paid, profit: received - result.paid, before: result.before, balance: result.balance, owned: result.owned,
         };
     }, options);
 }
