@@ -69,3 +69,18 @@ before the role is made, so nobody buys a rude name or a role that looks like st
   month of play and the friends role needs the group to share it.
 - Block names that copy staff roles or other members' roles, and colours too close to staff colours.
 - One role of each kind per member.
+
+## Staff task system
+
+- A dedicated channel where the bot hands out tasks to staff: reports to solve, or something to add
+  or do. Each task has a deadline.
+- Who gets what comes from the staff roles: the bot looks at a role (e.g. Admin), lists its members
+  and picks one. Easy tasks go to the members who solve the least; hard tasks go to the role above,
+  and so on up the hierarchy.
+- At first the picks are random. Over time the bot tracks who finished their tasks on time and who
+  didn't; a task that runs past its deadline is taken back and given to someone else.
+- Never assigned: the `psycho` role and the owners (`src/config/serverOwners.js`).
+- Possible pieces: tasks stored per guild (assignee, difficulty, deadline, status), buttons on each
+  task (done / can't do it), a per-member score (done on time, late, handed back), and a summary
+  board in the channel. Reports from the report channel (`src/services/reportChannelService.js`)
+  could become tasks automatically.
