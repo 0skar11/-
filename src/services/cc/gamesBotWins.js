@@ -6,7 +6,7 @@
 // the same text, and each message pays once.
 
 import { gamesBotIds } from '../../config/games.js';
-import { CC, formatCC } from '../../config/cc.js';
+import { CC, formatCC, ccBoostLine } from '../../config/cc.js';
 import { awardGamesBotWin } from './ccService.js';
 import { logger } from '../../utils/logger.js';
 
@@ -41,11 +41,14 @@ export async function handleGamesBotWin(message, client) {
     if (winner?.bot) return true;
 
     try {
-        const { amount, balance } = await awardGamesBotWin(client, message.guild.id, winnerId);
-        logger.info('[CC] Games bot win paid', { guildId: message.guild.id, userId: winnerId, amount, messageId: message.id });
-        const text = amount > 0
+        const { amount, balance, boost } = await awardGamesBotWin(client, message.guild.id, winnerId);
+        logger.info('[CC] Games bot win paid', { guildId: message.guild.id, userId: winnerId, amount, boost, messageId: message.id });
+        // While a CC event runs the notice says so and when it ends (`🔥 CC ×5 — بيخلص بعد 4 أيام`).
+        const event = ccBoostLine();
+        const text = (amount > 0
             ? `🌀 <@${winnerId}> كسب +${formatCC(amount)} • رصيدك: ${formatCC(balance)}`
-            : `🌀 <@${winnerId}> وصلت لحد الـ CC من الألعاب النهارده (${CC.gamesBot.dailyCap} ${CC.short})، الفوز اتحسب في إحصائياتك.`;
+            : `🌀 <@${winnerId}> وصلت لحد الـ CC من الألعاب النهارده (${CC.gamesBot.dailyCap * (boost || 1)} ${CC.short})، الفوز اتحسب في إحصائياتك.`)
+            + (event ? `\n${event}` : '');
         const notice = await message.reply({ content: text, allowedMentions: { parse: [] } }).catch(() => null);
         if (notice) setTimeout(() => notice.delete().catch(() => {}), NOTICE_DELETE_MS).unref?.();
     } catch (error) {

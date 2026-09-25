@@ -10,6 +10,7 @@ import { buildLevelUpMessage } from './levelUi.js';
 import { getChatCounts } from './chatCounter.js';
 import { getVoiceMinutes } from './voiceXp.js';
 import { syncMemberLevelRoles } from './levelRoleSyncService.js';
+import { awardLevelUp } from '../cc/ccService.js';
 
 /**
  * Award XP to a member. Returns null when XP is skipped (disabled/invalid amount).
@@ -56,8 +57,15 @@ export const addXp = wrapServiceBoundary(async function addXp(client, guild, mem
     }
 
     if (didLevelUp) {
+      // CC for the new level(s); a failed payment must not lose the XP.
+      const ccReward = await awardLevelUp(client, guild.id, member.user.id, initialLevel, levelData.level)
+        .catch((error) => {
+          logger.error(`Failed to pay level-up CC to ${member.user.id}:`, error);
+          return null;
+        });
+
       if (config.announceLevelUp) {
-        await sendLevelUpAnnouncement(guild, member, levelData, config, { fromLevel: initialLevel, rewardRoleIds, source: fromVoice ? 'voice' : 'chat' });
+        await sendLevelUpAnnouncement(guild, member, levelData, config, { fromLevel: initialLevel, rewardRoleIds, source: fromVoice ? 'voice' : 'chat', ccReward });
       }
 
       try {
@@ -102,7 +110,7 @@ const LEVEL_UP_CHANNEL_ID = '1552786804451573772';
 
 // One message per level-up (even when several levels are gained at once). It only pings the member
 // every 5 levels (see levelUi.js); the old free-text levelUpMessage is no longer used.
-async function sendLevelUpAnnouncement(guild, member, levelData, config, { fromLevel, rewardRoleIds, source }) {
+async function sendLevelUpAnnouncement(guild, member, levelData, config, { fromLevel, rewardRoleIds, source, ccReward }) {
   try {
     const levelUpChannel = guild.channels.cache.get(LEVEL_UP_CHANNEL_ID)
       || await guild.channels.fetch(LEVEL_UP_CHANNEL_ID).catch(() => null);
@@ -133,6 +141,8 @@ async function sendLevelUpAnnouncement(guild, member, levelData, config, { fromL
       source,
       messages,
       voiceMinutes,
+      ccReward: ccReward?.amount || 0,
+      ccBoost: ccReward?.boost || 1,
     });
     await levelUpChannel.send(payload).catch(error => {
       logger.error(`Failed to send level up message in channel ${levelUpChannel.id}:`, error);

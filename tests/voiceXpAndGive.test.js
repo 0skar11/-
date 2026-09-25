@@ -139,3 +139,83 @@ describe('give (CC transfer)', () => {
         assert.equal(applyWordAliases('حول', ['البيت'], false), null);
     });
 });
+
+describe('CC event (boost)', () => {
+    test('multiplies game rewards and caps until it ends, then goes back to normal by itself', async () => {
+        const { CC, ccBoost, ccBoostLine } = await import('../src/config/cc.js');
+        const { groupRewards, soloRewardLeft, awardGamesBotWin } = await import('../src/services/cc/ccService.js');
+        const saved = CC.boost;
+        CC.boost = { multiplier: 5, until: '2026-09-30T08:15:00Z' };
+        try {
+            const during = Date.parse('2026-09-27T12:00:00Z');
+            const after = Date.parse('2026-09-30T08:15:00Z');
+            assert.equal(ccBoost(during), 5);
+            assert.equal(ccBoost(after), 1);
+            assert.match(ccBoostLine(during), /CC ×5.*<t:\d+:R>/u);
+            assert.equal(ccBoostLine(after), '');
+
+            assert.deepEqual(groupRewards(10, { now: during }), [250, 150, 100]);
+            assert.deepEqual(groupRewards(10, { now: after }), [50, 30, 20]);
+            assert.equal(soloRewardLeft(0, { now: during }), CC.solo.win * 5);
+            assert.equal(soloRewardLeft(CC.solo.dailyCap, { now: during }), CC.solo.win * 5);
+            assert.equal(soloRewardLeft(CC.solo.dailyCap * 5, { now: during }), 0);
+
+            const client = fakeClient();
+            const win = await awardGamesBotWin(client, GUILD, A, { now: during });
+            assert.deepEqual([win.amount, win.boost], [CC.gamesBot.win * 5, 5]);
+            const normal = await awardGamesBotWin(client, GUILD, B, { now: after });
+            assert.deepEqual([normal.amount, normal.boost], [CC.gamesBot.win, 1]);
+        } finally {
+            CC.boost = saved;
+        }
+    });
+
+    test('transfers are never multiplied', async () => {
+        const client = fakeClient();
+        await grantCC(client, GUILD, A, 100);
+        const result = await transferCC(client, GUILD, A, B, 100);
+        assert.equal(result.received, 95);
+    });
+});
+
+describe('level-up CC', () => {
+    test('pays 10 CC × the new level, for every level gained', async () => {
+        const { CC } = await import('../src/config/cc.js');
+        const { levelUpReward } = await import('../src/services/cc/ccService.js');
+        const saved = CC.boost;
+        CC.boost = { multiplier: 1, until: null };
+        try {
+            assert.equal(levelUpReward(0, 1), 10);
+            assert.equal(levelUpReward(9, 10), 100);
+            assert.equal(levelUpReward(3, 5), 40 + 50);
+            assert.equal(levelUpReward(5, 5), 0);
+            CC.boost = { multiplier: 5, until: '2999-01-01T00:00:00Z' };
+            assert.equal(levelUpReward(9, 10), 500);
+        } finally {
+            CC.boost = saved;
+        }
+    });
+
+    test('leveling up through XP pays CC and the level-up message shows it', async () => {
+        const { CC } = await import('../src/config/cc.js');
+        const { addXp } = await import('../src/services/leveling/xpSystem.js');
+        const saved = CC.boost;
+        CC.boost = { multiplier: 1, until: null };
+        try {
+            const client = fakeClient();
+            const guild = { id: GUILD, name: 'void', channels: { cache: new Map(), fetch: async () => null } };
+            const member = voiceMember(A);
+            // Level 0 → 1 needs 50 XP, 1 → 2 needs 105.
+            const result = await addXp(client, guild, member, 200);
+            assert.equal(result.level, 2);
+            assert.equal((await getProfile(client, GUILD, A)).cc, 10 + 20);
+        } finally {
+            CC.boost = saved;
+        }
+
+        const { buildLevelUpMessage } = await import('../src/services/leveling/levelUi.js');
+        const shown = { id: A, displayName: 'x', toString: () => `<@${A}>`, displayAvatarURL: () => '' };
+        const message = buildLevelUpMessage(shown, { fromLevel: 6, level: 7, xp: 0, xpNeeded: 400, ccReward: 350, ccBoost: 5 });
+        assert.match(message.embeds[0].description, /\+350 CC\*\* 🔥 \(×5\)/u);
+    });
+});
