@@ -108,7 +108,7 @@ export function assertInVoice(member) {
         throw new TitanBotError(
             'Not in voice channel',
             ErrorTypes.USER_INPUT,
-            'You need to be in a voice channel.',
+            '🎧 لازم تدخل روم فويس الأول عشان تشغل أغاني.',
         );
     }
 }
@@ -131,6 +131,17 @@ export async function ensurePlayer(client, interaction) {
     const guildId = interaction.guild.id;
     const guildData = getGuildMusicData(guildId);
     let player = getPlayer(client, guildId);
+
+    // While the bot plays for people in its voice room, only members in that room can add songs. When
+    // its room is empty (everyone left), a member in another room takes the bot there.
+    if (player?.voiceChannel && !canControlMusic(interaction.member, player)) {
+        const botChannel = interaction.guild.channels?.cache?.get(player.voiceChannel);
+        const listeners = botChannel?.members?.filter?.((member) => !member.user?.bot)?.size ?? 1;
+        if (listeners > 0 || typeof player.setVoiceChannel !== 'function') {
+            throw new TitanBotError('Wrong voice channel', ErrorTypes.PERMISSION, VOICE_CHANNEL_DENIAL);
+        }
+        player.setVoiceChannel(interaction.member.voice.channel.id, { deaf: true });
+    }
 
     if (!player) {
         player = client.riffy.createConnection({

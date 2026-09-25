@@ -22,6 +22,7 @@ import { handleMediaMessage } from '../services/mediaRoleService.js';
 import { handleImageOnlyChannelMessage } from '../services/imageOnlyChannelService.js';
 import { handleGamesChannelMessage, isGamesOnlyFor, isGameCommandMessage } from '../services/games/gamesChannel.js';
 import { handleGamesBotWin } from '../services/cc/gamesBotWins.js';
+import { handleGamesBotOutsideChannel } from '../services/cc/gamesBotChannel.js';
 import { handleStoreChannelMessage } from '../services/cc/storeChannel.js';
 import { handleMessageXp } from '../services/leveling/messageXp.js';
 import { countMessage } from '../services/leveling/chatCounter.js';
@@ -38,6 +39,8 @@ export default {
       if (await handleGamesChannelMessage(message, client)) return;
       // The store room only keeps store commands (and reposts its panel every few messages).
       if (await handleStoreChannelMessage(message, client)) return;
+      // Games bots (Clover) only play in their channel; elsewhere their messages are deleted.
+      if (await handleGamesBotOutsideChannel(message)) return;
       // Wins announced by the games bot (Clover) pay CC here.
       if (await handleGamesBotWin(message, client)) return;
       if (message.author.bot || !message.guild) return;

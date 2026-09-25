@@ -1,4 +1,6 @@
-import { SlashCommandBuilder } from 'discord.js';
+import { SlashCommandBuilder, MessageFlags } from 'discord.js';
+import { GAMES_BOTS_CHANNEL_ID } from '../../config/games.js';
+import { isGamesBotsChannel } from '../../services/cc/gamesBotChannel.js';
 import { CC } from '../../config/cc.js';
 import { bourseSettings } from '../../config/store/bourse.js';
 import { getProfile } from '../../services/cc/ccService.js';
@@ -16,6 +18,20 @@ const quantityOption = (option) => option
     .setMinValue(1)
     .setMaxValue(bourseSettings.maxOwnedPerAsset)
     .setRequired(false);
+
+const WRONG_CHANNEL_DELETE_MS = 5_000;
+
+async function sendToBourseChannel(interaction, reply) {
+    const content = `📈 البورصة في <#${GAMES_BOTS_CHANNEL_ID}> بس.`;
+    const source = interaction._sourceMessage;
+    if (!source) return reply({ content, flags: MessageFlags.Ephemeral });
+    // Prefix form: the command and the notice both disappear after a few seconds.
+    const notice = await source.channel.send({ content, allowedMentions: { parse: [] } }).catch(() => null);
+    setTimeout(() => {
+        notice?.delete().catch(() => {});
+        source.delete().catch(() => {});
+    }, WRONG_CHANNEL_DELETE_MS).unref?.();
+}
 
 export default {
     data: new SlashCommandBuilder()
@@ -39,6 +55,8 @@ export default {
 
     async execute(interaction, config, client) {
         const reply = (payload) => InteractionHelper.safeReply(interaction, { allowedMentions: { parse: [] }, ...payload });
+        // The bourse works only in the games bots channel (report #121), so it doesn't flood the chat.
+        if (!isGamesBotsChannel(interaction.channel, interaction.channelId)) return sendToBourseChannel(interaction, reply);
         const sub = interaction.options.getSubcommand();
         const { guildId, user } = interaction;
 
