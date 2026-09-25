@@ -33,6 +33,7 @@ TitanBot offers a complete suite of tools for Discord server management and comm
 - **Clover wins** - Wins in the Clover games bot pay CC
 - **Group Games** - Roulette, musical chairs, mafia, trivia and more; the top 3 win CC
 - **Top CC** - Server leaderboard (see [docs/cc-and-games.md](docs/cc-and-games.md))
+- **Give** - Send CC to a member, with a tax that grows for frequent senders
 
 ### Fun & Entertainment
 - **Random Facts** - Learn something new
@@ -59,6 +60,7 @@ TitanBot offers a complete suite of tools for Discord server management and comm
 
 ### Leveling & XP System
 - **XP Tracking** - Automatic message-based XP
+- **Voice XP** - XP for every minute talking in voice with someone else, and `top voice`
 - **Level Roles** - Auto-assign roles by level
 - **Custom Configuration** - Personalize leveling
 

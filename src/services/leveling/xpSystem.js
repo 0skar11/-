@@ -10,9 +10,10 @@ import { buildLevelUpMessage } from './levelUi.js';
 
 /**
  * Award XP to a member. Returns null when XP is skipped (disabled/invalid amount).
- * Throws on storage or unexpected failures.
+ * Throws on storage or unexpected failures. Voice XP passes `fromVoice` so it doesn't start the
+ * chat XP cooldown (`lastMessage`).
  */
-export const addXp = wrapServiceBoundary(async function addXp(client, guild, member, xpToAdd) {
+export const addXp = wrapServiceBoundary(async function addXp(client, guild, member, xpToAdd, { fromVoice = false } = {}) {
   const lockKey = `leveling:${guild.id}:${member.user.id}`;
   return await Mutex.runExclusive(lockKey, async () => {
     if (!xpToAdd || xpToAdd <= 0) {
@@ -29,7 +30,7 @@ export const addXp = wrapServiceBoundary(async function addXp(client, guild, mem
 
     levelData.xp += xpToAdd;
     levelData.totalXp += xpToAdd;
-    levelData.lastMessage = Date.now();
+    if (!fromVoice) levelData.lastMessage = Date.now();
 
     let xpNeededForNextLevel = getXpForLevel(levelData.level);
     let didLevelUp = false;

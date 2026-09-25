@@ -19,6 +19,7 @@ import { runSafeTask, handleTaskError, ErrorCodes } from './utils/errorHandler.j
 import { initializeMusic } from './services/music/riffySetup.js';
 import { shutdownMusic } from './services/music/playerHandler.js';
 import { flushChatCounts } from './services/leveling/chatCounter.js';
+import { tickVoiceActivity } from './services/leveling/voiceXp.js';
 import pkg from '../package.json' with { type: 'json' };
 import { EXPECTED_SCHEMA_VERSION, EXPECTED_SCHEMA_LABEL } from './config/database/schemaVersion.js';
 
@@ -258,6 +259,7 @@ class TitanBot extends Client {
   setupCronJobs() {
     cron.schedule('0 6 * * *', runSafeTask('birthday_check', () => checkBirthdays(this)));
     cron.schedule('* * * * *', runSafeTask('giveaway_check', () => checkGiveaways(this)));
+    cron.schedule('* * * * *', runSafeTask('voice_xp', () => tickVoiceActivity(this)));
     cron.schedule('*/15 * * * *', runSafeTask('counter_update', () => this.updateAllCounters()));
     cron.schedule('*/5 * * * *', runSafeTask('closed_report_check', () => checkClosedReports(this)));
     cron.schedule('*/30 * * * *', runSafeTask('warning_expiry', () => this.pruneExpiredWarnings()));
