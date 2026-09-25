@@ -150,7 +150,7 @@ Received CC doesn't count as "earned" in the profile; it is kept apart in `ccSta
 CC is stored in each member's economy record (`guild:<id>:economy:<user>`):
 `cc`, `ccStats`, `ccSolo` (today's solo earnings), `ccGamesBot` (today's Clover earnings),
 `ccTransfers` (when the member sent CC in the last 7 days, for the transfer tax) and
-`ccInventory` (for the store). An old `ccLastDaily` from the removed daily is left untouched.
+`ccInventory` (for the store) and `ccBourse` (bourse holdings, `{ assetId: { qty, cost } }`). An old `ccLastDaily` from the removed daily is left untouched.
 The old `wallet` / `bank` values are left untouched and are no longer used, so everyone starts
 from 0 CC. Every change goes through `src/services/cc/ccService.js`, which locks per member.
 
@@ -186,6 +186,52 @@ attachments, links, reactions and threads, and has a 3 second slowmode.
   gives roles (refunding if Discord refuses) and fills `ccInventory` for stackable items.
 - The room: `src/services/cc/storeChannel.js`; the panel and embeds: `src/services/cc/storeUi.js`.
 - To open it for real: put the real items in `ccStoreItems` and set `ccStoreSettings.open = true`.
+
+## The bourse (البورصة)
+
+Eight things members buy with CC and sell back later: their prices change at the start of every
+hour (5:00, 6:00, 7:00...). The commands work in any channel (the store and games rooms included).
+
+| Asset | Min | Max | Start | Move per hour |
+|---|---|---|---|---|
+| 🏍️ موتوسيكل | 200 | 600 | 400 | up to ±8% |
+| 🥇 سبيكة دهب | 300 | 900 | 600 | up to ±3% |
+| 🚗 عربية | 800 | 2,000 | 1,300 | up to ±5% |
+| 🏠 شقة | 1,500 | 3,500 | 2,400 | up to ±3% |
+| 🏪 محل تجاري | 2,500 | 5,500 | 4,000 | up to ±5% |
+| 🏢 عقار (عمارة) | 4,000 | 9,000 | 6,000 | up to ±3% |
+| 🚢 سفينة | 6,000 | 13,000 | 9,000 | up to ±8% |
+| ✈️ طيارة | 8,000 | 18,000 | 12,000 | up to ±10% |
+
+- Each hour an asset moves by a random amount up to its volatility and never leaves its range.
+  Near a limit the move leans back towards the middle.
+- **Demand:** every member who bought an asset during the hour (more than they sold) adds +1% to
+  its next move and every net seller −1% (together at most ±15%). Buying also lifts the asset's
+  ceiling above its max by the same percent (up to +50%); each hour without buying demand lowers it
+  by 5% again, so the price comes back to its normal range by itself. Counting members, not pieces,
+  means one member can't pump a price on their own: +1% is less than the 1.5% sell fee.
+- Selling pays the price of the hour minus a **1.5%** fee (rounded up, at least 1 CC).
+- At most **10** pieces of each asset per member.
+- Buying and selling are confirmed with a ✅ button that only works for that member. If a new hour
+  started in between, nothing happens and the confirmation is shown again at the new price.
+
+| Chat word | Slash | What it does |
+|---|---|---|
+| `اسعار` / `بورصة` | `/bourse prices` | The prices of the hour, the move since last hour (🟢 ▲ / 🔴 ▼) and each range |
+| `استثمار 3` / `استثمار 3 2` | `/bourse invest asset [quantity]` | Buy asset 3 (or 2 of it) |
+| `بيع 3` / `بيع 3 2` | `/bourse sell asset [quantity]` | Sell at the price of the hour |
+| `ممتلكاتي` | `/bourse holdings` | What the member owns, what they paid and what they'd get selling now |
+
+Without the prefix the words only run with a number (`بيع 3`); with the prefix an asset name works
+too (`!بيع عربية`).
+
+- Assets and rules: `src/config/store/bourse.js`. Changing a price range takes effect at the next
+  read; never change an asset's `id` (it is the key in members' holdings).
+- The market of a guild is saved at `guild:<id>:bourse` (`hour`, and per asset `price`,
+  `previous`, `raise`, `flow`). There is no timer: whenever the market is read in a later hour,
+  the missed hours are played in order (at most 168), so a restart changes nothing.
+- Logic: `src/services/cc/bourseService.js`; embeds: `src/services/cc/bourseUi.js`; command:
+  `src/commands/Games/bourse.js`; confirm buttons: `src/interactions/buttons/store/bourse.js`.
 
 ## Clover wins
 

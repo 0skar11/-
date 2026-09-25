@@ -40,6 +40,11 @@ export function getEconomyPrefix(guildId) {
     return `guild:${guildId}:economy:`;
 }
 
+/** The CC bourse market of a guild (prices, demand); members' holdings live in their economy record. */
+export function getBourseKey(guildId) {
+    return `guild:${guildId}:bourse`;
+}
+
 export function getAFKKey(guildId, userId) {
     return `guild:${guildId}:afk:${userId}`;
 }
