@@ -94,3 +94,23 @@ describe('level words and top chat', () => {
     assert.match(embed.description, /ترتيبك:\*\* #2/u);
   });
 });
+
+describe('level-up message source', () => {
+  test('chat and voice level-ups look different and show both totals', () => {
+    const chat = buildLevelUpMessage(member, { fromLevel: 6, level: 7, xp: 10, xpNeeded: 400, source: 'chat', messages: 1234, voiceMinutes: 125 });
+    const voice = buildLevelUpMessage(member, { fromLevel: 6, level: 7, xp: 10, xpNeeded: 400, source: 'voice', messages: 1234, voiceMinutes: 125 });
+    assert.equal(chat.embeds[0].title, '💬 لفل 7 من الشات');
+    assert.equal(voice.embeds[0].title, '🎙️ لفل 7 من الفويس');
+    assert.notEqual(chat.embeds[0].color, voice.embeds[0].color);
+    assert.match(chat.embeds[0].description, /من الكلام في الشات/u);
+    assert.match(voice.embeds[0].description, /من القعدة في الفويس/u);
+    assert.match(chat.embeds[0].description, /الرسايل: \*\*1,234\*\*/u);
+    assert.match(chat.embeds[0].description, /الفويس: \*\*2س 5د\*\*/u);
+  });
+
+  test('a milestone keeps the ping and still shows the source', () => {
+    const message = buildLevelUpMessage(member, { fromLevel: 9, level: 10, xp: 0, xpNeeded: 1050, source: 'voice' });
+    assert.equal(message.content, '<@42>');
+    assert.match(message.embeds[0].title, /لفل 10 🎙️/u);
+  });
+});

@@ -7,6 +7,8 @@ import { formatLogLine } from '../../utils/logging/logEmbeds.js';
 import { Mutex } from '../../utils/mutex.js';
 import { wrapServiceBoundary } from '../../utils/errorHandler.js';
 import { buildLevelUpMessage } from './levelUi.js';
+import { getChatCounts } from './chatCounter.js';
+import { getVoiceMinutes } from './voiceXp.js';
 
 /**
  * Award XP to a member. Returns null when XP is skipped (disabled/invalid amount).
@@ -54,7 +56,7 @@ export const addXp = wrapServiceBoundary(async function addXp(client, guild, mem
 
     if (didLevelUp) {
       if (config.announceLevelUp) {
-        await sendLevelUpAnnouncement(guild, member, levelData, config, { fromLevel: initialLevel, rewardRoleIds });
+        await sendLevelUpAnnouncement(guild, member, levelData, config, { fromLevel: initialLevel, rewardRoleIds, source: fromVoice ? 'voice' : 'chat' });
       }
 
       try {
@@ -121,7 +123,7 @@ const LEVEL_UP_CHANNEL_ID = '1552786804451573772';
 
 // One message per level-up (even when several levels are gained at once). It only pings the member
 // every 5 levels (see levelUi.js); the old free-text levelUpMessage is no longer used.
-async function sendLevelUpAnnouncement(guild, member, levelData, config, { fromLevel, rewardRoleIds }) {
+async function sendLevelUpAnnouncement(guild, member, levelData, config, { fromLevel, rewardRoleIds, source }) {
   try {
     const levelUpChannel = guild.channels.cache.get(LEVEL_UP_CHANNEL_ID)
       || await guild.channels.fetch(LEVEL_UP_CHANNEL_ID).catch(() => null);
@@ -137,12 +139,21 @@ async function sendLevelUpAnnouncement(guild, member, levelData, config, { fromL
       return;
     }
 
+    // The member's chat and voice totals, so the message shows both sides (best effort).
+    const client = guild.client;
+    const [messages, voiceMinutes] = await Promise.all([
+      getChatCounts(client, guild.id).then((counts) => counts[member.id] || 0).catch(() => null),
+      getVoiceMinutes(client, guild.id).then((minutes) => minutes[member.id] || 0).catch(() => null),
+    ]);
     const payload = buildLevelUpMessage(member, {
       fromLevel,
       level: levelData.level,
       xp: levelData.xp,
       xpNeeded: getXpForLevel(levelData.level),
       rewardRoleIds,
+      source,
+      messages,
+      voiceMinutes,
     });
     await levelUpChannel.send(payload).catch(error => {
       logger.error(`Failed to send level up message in channel ${levelUpChannel.id}:`, error);
