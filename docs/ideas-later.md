@@ -92,6 +92,22 @@ before the role is made, so nobody buys a rude name or a role that looks like st
   | Spam           | تحسين AutoMod   | Bot Team    | 3 أيام |
   | Staff inactive | Activity system | Admins      | أسبوع  |
 
+- The GUI: same information as that table, but simpler and easier to read. Discord doesn't draw
+  tables, so each task is its own small card (an embed field) with emojis, e.g.:
+
+  ```
+  📉 قلة النشاط
+  ✅ Events أسبوعية
+  👥 Events Team ・ ⏰ الجمعة
+
+  🚫 Spam
+  ✅ تحسين AutoMod
+  👥 Bot Team ・ ⏰ خلال 3 أيام
+  ```
+
+  The deadline shows as a Discord timestamp (`<t:…:R>`, "in 3 days") and the card colour or a dot
+  (🟢 on time, 🟡 due soon, 🔴 late) shows the state at a glance.
+
 - Possible pieces: tasks stored per guild (assignee, difficulty, deadline, status), buttons on each
   task (done / can't do it), a per-member score (done on time, late, handed back), and a summary
   board in the channel. Reports from the report channel (`src/services/reportChannelService.js`)
