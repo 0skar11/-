@@ -29,35 +29,90 @@ const PERMISSION_LABELS = new Map([
   [PermissionFlagsBits.ManageThreads, 'Manage Threads — إدارة الثريدات'],
   [PermissionFlagsBits.ManageEvents, 'Manage Events — إدارة الفعاليات'],
   [PermissionFlagsBits.MentionEveryone, 'Mention Everyone — منشن الجميع'],
+  [PermissionFlagsBits.SendMessagesInThreads, 'Send Messages in Threads — الكتابة في الثريدات'],
+  [PermissionFlagsBits.EmbedLinks, 'Embed Links — إرسال الروابط'],
+  [PermissionFlagsBits.AttachFiles, 'Attach Files — إرسال الملفات'],
+  [PermissionFlagsBits.AddReactions, 'Add Reactions — الرياكشن'],
+  [PermissionFlagsBits.UseExternalEmojis, 'Use External Emojis — إيموجي خارجي'],
+  [PermissionFlagsBits.PinMessages, 'Pin Messages — تثبيت الرسائل'],
+  [PermissionFlagsBits.Stream, 'Video / Stream — الكاميرا والشير'],
+  [PermissionFlagsBits.UseVAD, 'Voice Activity — التحدث بدون ضغط زر'],
+  [PermissionFlagsBits.PrioritySpeaker, 'Priority Speaker — أولوية التحدث'],
+  [PermissionFlagsBits.RequestToSpeak, 'Request to Speak — طلب التحدث في الستيدج'],
+  [PermissionFlagsBits.UseSoundboard, 'Use Soundboard — الساوند بورد'],
+  [PermissionFlagsBits.UseExternalSounds, 'Use External Sounds — أصوات خارجية'],
+  [PermissionFlagsBits.UseEmbeddedActivities, 'Use Activities — الأنشطة في الفويس'],
+  [PermissionFlagsBits.SetVoiceChannelStatus, 'Set Voice Status — حالة روم الفويس'],
 ]);
 
-// Every permission except Administrator: 🛡️ Admin can do everything without being an administrator.
+// Every permission except Administrator: 🔨 Moderator can do everything without being an administrator.
 const ALL_EXCEPT_ADMINISTRATOR = new PermissionsBitField(PermissionsBitField.All).remove(PermissionFlagsBits.Administrator).bitfield;
 
-// Trial staff: moderate chat and voice (timeout, voice disconnect/move, server mute, server deafen) but never ban or kick.
-const TRIAL_STAFF_PERMISSIONS = [
-  PermissionFlagsBits.ViewAuditLog,
+const BASE_PERMISSIONS = [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.ReadMessageHistory];
+
+// Chat moderation: timeout/mute and /warn (ModerateMembers), /usernotes and message cleanup (ManageMessages), /cases (ViewAuditLog).
+const CHAT_MODERATOR_PERMISSIONS = [
+  ...BASE_PERMISSIONS,
   PermissionFlagsBits.ModerateMembers,
   PermissionFlagsBits.ManageMessages,
-  PermissionFlagsBits.ManageNicknames,
   PermissionFlagsBits.ManageThreads,
+  PermissionFlagsBits.PinMessages,
+  PermissionFlagsBits.ViewAuditLog,
+  PermissionFlagsBits.SendMessagesInThreads,
+  PermissionFlagsBits.EmbedLinks,
+  PermissionFlagsBits.AttachFiles,
+  PermissionFlagsBits.AddReactions,
+  PermissionFlagsBits.UseExternalEmojis,
+];
+
+// Every voice permission: disconnect/move, server mute and deafen, plus everything a member can do in voice.
+const VOICE_MODERATOR_PERMISSIONS = [
+  ...BASE_PERMISSIONS,
+  PermissionFlagsBits.Connect,
+  PermissionFlagsBits.Speak,
+  PermissionFlagsBits.Stream,
+  PermissionFlagsBits.UseVAD,
+  PermissionFlagsBits.PrioritySpeaker,
+  PermissionFlagsBits.RequestToSpeak,
+  PermissionFlagsBits.UseSoundboard,
+  PermissionFlagsBits.UseExternalSounds,
+  PermissionFlagsBits.UseEmbeddedActivities,
+  PermissionFlagsBits.SetVoiceChannelStatus,
   PermissionFlagsBits.MoveMembers,
   PermissionFlagsBits.MuteMembers,
   PermissionFlagsBits.DeafenMembers,
-  PermissionFlagsBits.ViewChannel,
-  PermissionFlagsBits.SendMessages,
-  PermissionFlagsBits.ReadMessageHistory,
-  PermissionFlagsBits.Connect,
-  PermissionFlagsBits.Speak,
 ];
 
+// Trial moderator: /warn and /timeout (ModerateMembers), /kick (KickMembers) and /usernotes (ManageMessages); never ban.
+const TRIAL_MODERATOR_PERMISSIONS = [
+  ...BASE_PERMISSIONS,
+  PermissionFlagsBits.ModerateMembers,
+  PermissionFlagsBits.KickMembers,
+  PermissionFlagsBits.ManageMessages,
+];
+
+// Support staff answer tickets only: no moderation permission at all.
+const SUPPORT_STAFF_PERMISSIONS = [
+  ...BASE_PERMISSIONS,
+  PermissionFlagsBits.SendMessagesInThreads,
+  PermissionFlagsBits.EmbedLinks,
+  PermissionFlagsBits.AttachFiles,
+  PermissionFlagsBits.AddReactions,
+];
+
+// Highest first. ⚔️ Senior Moderator and everything above it are Administrator.
 const ROLE_DEFINITIONS = [
   { name: '👑 Owner', color: '#f1c40f', permissions: [PermissionFlagsBits.Administrator] },
   { name: '⚡ Head Admin', color: '#e74c3c', permissions: [PermissionFlagsBits.Administrator] },
-  // allButAdministrator: the board sums Admin up in one line; ~50 permissions spelled out would not fit Discord's embed limits.
-  { name: '🛡️ Admin', color: '#e67e22', permissions: [ALL_EXCEPT_ADMINISTRATOR], allButAdministrator: true },
-  { name: '🔨 Moderator', color: '#2ecc71', permissions: TRIAL_STAFF_PERMISSIONS },
-  { name: '🔰 Trial Moderator', color: '#3498db', permissions: TRIAL_STAFF_PERMISSIONS },
+  { name: '🛡️ Admin', color: '#e67e22', permissions: [PermissionFlagsBits.Administrator] },
+  { name: '🎖️ Supervisor', color: '#9b59b6', permissions: [PermissionFlagsBits.Administrator] },
+  { name: '⚔️ Senior Moderator', color: '#16a085', permissions: [PermissionFlagsBits.Administrator] },
+  // allButAdministrator: the board sums Moderator up in one line; ~50 permissions spelled out would not fit Discord's embed limits.
+  { name: '🔨 Moderator', color: '#2ecc71', permissions: [ALL_EXCEPT_ADMINISTRATOR], allButAdministrator: true },
+  { name: '💬 Chat Moderator', color: '#e84393', permissions: CHAT_MODERATOR_PERMISSIONS },
+  { name: '🎧 Voice Moderator', color: '#6c5ce7', permissions: VOICE_MODERATOR_PERMISSIONS },
+  { name: '🔰 Trial Moderator', color: '#3498db', permissions: TRIAL_MODERATOR_PERMISSIONS },
+  { name: '🎫 Support Staff', color: '#95a5a6', permissions: SUPPORT_STAFF_PERMISSIONS },
 ];
 
 // Roles removed from the server on purpose (🧪 Developer and the non-booster VIP); deleted on startup if they still exist.
@@ -243,4 +298,4 @@ export async function refreshStaffPermissionBoard(guild) {
   return result;
 }
 
-export { ROLE_DEFINITIONS, ALL_EXCEPT_ADMINISTRATOR, TRIAL_STAFF_PERMISSIONS, ROLE_PERMISSIONS_CHANNEL_ID, RETIRED_ROLE_IDS, BOARD_RESET_VERSION };
+export { ROLE_DEFINITIONS, ALL_EXCEPT_ADMINISTRATOR, CHAT_MODERATOR_PERMISSIONS, VOICE_MODERATOR_PERMISSIONS, TRIAL_MODERATOR_PERMISSIONS, SUPPORT_STAFF_PERMISSIONS, ROLE_PERMISSIONS_CHANNEL_ID, RETIRED_ROLE_IDS, BOARD_RESET_VERSION };
