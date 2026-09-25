@@ -4,10 +4,11 @@ import { TitanBotError, ErrorTypes } from '../../utils/errorHandler.js';
 import { getUserLevelData, getLevelingConfig, getXpForLevel, getLeaderboard } from '../../services/leveling/leveling.js';
 import { buildRankEmbed } from '../../services/leveling/levelUi.js';
 import { getChatCounts } from '../../services/leveling/chatCounter.js';
+import { getVoiceMinutes } from '../../services/leveling/voiceXp.js';
 
 import { InteractionHelper } from '../../utils/interactionHelper.js';
 
-// `rank` / `لفل` / `لفل @member`: a member's level, place on the server, messages and progress to the next level.
+// `rank` / `لفل` / `لفل @member`: a member's level, place on the server, messages, voice time and progress to the next level.
 export default {
   data: new SlashCommandBuilder()
     .setName('rank')
@@ -54,6 +55,7 @@ export default {
       position: entry?.rank ?? null,
       rankedCount: everyone.length,
       messages: (await getChatCounts(client, interaction.guildId).catch(() => ({})))[targetUser.id] || 0,
+      voiceMinutes: (await getVoiceMinutes(client, interaction.guildId).catch(() => ({})))[targetUser.id] || 0,
     });
 
     await InteractionHelper.safeEditReply(interaction, { embeds: [embed], allowedMentions: { parse: [] } });

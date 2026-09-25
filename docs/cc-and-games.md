@@ -14,7 +14,8 @@ and this bot's own games when they are switched back on (group games pay the top
 a little with a daily cap). There is no `daily`.
 
 The old ways to earn coins (daily, work, crime, rob, beg, fish, mine, gamble, slut, pay) and the old
-bank/shop/inventory commands were removed. Staff can still add or remove CC by hand from
+bank/shop/inventory commands were removed. Members can send CC to each other with
+[`give`](#sending-cc-give), which takes a tax. Staff can still add or remove CC by hand from
 `/economy dashboard`.
 
 All numbers live in `src/config/cc.js`.
@@ -49,6 +50,7 @@ Game words typed without the prefix only start a game when the message is just t
 |---|---|---|
 | `رصيد` / `cc` / `bal` | `/cc [user]` | CC balance, rank and game stats (reply to a message to see that member's) |
 | `top cc` / `توب cc` / `cctop` | `/cctop` | CC leaderboard |
+| `تحويل @member 100` / `cc give @member 100` / `give` | `/give user amount` | Send CC to a member, minus a tax (see below) |
 | `العاب` | `/game list` | The games panel (see below) |
 | `روليت` | `/game roulette` | Roulette (3–20 players, join with buttons) |
 | `كراسي` | `/game chairs` | Chairs (3–25 players): grey chairs flash 🔴 at random (pressing then knocks you out), then turn 🟢 at a random moment and everyone races to sit |
@@ -77,7 +79,7 @@ time of the chat games (trivia 10s, guess 60s, ...) is separate. A game that is 
 enough players) or stopped with `وقف` deletes all its messages and the command that started it;
 the stop notice disappears after 5 seconds. Finished games keep their messages and results.
 
-The CC commands (`cc`, `cctop`) are in the Games category with the games, so turning
+The CC commands (`cc`, `cctop`, `give`) are in the Games category with the games, so turning
 off the Economy category in the command access dashboard doesn't hide them.
 
 ## The games panel
@@ -112,10 +114,25 @@ guild config (`boardMessageIds.cctop`), so a restart keeps editing the same post
 channel it is, and deleting it makes the bot post a new one on the next refresh. `top cc` replies
 look the same but have no footer, so they are never mistaken for the board.
 
+## Sending CC (`give`)
+
+`تحويل @member 100` (also `حول`, `transfer`, `cc give`, `/give`) sends CC to another member. The
+sender pays the full amount and the receiver gets it minus the tax. The least you can send is 10 CC,
+and you can't send to yourself or to a bot.
+
+The tax depends on how many times the sender sent CC in the last 7 days: the first 3 pay 5%, then
+every transfer pays 5% more (10%, 15%, 20%, ...) up to 50%. A transfer stops counting 7 days after
+it was made. The tax is rounded up, so every transfer pays at least 1 CC. The reply shows the tax
+and what the next transfer will cost. The numbers are `CC.transfer` in `src/config/cc.js`.
+
+Received CC doesn't count as "earned" in the profile; it is kept apart in `ccStats.sent` /
+`ccStats.received`.
+
 ## Storage
 
 CC is stored in each member's economy record (`guild:<id>:economy:<user>`):
-`cc`, `ccStats`, `ccSolo` (today's solo earnings), `ccGamesBot` (today's Clover earnings) and
+`cc`, `ccStats`, `ccSolo` (today's solo earnings), `ccGamesBot` (today's Clover earnings),
+`ccTransfers` (when the member sent CC in the last 7 days, for the transfer tax) and
 `ccInventory` (for the store). An old `ccLastDaily` from the removed daily is left untouched.
 The old `wallet` / `bank` values are left untouched and are no longer used, so everyone starts
 from 0 CC. Every change goes through `src/services/cc/ccService.js`, which locks per member.

@@ -2,6 +2,7 @@
 export const commandAliases = {
   bal: 'cc', balance: 'cc', money: 'cc', cash: 'cc', credits: 'cc', h: 'help', info: 'help',
   رصيد: 'cc', رصيدي: 'cc', رصيدى: 'cc', فلوس: 'cc', كريدت: 'cc',
+  تحويل: 'give', حول: 'give', حوّل: 'give', transfer: 'give',
   بان: 'ban', انبان: 'unban', تايم: 'timeout', انتايم: 'untimeout', mute: 'timeout', unmute: 'untimeout',
   وارن: 'warn', وارنات: 'warnings', كلير: 'clear', clear: 'clear',
   طرد: 'kick', تحذير: 'warn', تحذيرات: 'warnings', مسح: 'clear', قفل: 'lock', فتح: 'unlock',
@@ -53,6 +54,15 @@ export const twoWordCommandAliases = {
   'توب الشات': 'leaderboard chat',
   'توب رسايل': 'leaderboard chat',
   'توب الرسايل': 'leaderboard chat',
+  'top voice': 'leaderboard voice',
+  'top vc': 'leaderboard voice',
+  'توب voice': 'leaderboard voice',
+  'توب vc': 'leaderboard voice',
+  'توب فويس': 'leaderboard voice',
+  'توب الفويس': 'leaderboard voice',
+  'توب صوت': 'leaderboard voice',
+  'توب الصوت': 'leaderboard voice',
+  'cc give': 'give',
   'top cc': 'cctop',
   'توب cc': 'cctop',
   'توب كريدت': 'cctop',
@@ -92,6 +102,8 @@ export const commandArgAliases = {
 export const standaloneOnlyAliases = new Set([
   ...Object.keys(commandArgAliases),
   'رصيد', 'رصيدي', 'رصيدى', 'فلوس', 'كريدت',
+  // `حول`/`تحويل` are everyday words, so they only send CC as `تحويل @member 100`.
+  'تحويل', 'حول', 'حوّل',
   // Level words are common in chat (`لفل كام؟`), so they only run as the whole message (+ a mention).
   'لفل', 'ليفل', 'مستوى', 'مستوايا', 'رانك', 'توب',
 ]);
