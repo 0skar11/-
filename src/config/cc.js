@@ -27,11 +27,14 @@ export const CC = {
         dailyCap: 50,
     },
 
-    // A win announced by the games bot (Clover), read from its "👑 | @winner" message
-    // (services/cc/gamesBotWins.js). Its message doesn't say how many played, so a win pays a fixed
-    // amount, with a daily cap so a game with a friend over and over can't be farmed.
+    // Wins announced by the games bot (Clover), read from its messages (services/cc/gamesBotWins.js):
+    // - a group game win, `👑 | @winner`, pays `win`;
+    // - a solo win, `✅ | قام @member بكتابة الاجابة الصحيحة خلال ... ثانية` (first to type the answer), pays `answer`.
+    // Its messages don't say how many played, so a win pays a fixed amount (times the CC event
+    // multiplier), with a daily cap shared by both so a game with a friend over and over can't be farmed.
     gamesBot: {
-        win: 10,
+        win: 50,
+        answer: 10,
         // Most CC a member can get from games bot wins per day (UTC).
         dailyCap: 200,
     },

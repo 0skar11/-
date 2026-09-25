@@ -136,21 +136,27 @@ export async function awardSoloWin(client, guildId, userId, game, { now = Date.n
 }
 
 /**
- * Pays a win announced by the games bot, up to the daily cap (CC.gamesBot). Returns
- * `{ amount, capped, balance }`; `amount` is 0 once the cap is reached (the win is still counted).
+ * Pays a win announced by the games bot, up to the daily cap (CC.gamesBot). `kind` is 'group' for a
+ * group game win (CC.gamesBot.win) or 'answer' for a solo first-to-answer win (CC.gamesBot.answer).
+ * Returns `{ amount, capped, balance }`; `amount` is 0 once the cap is reached (the win is still counted).
  */
-export async function awardGamesBotWin(client, guildId, userId, { now = Date.now() } = {}) {
+export async function awardGamesBotWin(client, guildId, userId, { now = Date.now(), kind = 'group' } = {}) {
     return updateRecord(client, guildId, userId, (state, record) => {
         const today = utcDay(now);
         const earned = record.ccGamesBot?.day === today ? record.ccGamesBot.earned : 0;
         const boost = ccBoost(now);
-        const amount = Math.max(0, Math.min(CC.gamesBot.win * boost, CC.gamesBot.dailyCap * boost - earned));
+        const base = kind === 'answer' ? CC.gamesBot.answer : CC.gamesBot.win;
+        const amount = Math.max(0, Math.min(base * boost, CC.gamesBot.dailyCap * boost - earned));
         if (amount > 0) credit(state, amount);
         state.stats.gamesPlayed += 1;
-        state.stats.podiums += 1;
-        state.stats.groupWins += 1;
+        if (kind === 'answer') {
+            state.stats.soloWins += 1;
+        } else {
+            state.stats.podiums += 1;
+            state.stats.groupWins += 1;
+        }
         record.ccGamesBot = { day: today, earned: earned + amount };
-        return { amount, capped: amount < CC.gamesBot.win * boost, boost };
+        return { amount, capped: amount < base * boost, boost };
     });
 }
 

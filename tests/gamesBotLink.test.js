@@ -228,6 +228,43 @@ describe('games bot (Clover) wins', async () => {
         assert.equal((await getProfile(client, GUILD, A)).cc, CC.gamesBot.win);
     });
 
+    test('a first-to-answer win pays the solo amount, a crown win the group amount, both ×5 in the event', async () => {
+        const { parseWin } = await import('../src/services/cc/gamesBotWins.js');
+        const answer = `✅ | قام <@${A}> بكتابة الاجابة الصحيحة خلال **__4.12__** ثانية`;
+        assert.deepEqual(parseWin(answer), { userId: A, kind: 'answer' });
+        assert.deepEqual(parseWin(`✅ | قام <@!${A}> بكتابة الإجابة الصحيحة خلال 2 ثانية`), { userId: A, kind: 'answer' });
+        assert.deepEqual(parseWin(`👑 | <@${A}>`), { userId: A, kind: 'group' });
+        assert.equal(parseWin(`قام <@${A}> بكتابة الاجابة الصحيحة`), null);
+        assert.equal(CC.gamesBot.win, 50);
+        assert.equal(CC.gamesBot.answer, 10);
+
+        const saved = CC.boost;
+        CC.boost = { multiplier: 1, until: '2000-01-01T00:00:00Z' };
+        try {
+            const client = { db: memoryDb() };
+            const message = winMessage(answer);
+            assert.equal(await handleGamesBotWin(message, client), true);
+            let profile = await getProfile(client, GUILD, A);
+            assert.equal(profile.cc, 10);
+            assert.equal(profile.stats.soloWins, 1);
+            assert.equal(profile.stats.groupWins, 0);
+            assert.match(message.replies[0].content, /\+\*\*10\*\*/u);
+            await handleGamesBotWin(winMessage(`👑 | <@${A}>`), client);
+            profile = await getProfile(client, GUILD, A);
+            assert.equal(profile.cc, 60);
+            assert.equal(profile.stats.groupWins, 1);
+
+            CC.boost = { multiplier: 5, until: '2999-01-01T00:00:00Z' };
+            const boosted = { db: memoryDb() };
+            await handleGamesBotWin(winMessage(answer), boosted);
+            assert.equal((await getProfile(boosted, GUILD, A)).cc, 50);
+            await handleGamesBotWin(winMessage(`👑 | <@${A}>`), boosted);
+            assert.equal((await getProfile(boosted, GUILD, A)).cc, 50 + 250);
+        } finally {
+            CC.boost = saved;
+        }
+    });
+
     test('daily cap', async () => {
         const client = { db: memoryDb() };
         const wins = Math.ceil(CC.gamesBot.dailyCap / CC.gamesBot.win) + 2;
