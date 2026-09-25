@@ -114,3 +114,49 @@ describe('level-up message source', () => {
     assert.match(message.embeds[0].title, /لفل 10 🎙️/u);
   });
 });
+
+import { getLeaderboard } from '../src/services/leveling/leveling.js';
+import { getUserLevelKey } from '../src/utils/database/keys.js';
+
+describe('level leaderboard', () => {
+  const GUILD = '100000000000000001';
+  const ids = { oskar: '200000000000000001', other: '200000000000000002', bot: '200000000000000003', left: '200000000000000004' };
+
+  function makeClient({ fetchFails }) {
+    const store = new Map([
+      [getUserLevelKey(GUILD, ids.oskar), { level: 12, xp: 0, totalXp: 6430 }],
+      [getUserLevelKey(GUILD, ids.other), { level: 3, xp: 10, totalXp: 400 }],
+      [getUserLevelKey(GUILD, ids.bot), { level: 20, xp: 0, totalXp: 99999 }],
+      [getUserLevelKey(GUILD, ids.left), { level: 30, xp: 0, totalXp: 50000 }],
+    ]);
+    const member = (id, bot = false) => [id, { user: { id, bot, username: id } }];
+    const all = new Map([member(ids.oskar), member(ids.other), member(ids.bot, true)]);
+    const guild = {
+      id: GUILD,
+      memberCount: all.size,
+      members: {
+        // Only the caller is cached, like right after a `rank`.
+        cache: new Map([member(ids.oskar)]),
+        fetch: async () => { if (fetchFails) throw new Error('rate limited'); return all; },
+      },
+    };
+    return {
+      guilds: { cache: new Map([[GUILD, guild]]) },
+      db: {
+        get: async (key) => store.get(key) ?? null,
+        list: async (prefix) => [...store.keys()].filter((key) => key.startsWith(prefix)),
+      },
+    };
+  }
+
+  test('ranks members by XP, without bots or people who left', async () => {
+    const board = await getLeaderboard(makeClient({ fetchFails: false }), GUILD, 10);
+    assert.deepEqual(board.map((entry) => [entry.userId, entry.rank, entry.level]), [[ids.oskar, 1, 12], [ids.other, 2, 3]]);
+  });
+
+  test('still shows the top when Discord refuses the member fetch', async () => {
+    const board = await getLeaderboard(makeClient({ fetchFails: true }), GUILD, 10);
+    assert.ok(board.some((entry) => entry.userId === ids.oskar && entry.totalXp === 6430));
+    assert.ok(board.length > 0);
+  });
+});
