@@ -1,17 +1,13 @@
-import { PermissionFlagsBits } from 'discord.js';
 import { logger } from '../../utils/logger.js';
 import { getLevelingConfig, saveLevelingConfig } from './leveling.js';
 
-// Level roles: one role per tier, stacked right above the anchor role below in order (higher level = higher role).
+// Level roles: one role per tier (higher level = higher role).
 // Emojis and colours are their own, apart from the staff roles (👑 ⚡ 🛡️ 🔨 🔰): green for the first
 // levels, through blue and purple, up to gold at level 100. They carry no permissions, only a colour.
 // Each tier is saved in the leveling config's roleRewards, so the level-up message gives the role
 // (and names it) and the startup level role sync hands it to members who already passed that level.
 // A member only keeps the role of their highest tier: the next tier replaces the previous one.
-// The bot only sets a level role up when it creates it (colour, place above the anchor). After that the
-// role is the owner's: name, colour, permissions and position are never changed back on a restart.
-// The owner asked for the level roles to sit right above this role.
-export const LEVEL_ROLES_ABOVE_ROLE_ID = '1551151228833234985';
+// The roles are the owner's: the bot never creates, renames, recolours, moves or deletes them.
 
 export const LEVEL_TIERS = [
     { level: 5, name: '🌱 Level 5', color: '#a3e4a1' },
@@ -25,89 +21,35 @@ export const LEVEL_TIERS = [
     { level: 100, name: '🌌 Level 100', color: '#ffd700' },
 ];
 
-// Same order discord.js uses for setPosition: bottom first, equal positions broken by the higher ID being lower.
-export function sortRolesBottomUp(roles) {
-    return [...roles].sort((a, b) => (a.position === b.position ? Number(BigInt(b.id) - BigInt(a.id)) : a.position - b.position));
-}
-
-/** The relative move that puts `roleId` right above `belowId` in the bottom-up list of role IDs (0 = already there). */
-export function offsetToSitAbove(orderedIds, roleId, belowId) {
-    const current = orderedIds.indexOf(roleId);
-    const below = orderedIds.indexOf(belowId);
-    if (current === -1 || below === -1) return 0;
-    if (current === below + 1) return 0;
-    // Moving up: taking the role out shifts everything above it down by one.
-    return current < below ? below - current : below + 1 - current;
-}
-
-// The tier's role: the one saved as its reward (so a renamed role is still found), else one with its name,
-// else a new one. An existing role is used as it is.
-async function ensureTierRole(guild, roles, tier, savedRoleId) {
-    const existing = (savedRoleId && roles.get(savedRoleId))
-        || [...roles.values()].find((role) => role.name === tier.name && !role.managed);
-    if (existing) return { role: existing, created: false };
-    const role = await guild.roles.create({ name: tier.name, color: tier.color, hoist: false, mentionable: false, permissions: [], reason: `Level ${tier.level} role` });
-    return { role, created: true };
+// The tier's role: the one saved as its reward (so a renamed role is still found), else one with its name.
+function findTierRole(roles, tier, savedRoleId) {
+    return (savedRoleId && roles.get(savedRoleId))
+        || [...roles.values()].find((role) => role.name === tier.name && !role.managed)
+        || null;
 }
 
 /**
- * Creates missing level roles, puts each new one in order above the anchor role (level 5 first, level 100
- * on top) and saves them as the level rewards. Roles that already exist are left exactly as they are.
+ * Saves the level roles that exist as the level rewards. The bot never creates, edits, moves or deletes a
+ * level role: a missing one is only reported, and it is the owner who makes it.
  */
-export async function ensureLevelTierRoles(client, guild) {
-    const summary = { created: 0, moved: 0, rewardsSaved: false };
-    const botMember = guild.members.me || await guild.members.fetchMe().catch(() => null);
-    if (!botMember?.permissions.has(PermissionFlagsBits.ManageRoles)) {
-        logger.warn(`Level roles skipped for ${guild.name}: bot needs Manage Roles.`);
-        return summary;
-    }
-
+export async function findLevelTierRoles(client, guild) {
+    const summary = { found: 0, missing: [], rewardsSaved: false };
     const roles = await guild.roles.fetch();
     const config = await getLevelingConfig(client, guild.id);
-    const tierRoles = [];
-    for (const tier of LEVEL_TIERS) {
-        const { role, created } = await ensureTierRole(guild, roles, tier, config.roleRewards?.[tier.level]);
-        if (created) summary.created += 1;
-        tierRoles.push({ tier, role, created });
-    }
-
-    const anchor = guild.roles.cache.get(LEVEL_ROLES_ABOVE_ROLE_ID);
-    if (!anchor && summary.created) {
-        logger.warn(`Level roles in ${guild.name}: role ${LEVEL_ROLES_ABOVE_ROLE_ID} was not found, so they were not ordered.`);
-    } else if (anchor) {
-        let belowId = anchor.id;
-        for (const { tier, role, created } of tierRoles) {
-            // Only a role the bot just made is placed; the others stay where the owner put them.
-            if (!created) {
-                belowId = role.id;
-                continue;
-            }
-            const ordered = sortRolesBottomUp(guild.roles.cache.values()).map((r) => r.id);
-            const offset = offsetToSitAbove(ordered, role.id, belowId);
-            if (offset !== 0) {
-                if (!role.editable) {
-                    logger.warn(`Level role ${tier.name} in ${guild.name} can't be moved: the bot's highest role must be above it.`);
-                    break;
-                }
-                try {
-                    await role.setPosition(offset, { relative: true, reason: 'Keep level roles in order above their anchor role' });
-                    summary.moved += 1;
-                } catch (error) {
-                    logger.warn(`Could not move level role ${tier.name} in ${guild.name} (the bot's role must be above all level roles): ${error.message}`);
-                    break;
-                }
-            }
-            belowId = role.id;
-        }
-    }
-
     const rewards = { ...(config.roleRewards || {}) };
     let changed = false;
-    for (const { tier, role } of tierRoles) {
+    for (const tier of LEVEL_TIERS) {
+        const role = findTierRole(roles, tier, rewards[tier.level]);
+        if (!role) {
+            summary.missing.push(tier.name);
+            continue;
+        }
+        summary.found += 1;
         if (rewards[tier.level] === role.id) continue;
         rewards[tier.level] = role.id;
         changed = true;
     }
+    if (summary.missing.length) logger.warn(`Level roles missing in ${guild.name} (the bot doesn't create roles): ${summary.missing.join(', ')}`);
     if (changed) {
         await saveLevelingConfig(client, guild.id, { ...config, roleRewards: rewards });
         summary.rewardsSaved = true;

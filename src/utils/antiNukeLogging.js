@@ -58,18 +58,14 @@ export async function isTrusted(guild, config, executorId) {
   return Boolean(member?.roles?.cache?.some((role) => trustedRoles.has(role.id)));
 }
 
-async function stripDangerousPermissions(member) {
+// Takes the member's dangerous roles off them. The roles themselves are never edited, so everyone else
+// who holds them keeps their permissions.
+async function removeDangerousRoles(member) {
   if (!member?.manageable) return false;
   const dangerous = [PermissionFlagsBits.Administrator, PermissionFlagsBits.ManageGuild, PermissionFlagsBits.ManageChannels, PermissionFlagsBits.ManageRoles, PermissionFlagsBits.BanMembers, PermissionFlagsBits.KickMembers];
-  let changed = false;
-  for (const role of member.roles.cache.filter((role) => role.editable)) {
-    const permissions = role.permissions.remove(dangerous);
-    if (!permissions.equals(role.permissions)) {
-      await role.setPermissions(permissions, 'Anti-Nuke: excessive destructive activity').catch(() => {});
-      changed = true;
-    }
-  }
-  return changed;
+  const roles = member.roles.cache.filter((role) => role.editable && !role.managed && role.id !== member.guild.id && role.permissions.any(dangerous));
+  if (!roles.size) return false;
+  return member.roles.remove([...roles.keys()], 'Anti-Nuke: excessive destructive activity').then(() => true).catch(() => false);
 }
 
 const ACTION_LABELS = Object.freeze({
@@ -107,7 +103,7 @@ function alert(guild, executorId, punishment, reason) {
 
 async function punish(member, reason) {
   if (member?.kickable && await member.kick(reason).then(() => true).catch(() => false)) return 'تم طرده';
-  if (await stripDangerousPermissions(member)) return 'تم سحب صلاحياته (لم يمكن طرده)';
+  if (await removeDangerousRoles(member)) return 'تم سحب رتبه الخطيرة (لم يمكن طرده)';
   return 'فشل التعامل معه — يحتاج تدخل يدوي';
 }
 

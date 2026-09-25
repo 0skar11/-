@@ -7,7 +7,6 @@
 // A record is never replaced, so a member who comes back can't be counted a second time.
 // The invite roles' IDs are saved in `guild:<id>:invite_reward_roles` ({ [tier count]: roleId }).
 
-import { PermissionFlagsBits } from 'discord.js';
 import { INVITE_REWARDS, CHAOS_GUILD_ID, WELCOME_CHANNEL_ID } from '../config/inviteRewards.js';
 import { CC, ccEmbed } from '../config/cc.js';
 import { grantCC } from './cc/ccService.js';
@@ -214,28 +213,28 @@ export async function sweepInviteRewards(client, { now = Date.now() } = {}) {
   return paid;
 }
 
-/** The invite roles: the saved ones, else ones with the tier's name, else new ones. Returns { [tier count]: roleId }. */
-export async function ensureInviteTierRoles(client, guild) {
+/**
+ * The invite roles: the saved ones, else ones with the tier's name. Returns { [tier count]: roleId }.
+ * The bot never creates, edits or deletes a role: a missing tier role is skipped until the owner makes it.
+ */
+export async function findInviteTierRoles(client, guild) {
   const saved = (await client.db.get(rolesKey(guild.id), null)) || {};
-  const botMember = guild.members.me || await guild.members.fetchMe().catch(() => null);
-  if (!botMember?.permissions.has(PermissionFlagsBits.ManageRoles)) {
-    logger.warn(`Invite roles skipped for ${guild.name}: bot needs Manage Roles.`);
-    return saved;
-  }
   const roles = await guild.roles.fetch();
   const roleIds = {};
+  const missing = [];
   for (const tier of INVITE_REWARDS.tiers) {
-    const existing = (saved[tier.count] && roles.get(saved[tier.count]))
-      || [...roles.values()].find((role) => role.name === tier.name && !role.managed);
-    const role = existing || await guild.roles.create({ name: tier.name, color: tier.color, hoist: false, mentionable: false, permissions: [], reason: `Invite role (${tier.count} invites)` });
-    roleIds[tier.count] = role.id;
+    const role = (saved[tier.count] && roles.get(saved[tier.count]))
+      || [...roles.values()].find((candidate) => candidate.name === tier.name && !candidate.managed);
+    if (role) roleIds[tier.count] = role.id;
+    else missing.push(tier.name);
   }
+  if (missing.length) logger.warn(`Invite roles missing in ${guild.name} (the bot doesn't create roles): ${missing.join(', ')}`);
   if (INVITE_REWARDS.tiers.some((tier) => saved[tier.count] !== roleIds[tier.count])) await client.db.set(rolesKey(guild.id), roleIds);
   return roleIds;
 }
 
 async function syncInviterRoles(client, guild, inviterId, paid) {
-  const roleIds = (await client.db.get(rolesKey(guild.id), null)) || await ensureInviteTierRoles(client, guild);
+  const roleIds = await findInviteTierRoles(client, guild);
   const member = guild.members.cache.get(inviterId) || await guild.members.fetch(inviterId).catch(() => null);
   if (!member) return null;
   const changes = inviteRoleChanges(paid, roleIds, new Set(member.roles.cache.keys()));
@@ -244,11 +243,11 @@ async function syncInviterRoles(client, guild, inviterId, paid) {
   return changes;
 }
 
-/** Sets the invite roles up and starts the pending invites check. */
+/** Finds the invite roles and starts the pending invites check. */
 export async function startInviteRewards(client) {
   const guild = client.guilds.cache.get(CHAOS_GUILD_ID);
   if (!guild) return { status: 'guild not found' };
-  await ensureInviteTierRoles(client, guild).catch((error) => logger.error('Failed to set up the invite roles:', error));
+  await findInviteTierRoles(client, guild).catch((error) => logger.error('Failed to find the invite roles:', error));
   const run = () => sweepInviteRewards(client).catch((error) => logger.error('Invite rewards check failed:', error));
   await run();
   setInterval(run, INVITE_REWARDS.checkEveryMinutes * 60 * 1000).unref?.();
