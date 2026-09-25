@@ -75,6 +75,33 @@ describe('staff role permissions', () => {
   });
 });
 
+describe('owner edits to staff roles', () => {
+  test('existing staff roles are never edited or moved, even renamed ones', async () => {
+    const store = new Map();
+    const client = { db: { get: async (key, fallback) => (store.has(key) ? store.get(key) : fallback), set: async (key, value) => { store.set(key, value); return true; } } };
+    const untouchable = (id, name, position) => ({
+      id, name, position, managed: false, editable: true,
+      edit: async () => { throw new Error('must not edit'); },
+      setPermissions: async () => { throw new Error('must not edit'); },
+      setPosition: async () => { throw new Error('must not move'); },
+    });
+    const roles = new Map(ROLE_DEFINITIONS.map((definition, index) => [String(index + 1), untouchable(String(index + 1), definition.name, 50 - index)]));
+    roles.find = (fn) => [...roles.values()].find(fn);
+    const created = [];
+    const guild = {
+      id: 'g-staff', name: 'g', client,
+      members: { me: { permissions: new PermissionsBitField(PermissionsBitField.All), roles: { highest: { position: 99 } } } },
+      roles: { fetch: async () => roles, create: async (options) => { created.push(options); return { ...options, id: 'new', position: 1 }; } },
+    };
+
+    assert.deepEqual(await synchronizeStaffRoles(guild), { created: 0, updated: 0, positioned: 0 });
+    // The owner renames the first staff role: it is still recognised by its saved ID, no copy is made.
+    roles.get('1').name = 'The Boss';
+    assert.deepEqual(await synchronizeStaffRoles(guild), { created: 0, updated: 0, positioned: 0 });
+    assert.equal(created.length, 0);
+  });
+});
+
 describe('configured modRole', () => {
   const member = { id: 'm', guild: { ownerId: 'o' }, permissions: new PermissionsBitField(), roles: { cache: new Map([['mod', {}]]) } };
   const config = { modRole: 'mod' };

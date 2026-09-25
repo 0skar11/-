@@ -70,16 +70,17 @@ describe('media lock', () => {
     assert.equal(chaos.permissions.has(PermissionFlagsBits.AttachFiles), false);
   });
 
-  test('moves a media role that sits above chaos down to right below it', async () => {
-    const role = (id, position) => ({
+  test('an existing media role and @everyone / chaos are never changed back', async () => {
+    const role = (id, position, permissions) => ({
       id, position, name: id, managed: false, editable: true,
-      permissions: new PermissionsBitField(MEDIA_PERMISSIONS),
-      async setPermissions(value) { this.permissions = new PermissionsBitField(value); },
-      async setPosition(value) { this.movedTo = value; },
+      permissions: new PermissionsBitField(permissions),
+      async setPermissions() { throw new Error('must not change permissions'); },
+      async setPosition() { throw new Error('must not move'); },
     });
-    const everyone = role('everyone', 0);
-    const chaos = role(CHAOS_ROLE_ID, 3);
-    const media = role('media', 4);
+    // The owner moved media above chaos, gave chaos Attach Files and took Embed Links off media.
+    const everyone = role('everyone', 0, [PermissionFlagsBits.AttachFiles]);
+    const chaos = role(CHAOS_ROLE_ID, 3, [PermissionFlagsBits.AttachFiles]);
+    const media = role('media', 4, [PermissionFlagsBits.AttachFiles]);
     const roles = new Map([[everyone.id, everyone], [chaos.id, chaos], [media.id, media]]);
     roles.find = (fn) => [...roles.values()].find(fn);
     const guild = {
@@ -88,10 +89,8 @@ describe('media lock', () => {
       roles: { everyone, fetch: async () => roles },
     };
 
-    const result = await ensureMediaRole(guild);
-    assert.equal(result.positioned, true);
-    // Moving down onto chaos's index puts media directly under it (chaos shifts up by one).
-    assert.equal(media.movedTo, chaos.position);
+    assert.deepEqual(await ensureMediaRole(guild), { created: false, positioned: false, locked: 0 });
+    assert.equal(media.position, 4);
   });
 
   test('gives the media role to every current member once, skipping bots', async () => {

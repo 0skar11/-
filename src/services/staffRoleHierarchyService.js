@@ -171,6 +171,32 @@ function grantablePermissions(botMember, definition) {
   return new PermissionsBitField(wanted.bitfield & botMember.permissions.bitfield).bitfield;
 }
 
+// Staff role IDs the bot created, by definition name, so a role the owner renamed is still recognised.
+const STAFF_ROLE_IDS_KEY = 'staffRoleIds';
+
+async function savedStaffRoleIds(guild) {
+  if (!guild.client?.db) return {};
+  const config = await getGuildConfig(guild.client, guild.id).catch(() => null);
+  return { ...(config?.[STAFF_ROLE_IDS_KEY] || {}) };
+}
+
+function findStaffRole(roles, definition, savedIds) {
+  return (savedIds[definition.name] && roles.get(savedIds[definition.name]))
+    || roles.find((candidate) => candidate.name === definition.name && !candidate.managed);
+}
+
+// discord.js setPosition index: right below `above` (moving up lands one below the target index's role).
+async function placeBelow(role, above, reason) {
+  if (typeof role.setPosition !== 'function' || !above) return false;
+  await role.setPosition(role.position < above.position ? above.position - 1 : above.position, { reason });
+  return true;
+}
+
+/**
+ * Creates the staff roles that are missing, with their colour and permissions, each placed right below
+ * the staff role above it (or below the bot's highest role). A staff role that already exists is never
+ * changed: the owner's edits to its name, colour, permissions or position stay as they are.
+ */
 export async function synchronizeStaffRoles(guild) {
   const botMember = guild.members.me || await guild.members.fetchMe().catch(() => null);
   if (!botMember?.permissions.has(PermissionFlagsBits.ManageRoles)) {
@@ -179,35 +205,35 @@ export async function synchronizeStaffRoles(guild) {
   }
 
   const roles = await guild.roles.fetch();
-  const managedRoles = [];
+  const savedIds = await savedStaffRoleIds(guild);
   let created = 0;
-  let updated = 0;
+  let positioned = 0;
+  let above = botMember.roles?.highest || null;
 
   for (const definition of ROLE_DEFINITIONS) {
-    // Discord only lets the bot grant permissions it holds itself (all of them when it is an Administrator).
-    const permissions = grantablePermissions(botMember, definition);
-    let role = roles.find((candidate) => candidate.name === definition.name && !candidate.managed);
-    try {
-      if (!role) {
-        role = await guild.roles.create({ name: definition.name, color: definition.color, hoist: true, mentionable: false, permissions, reason: 'Create/update ordered staff role hierarchy' });
+    let role = findStaffRole(roles, definition, savedIds);
+    if (!role) {
+      // Discord only lets the bot grant permissions it holds itself (all of them when it is an Administrator).
+      const permissions = grantablePermissions(botMember, definition);
+      try {
+        role = await guild.roles.create({ name: definition.name, color: definition.color, hoist: true, mentionable: false, permissions, reason: 'Create missing staff role' });
         created += 1;
-      } else if (role.position < botMember.roles.highest.position) {
-        await role.edit({ color: definition.color, hoist: true, permissions, reason: 'Synchronize ordered staff role permissions' });
-        updated += 1;
-      } else {
-        logger.warn(`Role ${definition.name} in ${guild.name} is above the bot's highest role; its permissions were not synchronized.`);
+        if (await placeBelow(role, above, 'Place the new staff role in the hierarchy').catch((error) => {
+          logger.warn(`Could not place ${definition.name} in ${guild.name}: ${error.message}`);
+          return false;
+        })) positioned += 1;
+      } catch (error) {
+        logger.error(`Failed to create ${definition.name} in ${guild.name}:`, error);
       }
-    } catch (error) {
-      logger.error(`Failed to synchronize ${definition.name} in ${guild.name}:`, error);
     }
-    if (role && !role.managed && role.position < botMember.roles.highest.position) managedRoles.push(role);
+    if (role) {
+      savedIds[definition.name] = role.id;
+      above = role;
+    }
   }
 
-  const refreshedBotMember = await guild.members.fetchMe();
-  const highestPosition = refreshedBotMember.roles.highest.position;
-  const positionUpdates = managedRoles.map((role, index) => ({ role: role.id, position: Math.max(1, highestPosition - index - 1) }));
-  if (positionUpdates.length) await guild.roles.setPositions(positionUpdates);
-  return { created, updated, positioned: positionUpdates.length };
+  if (guild.client?.db) await updateGuildConfig(guild.client, guild.id, { [STAFF_ROLE_IDS_KEY]: savedIds }).catch(() => {});
+  return { created, updated: 0, positioned };
 }
 
 const BOARD_KEY = 'staffPermissions';
@@ -232,8 +258,9 @@ async function fetchBoardChannel(guild, { reset = false } = {}) {
 // One message holds every staff role's embed (one embed per role, in hierarchy order).
 async function buildBoardEmbeds(guild) {
   const roles = await guild.roles.fetch();
+  const savedIds = await savedStaffRoleIds(guild);
   return ROLE_DEFINITIONS.flatMap((definition) => {
-    const role = roles.find((candidate) => candidate.name === definition.name && !candidate.managed);
+    const role = findStaffRole(roles, definition, savedIds);
     return role ? [buildBoardEmbed(role, definition)] : [];
   });
 }

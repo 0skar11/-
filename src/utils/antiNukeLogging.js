@@ -1,6 +1,7 @@
 import { AuditLogEvent, EmbedBuilder, PermissionFlagsBits } from 'discord.js';
 import { logger } from './logger.js';
 import { getGuildConfig } from '../services/config/guildConfig.js';
+import { isServerOwner } from '../config/serverOwners.js';
 
 const TEN_SECONDS = 10_000;
 const ONE_MINUTE = 60_000;
@@ -48,6 +49,8 @@ function record(guildId, executorId, action, windowMs) {
 
 export async function isTrusted(guild, config, executorId) {
   if (executorId === guild.ownerId || executorId === guild.client.user?.id) return true;
+  // The server owners (config/serverOwners.js) are never treated as an attack, whoever Discord lists as owner.
+  if (isServerOwner(executorId)) return true;
   if (config?.antiNukeTrustedUsers?.includes(executorId)) return true;
   const trustedRoles = new Set(config?.antiNukeTrustedRoles || []);
   if (!trustedRoles.size) return false;
