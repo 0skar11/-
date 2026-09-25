@@ -13,6 +13,7 @@ export const commandAliases = {
   rank: 'rank', lvl: 'rank', xp: 'rank', leaderboard: 'leaderboard', lb: 'leaderboard', top: 'leaderboard',
   لفل: 'rank', ليفل: 'rank', مستوى: 'rank', مستوايا: 'rank', رانك: 'rank', توب: 'leaderboard',
   افك: 'afk', أفك: 'afk',
+  invites: 'invitetop', دعواتي: 'invitetop', دعواتى: 'invitetop',
   user: 'userinfo', avatar: 'avatar', av: 'avatar', pfp: 'avatar', icon: 'avatar', bd: 'birthday', bday: 'birthday', b: 'birthday',
   flip: 'flip', coin: 'flip', roll: 'roll', dice: 'roll', fight: 'fight',
   gstart: 'gcreate', gstop: 'gend', groll: 'greroll', ticket: 'ticket', t: 'ticket', new: 'ticket',
@@ -68,6 +69,13 @@ export const twoWordCommandAliases = {
   'top cc': 'cctop',
   'توب cc': 'cctop',
   'توب كريدت': 'cctop',
+  'top invites': 'invitetop',
+  'top invite': 'invitetop',
+  'توب invites': 'invitetop',
+  'توب دعوات': 'invitetop',
+  'توب الدعوات': 'invitetop',
+  'توب انفايت': 'invitetop',
+  'توب انفايتات': 'invitetop',
   'وقف اللعبة': 'game stop',
   'وقف اللعبه': 'game stop',
   'ايقاف اللعبة': 'game stop',
@@ -112,6 +120,7 @@ export const commandArgAliases = {
 export const standaloneOnlyAliases = new Set([
   ...Object.keys(commandArgAliases),
   'رصيد', 'رصيدي', 'رصيدى', 'فلوس', 'كريدت',
+  'دعواتي', 'دعواتى', 'invites',
   // `حول`/`تحويل` are everyday words, so they only send CC as `تحويل @member 100`.
   'تحويل', 'حول', 'حوّل',
   // Level words are common in chat (`لفل كام؟`), so they only run as the whole message (+ a mention).

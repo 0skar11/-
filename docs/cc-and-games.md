@@ -121,6 +121,29 @@ level 50 = 500. Gaining several levels at once pays each one. The level-up messa
 channel shows the CC. Staff setting levels by command pays nothing. The number is
 `CC.levelUp.perLevel`.
 
+## Invite rewards
+
+Inviting people pays CC (`src/services/inviteRewardService.js`, numbers in `src/config/inviteRewards.js`).
+When a member joins, the invite tracker finds the invite they used and saves who invited them. The
+inviter gets **1,000 CC** once the invited member reaches **level 5** and has been in the server for
+**3 days** (checked on every level-up and every 30 minutes). The CC event multiplier doesn't apply.
+
+An invite doesn't count when the account is younger than 7 days (fake/alt accounts), when the member
+was in the server before (a rejoin, or they already have a CC record), when someone invites
+themselves, or when the invited member leaves before the reward. Each member can only ever be paid
+for once.
+
+Under the `welcome to chaos` message the bot posts a second, small message (Discord subtext) saying
+who invited the member and the reward conditions, or why the invite doesn't count. When the reward
+is paid, the welcome channel gets a notice that pings the inviter.
+
+Paid invites give roles: `📨 5 Invites`, `💌 10 Invites`, `🏆 25 Invites`. They are created at
+startup when missing (with no permissions, placed at the bottom, so move them where you like), and a
+member only keeps the role of their highest tier.
+
+`top invites` / `توب دعوات` / `دعواتي` (`/invitetop`) shows the top inviters, your own paid and
+pending invites and the rules.
+
 ## CC events (`CC.boost`)
 
 `CC.boost` in `src/config/cc.js` multiplies every CC earned from games (group games, solo wins,

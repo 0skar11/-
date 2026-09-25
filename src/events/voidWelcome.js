@@ -1,8 +1,8 @@
 import { Events, PermissionFlagsBits } from 'discord.js';
 import { logger } from '../utils/logger.js';
-
-const TARGET_GUILD_ID = '1155236281706627173';
-const WELCOME_CHANNEL_ID = '1547305745417113700';
+import { CHAOS_GUILD_ID as TARGET_GUILD_ID, WELCOME_CHANNEL_ID } from '../config/inviteRewards.js';
+import { handleMemberJoinInvite } from '../services/inviteTrackerService.js';
+import { inviteWelcomeNotice } from '../services/inviteRewardService.js';
 
 export default {
   name: Events.GuildMemberAdd,
@@ -37,6 +37,15 @@ export default {
       logger.info(`Sent chaos welcome for ${member.user.tag} in channel ${WELCOME_CHANNEL_ID}.`);
     } catch (error) {
       logger.error(`Failed to send chaos welcome in channel ${WELCOME_CHANNEL_ID}:`, error);
+    }
+
+    // A separate small message under the welcome: who invited them and what the inviter gets.
+    try {
+      const join = await handleMemberJoinInvite(member);
+      const notice = inviteWelcomeNotice(member.id, join?.reward);
+      if (notice) await channel.send({ content: notice, allowedMentions: { parse: [] } });
+    } catch (error) {
+      logger.error(`Failed to send the invite notice for ${member.user.tag}:`, error);
     }
   },
 };

@@ -12,6 +12,7 @@ import { publishTrustedBoard } from "../services/trustedBoardService.js";
 import { publishSavedIdeasBoard } from "../services/savedIdeasBoardService.js";
 import { startCCTopBoard } from "../services/games/ccTopBoard.js";
 import { startStoreChannel } from "../services/cc/storeChannel.js";
+import { startInviteRewards } from "../services/inviteRewardService.js";
 
 export default {
   name: Events.ClientReady,
@@ -47,6 +48,12 @@ export default {
       startupLog(`Top CC board: ${ccTopBoard.status} (channel ${ccTopBoard.channelId})`);
       for (const result of await startStoreChannel(client)) {
         startupLog(`Store room: ${result.status} (channel ${result.channelId})`);
+      }
+      try {
+        const inviteRewards = await startInviteRewards(client);
+        startupLog(`Invite rewards: ${inviteRewards.status}`);
+      } catch (error) {
+        logger.error("Failed to start invite rewards:", error);
       }
       await ensureAuditLogChannels(client);
 
