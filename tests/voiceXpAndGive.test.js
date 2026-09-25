@@ -177,3 +177,45 @@ describe('CC event (boost)', () => {
         assert.equal(result.received, 95);
     });
 });
+
+describe('level-up CC', () => {
+    test('pays 10 CC × the new level, for every level gained', async () => {
+        const { CC } = await import('../src/config/cc.js');
+        const { levelUpReward } = await import('../src/services/cc/ccService.js');
+        const saved = CC.boost;
+        CC.boost = { multiplier: 1, until: null };
+        try {
+            assert.equal(levelUpReward(0, 1), 10);
+            assert.equal(levelUpReward(9, 10), 100);
+            assert.equal(levelUpReward(3, 5), 40 + 50);
+            assert.equal(levelUpReward(5, 5), 0);
+            CC.boost = { multiplier: 5, until: '2999-01-01T00:00:00Z' };
+            assert.equal(levelUpReward(9, 10), 500);
+        } finally {
+            CC.boost = saved;
+        }
+    });
+
+    test('leveling up through XP pays CC and the level-up message shows it', async () => {
+        const { CC } = await import('../src/config/cc.js');
+        const { addXp } = await import('../src/services/leveling/xpSystem.js');
+        const saved = CC.boost;
+        CC.boost = { multiplier: 1, until: null };
+        try {
+            const client = fakeClient();
+            const guild = { id: GUILD, name: 'void', channels: { cache: new Map(), fetch: async () => null } };
+            const member = voiceMember(A);
+            // Level 0 → 1 needs 50 XP, 1 → 2 needs 105.
+            const result = await addXp(client, guild, member, 200);
+            assert.equal(result.level, 2);
+            assert.equal((await getProfile(client, GUILD, A)).cc, 10 + 20);
+        } finally {
+            CC.boost = saved;
+        }
+
+        const { buildLevelUpMessage } = await import('../src/services/leveling/levelUi.js');
+        const shown = { id: A, displayName: 'x', toString: () => `<@${A}>`, displayAvatarURL: () => '' };
+        const message = buildLevelUpMessage(shown, { fromLevel: 6, level: 7, xp: 0, xpNeeded: 400, ccReward: 350, ccBoost: 5 });
+        assert.match(message.embeds[0].description, /\+350 CC\*\* 🔥 \(×5\)/u);
+    });
+});

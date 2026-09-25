@@ -154,6 +154,25 @@ export async function awardGamesBotWin(client, guildId, userId, { now = Date.now
     });
 }
 
+/** CC for reaching each level in (fromLevel, toLevel]: CC.levelUp.perLevel × level, with the CC event multiplier. */
+export function levelUpReward(fromLevel, toLevel, { now = Date.now() } = {}) {
+    let total = 0;
+    for (let level = fromLevel + 1; level <= toLevel; level += 1) total += level * CC.levelUp.perLevel;
+    return total * ccBoost(now);
+}
+
+/** Pays a member for leveling up from `fromLevel` to `toLevel`. Returns `{ amount, balance, boost }`. */
+export async function awardLevelUp(client, guildId, userId, fromLevel, toLevel, { now = Date.now() } = {}) {
+    const amount = levelUpReward(fromLevel, toLevel, { now });
+    if (amount <= 0) return { amount: 0, boost: ccBoost(now) };
+    const result = await updateRecord(client, guildId, userId, (state) => {
+        credit(state, amount);
+        return { amount };
+    });
+    logger.info('[CC] Level-up paid', { guildId, userId, fromLevel, toLevel, amount });
+    return { amount, balance: result.balance, boost: ccBoost(now) };
+}
+
 /** Gives CC outside the reward rules above (the games bot, via ccApi.js). */
 export async function grantCC(client, guildId, userId, amount, { source = 'unknown', reason = '' } = {}) {
     if (!Number.isSafeInteger(amount) || amount <= 0) throw new Error('Invalid CC amount');

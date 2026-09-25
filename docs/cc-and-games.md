@@ -114,10 +114,17 @@ guild config (`boardMessageIds.cctop`), so a restart keeps editing the same post
 channel it is, and deleting it makes the bot post a new one on the next refresh. `top cc` replies
 look the same but have no footer, so they are never mistaken for the board.
 
+## Level-up CC
+
+Every level-up (from chat or voice XP) pays `10 × the new level` CC: level 1 = 10, level 10 = 100,
+level 50 = 500. Gaining several levels at once pays each one. The level-up message in the levels
+channel shows the CC. Staff setting levels by command pays nothing. The number is
+`CC.levelUp.perLevel`.
+
 ## CC events (`CC.boost`)
 
 `CC.boost` in `src/config/cc.js` multiplies every CC earned from games (group games, solo wins,
-Clover wins and the games bot's API rewards) and their daily caps until the `until` time, then stops
+Clover wins and the games bot's API rewards), level-up CC, and the daily caps until the `until` time, then stops
 by itself. While it runs, `رصيد` and `top cc` show `🔥 CC ×5` with when it ends, and Clover win
 notices show the multiplier. Transfers and staff changes are never multiplied. To end it early, set
 `multiplier: 1`.

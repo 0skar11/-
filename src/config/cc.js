@@ -36,8 +36,15 @@ export const CC = {
         dailyCap: 200,
     },
 
+    // Leveling up (chat or voice XP) pays `perLevel × the new level`: level 1 = 10 CC, level 10 = 100,
+    // level 50 = 500. Gaining several levels at once pays each of them. Staff changing levels by
+    // command (leveladd / levelset) pays nothing.
+    levelUp: {
+        perLevel: 10,
+    },
+
     // A limited-time event: every CC earned from games (group, solo, Clover wins and the games bot's
-    // API rewards) and the daily caps are multiplied until `until`, then it stops by itself. Transfers
+    // API rewards), level-ups, and the daily caps are multiplied until `until`, then it stops by itself. Transfers
     // and staff changes are never multiplied. Set `multiplier: 1` to end it early.
     boost: {
         multiplier: 5,

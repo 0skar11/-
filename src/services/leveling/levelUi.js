@@ -42,7 +42,7 @@ const SOURCES = {
  * Every 5th level it pings the member (content mention); otherwise the member is shown as a mention
  * inside the embed, which never notifies anyone.
  */
-export function buildLevelUpMessage(member, { fromLevel, level, xp, xpNeeded, rewardRoleIds = [], source = 'chat', messages = null, voiceMinutes = null }) {
+export function buildLevelUpMessage(member, { fromLevel, level, xp, xpNeeded, rewardRoleIds = [], source = 'chat', messages = null, voiceMinutes = null, ccReward = 0, ccBoost = 1 }) {
     const milestone = isMilestone(fromLevel, level);
     const nextMilestone = Math.ceil((level + 1) / PING_EVERY_LEVELS) * PING_EVERY_LEVELS;
     const from = SOURCES[source] || SOURCES.chat;
@@ -58,6 +58,7 @@ export function buildLevelUpMessage(member, { fromLevel, level, xp, xpNeeded, re
         '',
         `📈 **التقدم للفل ${level + 1}**`,
         `${progressBar(xp, xpNeeded)}  \`${number(xp)} / ${number(xpNeeded)} XP\``,
+        ccReward > 0 ? `\n🌀 **+${number(ccReward)} CC**${ccBoost > 1 ? ` 🔥 (×${ccBoost})` : ''}` : null,
         rewardRoleIds.length ? `\n🎁 **رتبة جديدة:** ${rewardRoleIds.map((id) => `<@&${id}>`).join(' ')}` : null,
     ].filter((line) => line !== null);
 
