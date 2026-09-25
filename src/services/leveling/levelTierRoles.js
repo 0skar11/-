@@ -1,13 +1,15 @@
 import { PermissionFlagsBits } from 'discord.js';
 import { logger } from '../../utils/logger.js';
-import { CHAOS_ROLE_ID } from '../mediaRoleService.js';
 import { getLevelingConfig, saveLevelingConfig } from './leveling.js';
 
-// Level roles: one role per tier, stacked right above chaos in order (higher level = higher role).
+// Level roles: one role per tier, stacked right above the anchor role below in order (higher level = higher role).
 // Emojis and colours are their own, apart from the staff roles (👑 ⚡ 🛡️ 🔨 🔰): green for the first
 // levels, through blue and purple, up to gold at level 100. They carry no permissions, only a colour.
 // Each tier is saved in the leveling config's roleRewards, so the level-up message gives the role
 // (and names it) and the startup level role sync hands it to members who already passed that level.
+// The owner asked for the level roles to sit right above this role.
+export const LEVEL_ROLES_ABOVE_ROLE_ID = '1551151228833234985';
+
 export const LEVEL_TIERS = [
     { level: 5, name: '🌱 Level 5', color: '#a3e4a1' },
     { level: 10, name: '🍀 Level 10', color: '#27ae60' },
@@ -50,7 +52,7 @@ async function ensureTierRole(guild, roles, tier) {
 }
 
 /**
- * Creates the level roles, keeps them stacked right above chaos (level 5 first, level 100 on top)
+ * Creates the level roles, keeps them stacked right above the anchor role (level 5 first, level 100 on top)
  * and saves them as the level rewards.
  */
 export async function ensureLevelTierRoles(client, guild) {
@@ -69,11 +71,11 @@ export async function ensureLevelTierRoles(client, guild) {
         tierRoles.push({ tier, role });
     }
 
-    const chaos = guild.roles.cache.get(CHAOS_ROLE_ID);
-    if (!chaos) {
-        logger.warn(`Level roles in ${guild.name}: chaos role ${CHAOS_ROLE_ID} was not found, so they were not ordered.`);
+    const anchor = guild.roles.cache.get(LEVEL_ROLES_ABOVE_ROLE_ID);
+    if (!anchor) {
+        logger.warn(`Level roles in ${guild.name}: role ${LEVEL_ROLES_ABOVE_ROLE_ID} was not found, so they were not ordered.`);
     } else {
-        let belowId = chaos.id;
+        let belowId = anchor.id;
         for (const { tier, role } of tierRoles) {
             const ordered = sortRolesBottomUp(guild.roles.cache.values()).map((r) => r.id);
             const offset = offsetToSitAbove(ordered, role.id, belowId);
@@ -83,7 +85,7 @@ export async function ensureLevelTierRoles(client, guild) {
                     break;
                 }
                 try {
-                    await role.setPosition(offset, { relative: true, reason: 'Keep level roles in order above chaos' });
+                    await role.setPosition(offset, { relative: true, reason: 'Keep level roles in order above their anchor role' });
                     summary.moved += 1;
                 } catch (error) {
                     logger.warn(`Could not move level role ${tier.name} in ${guild.name} (the bot's role must be above all level roles): ${error.message}`);
