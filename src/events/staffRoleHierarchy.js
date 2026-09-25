@@ -10,6 +10,7 @@ export default {
     let created = 0;
     let updated = 0;
     let positioned = 0;
+    let kept = 0;
     let retired = 0;
     const boardResults = [];
 
@@ -26,6 +27,7 @@ export default {
         created += summary.created;
         updated += summary.updated;
         positioned += summary.positioned;
+        kept += summary.kept;
       } catch (error) {
         logger.error(`Failed to synchronize staff roles in ${guild.name}:`, error);
       }
@@ -37,6 +39,6 @@ export default {
       }
     }
 
-    startupLog(`Staff role hierarchy: created ${created}, updated ${updated}, positioned ${positioned}, retired ${retired}, permission board ${boardResults.join(', ') || 'skipped'}`);
+    startupLog(`Staff role hierarchy: created ${created}, updated ${updated}, kept ${kept} (owner edits), positioned ${positioned}, retired ${retired}, permission board ${boardResults.join(', ') || 'skipped'}`);
   },
 };
