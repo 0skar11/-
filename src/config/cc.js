@@ -23,8 +23,10 @@ export const CC = {
     solo: {
         // CC for winning a solo game (rps, xo, solo question, solo number, slots).
         win: 5,
-        // Most CC a member can earn from solo games per day (UTC).
-        dailyCap: 50,
+        // Most CC a member can earn from solo games per day (UTC): `boostDailyCap` while the CC event runs
+        // (a flat amount, not multiplied), `dailyCap` after it (null = no cap).
+        boostDailyCap: 1500,
+        dailyCap: null,
     },
 
     // Wins announced by the games bot (Clover), read from its messages (services/cc/gamesBotWins.js):
@@ -48,8 +50,9 @@ export const CC = {
     },
 
     // A limited-time event: every CC earned from games (group, solo, Clover wins and the games bot's
-    // API rewards), level-ups, and the daily caps (except Clover's, see gamesBot) are multiplied until `until`, then it stops by itself. Transfers
-    // and staff changes are never multiplied. Set `multiplier: 1` to end it early.
+    // API rewards) and level-ups is multiplied until `until`, then it stops by itself. The daily caps are
+    // not multiplied (see solo and gamesBot). Transfers and staff changes are never multiplied. Set
+    // `multiplier: 1` to end it early.
     boost: {
         multiplier: 5,
         until: '2026-09-30T08:15:00Z',
@@ -72,6 +75,17 @@ export function ccBoost(now = Date.now()) {
     const { multiplier, until } = CC.boost || {};
     const end = Date.parse(until);
     return Number.isInteger(multiplier) && multiplier > 1 && Number.isFinite(end) && now < end ? multiplier : 1;
+}
+
+/** Today's cap on CC from solo wins: `boostDailyCap` during the CC event, otherwise `dailyCap` (Infinity when null). */
+export function soloDailyCap(now = Date.now()) {
+    const cap = ccBoost(now) > 1 ? CC.solo.boostDailyCap : CC.solo.dailyCap;
+    return Number.isFinite(cap) ? cap : Infinity;
+}
+
+/** `1,500 CC` for a daily cap, or `no cap` when there is none. */
+export function capText(cap) {
+    return Number.isFinite(cap) ? `${cap.toLocaleString('en-US')} ${CC.short}` : 'no cap';
 }
 
 /** Today's cap on CC from games bot wins: `boostDailyCap` during the CC event, otherwise `dailyCap` (Infinity when null). */

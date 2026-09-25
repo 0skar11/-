@@ -9,7 +9,7 @@
 //   ccGamesBot  { day: 'YYYY-MM-DD', earned } — CC from games bot wins today, for its daily cap
 //   ccTransfers [timestamp] — when the member sent CC with `give` in the last 7 days, for the transfer tax
 
-import { CC, ccBoost, gamesBotDailyCap } from '../../config/cc.js';
+import { CC, ccBoost, gamesBotDailyCap, soloDailyCap } from '../../config/cc.js';
 import { getEconomyKey, getEconomyPrefix } from '../../utils/database.js';
 import { normalizeEconomyData } from '../../utils/schemas.js';
 import { DEFAULT_ECONOMY_DATA } from '../../utils/constants.js';
@@ -30,10 +30,9 @@ export function groupRewards(playerCount, { now = Date.now() } = {}) {
     return CC.group.split.slice(0, places).map((share) => Math.max(1, Math.round(pool * share)) * boost);
 }
 
-/** How much of a solo win is still allowed today, given what was already earned (win and cap follow the CC event). */
+/** How much of a solo win is still allowed today, given what was already earned (the win follows the CC event, the cap is soloDailyCap). */
 export function soloRewardLeft(alreadyEarnedToday, { now = Date.now() } = {}) {
-    const boost = ccBoost(now);
-    return Math.max(0, Math.min(CC.solo.win * boost, CC.solo.dailyCap * boost - (alreadyEarnedToday || 0)));
+    return Math.max(0, Math.min(CC.solo.win * ccBoost(now), soloDailyCap(now) - (alreadyEarnedToday || 0)));
 }
 
 export function utcDay(now = Date.now()) {

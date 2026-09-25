@@ -11,7 +11,7 @@ import { runRoulette, ROULETTE_LIMITS } from './roulette.js';
 import { runChairs, CHAIRS_LIMITS } from './chairs.js';
 import { runMafia, MAFIA_LIMITS } from './mafia.js';
 import { runHideAndSeek, runHunt, HIDE_LIMITS, HUNT_LIMITS } from './hideGames.js';
-import { CC, ccEmbed } from '../../config/cc.js';
+import { CC, ccEmbed, soloDailyCap } from '../../config/cc.js';
 
 export const PANEL_BUTTON_PREFIX = 'gamespanel';
 const STOP_NOTICE_MS = 5_000;
@@ -130,7 +130,7 @@ export function buildGamesPanel() {
                     '🎰 **سلوت** — 3 زي بعض تكسب',
                     '✊ **حجر ورقة مقص** — ضد البوت',
                     '❌ **اكس @عضو** — XO ضد عضو',
-                    `الحد: **${CC.solo.dailyCap} ${CC.short}** في اليوم`,
+                    Number.isFinite(soloDailyCap()) ? `الحد: **${soloDailyCap().toLocaleString('en-US')} ${CC.short}** في اليوم` : 'من غير حد يومي',
                 ].join('\n'),
             },
             {
