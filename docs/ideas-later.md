@@ -83,6 +83,15 @@ before the role is made, so nobody buys a rude name or a role that looks like st
 - Skips: each staff member can skip (hand back) at most 3 tasks per week. The 4th skip in the same
   week sends the owner (`1159601661392715906`) a message with a mention saying that member went over
   the allowed skips.
+- The owner's example of the task board, one row per task (problem, solution, who is responsible,
+  deadline). The responsible can be a team or role, and the deadline a weekday or a duration:
+
+  | المشكلة        | الحل            | المسؤول     | الموعد |
+  | -------------- | --------------- | ----------- | ------ |
+  | قلة النشاط     | Events أسبوعية  | Events Team | الجمعة |
+  | Spam           | تحسين AutoMod   | Bot Team    | 3 أيام |
+  | Staff inactive | Activity system | Admins      | أسبوع  |
+
 - Possible pieces: tasks stored per guild (assignee, difficulty, deadline, status), buttons on each
   task (done / can't do it), a per-member score (done on time, late, handed back), and a summary
   board in the channel. Reports from the report channel (`src/services/reportChannelService.js`)
