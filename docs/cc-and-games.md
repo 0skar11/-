@@ -219,13 +219,14 @@ hour (5:00, 6:00, 7:00...). The commands work in any channel (the store and game
 
 | Chat word | Slash | What it does |
 |---|---|---|
-| `اسعار` / `بورصة` | `/bourse prices` | The prices of the hour, the move since last hour (🟢 ▲ / 🔴 ▼) and each range |
-| `استثمار 3` / `استثمار 3 2` | `/bourse invest asset [quantity]` | Buy asset 3 (or 2 of it) |
-| `بيع 3` / `بيع 3 2` | `/bourse sell asset [quantity]` | Sell at the price of the hour |
+| `اسعار` / `بورصة` | `/bourse prices` | A card per asset with its price and move since last hour (🟢 ▲ / 🔴 ▼, 🔥 when in demand); the rules in the footer |
+| `استثمار عربية` / `استثمار 3 2` | `/bourse invest asset [quantity]` | Buy by name or number (2 of it) |
+| `بيع عربية` / `بيع 3 2` | `/bourse sell asset [quantity]` | Sell at the price of the hour |
 | `ممتلكاتي` | `/bourse holdings` | What the member owns, what they paid and what they'd get selling now |
 
-Without the prefix the words only run with a number (`بيع 3`); with the prefix an asset name works
-too (`!بيع عربية`).
+Without the prefix `استثمار` / `بيع` run only when what follows is a number or exactly an asset's
+name, optionally with a number (`بيع سبيكة دهب 2`, `استثمار العربية`), so a sentence like `بيع
+العربية دي` is left alone. Receipts show the balance before and after, read in the same save.
 
 - Assets and rules: `src/config/store/bourse.js`. Changing a price range takes effect at the next
   read; never change an asset's `id` (it is the key in members' holdings).

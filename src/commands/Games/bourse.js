@@ -6,8 +6,8 @@ import { findAsset, getMarket, getHoldings } from '../../services/cc/bourseServi
 import { pricesEmbed, holdingsEmbed, confirmInvestPayload, confirmSellPayload, bourseFailureText } from '../../services/cc/bourseUi.js';
 import { InteractionHelper } from '../../utils/interactionHelper.js';
 
-// The CC bourse: `اسعار` (prices of the hour), `استثمار 3` / `استثمار 3 2` (buy), `بيع 3` / `بيع 3 2`
-// (sell) and `ممتلكاتي` (holdings). Buying and selling are confirmed with a button
+// The CC bourse: `اسعار` (prices of the hour), `استثمار عربية` / `استثمار 3 2` (buy), `بيع عربية` /
+// `بيع 3 2` (sell) and `ممتلكاتي` (holdings). Buying and selling are confirmed with a button
 // (src/interactions/buttons/store/bourse.js). The rules are src/config/store/bourse.js.
 const assetOption = (option) => option.setName('asset').setDescription('Asset number or name (see /bourse prices)').setRequired(true);
 const quantityOption = (option) => option
@@ -27,10 +27,14 @@ export default {
         .addSubcommand((sub) => sub.setName('sell').setDescription('Sell an asset at the price of the hour').addStringOption(assetOption).addIntegerOption(quantityOption))
         .addSubcommand((sub) => sub.setName('holdings').setDescription('What you own and what it is worth')),
 
-    // `بورصة` alone shows the prices, and so do `استثمار` / `بيع` without an asset.
+    // `بورصة` alone shows the prices, and so do `استثمار` / `بيع` without an asset. A name of several
+    // words (`بيع سبيكة دهب 2`) is kept together as the asset.
     normalizePrefixArgs(args) {
-        if (!args.length || (args.length === 1 && (args[0] === 'invest' || args[0] === 'sell'))) return ['prices'];
-        return args;
+        const [sub, ...rest] = args;
+        if (!args.length || ((sub === 'invest' || sub === 'sell') && !rest.length)) return ['prices'];
+        if (sub !== 'invest' && sub !== 'sell') return args;
+        const quantity = rest.length > 1 && /^\d+$/u.test(rest[rest.length - 1]) ? [rest.pop()] : [];
+        return [sub, rest.join(' '), ...quantity];
     },
 
     async execute(interaction, config, client) {

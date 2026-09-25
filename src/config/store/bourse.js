@@ -41,3 +41,27 @@ export const bourseSettings = {
     // After the bot was off, at most this many missed hours are replayed.
     maxCatchUpHours: 168,
 };
+
+function normalizeName(text) {
+    return String(text || '')
+        .trim()
+        .toLowerCase()
+        .replace(/[\u064B-\u0652\u0640]/gu, '') // tashkeel and tatweel
+        .replace(/[أإآ]/gu, 'ا')
+        .replace(/ة/gu, 'ه')
+        .replace(/ى/gu, 'ي')
+        .replace(/^ال/u, '')
+        .replace(/\s+/gu, ' ');
+}
+
+/** Finds an asset by its number in the list (`1` is the first), its id or its name (`عربية`، `العربيه`). */
+export function findAsset(query, assets = bourseAssets) {
+    const text = String(query || '').trim();
+    if (/^\d{1,2}$/u.test(text)) return assets[Number(text) - 1] || null;
+    const wanted = normalizeName(text);
+    if (!wanted) return null;
+    return assets.find((asset) => asset.id === text.toLowerCase())
+        || assets.find((asset) => normalizeName(asset.name) === wanted)
+        || assets.find((asset) => normalizeName(asset.name).split(/[\s()]+/u).includes(wanted))
+        || null;
+}

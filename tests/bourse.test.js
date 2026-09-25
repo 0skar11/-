@@ -7,6 +7,7 @@ import {
 } from '../src/services/cc/bourseService.js';
 import { adjustCC, getProfile } from '../src/services/cc/ccService.js';
 import { changeArrow, pricesEmbed } from '../src/services/cc/bourseUi.js';
+import { applyWordAliases } from '../src/config/commands/commandAliases.js';
 
 const GUILD = '100000000000000009';
 const A = '200000000000000001';
@@ -174,7 +175,7 @@ describe('bourse trading', () => {
         assert.equal((await invest(client, GUILD, A, 'plane', 1, options)).reason, 'no_cc');
 
         const bought = await invest(client, GUILD, A, '3', 2, { ...options, expectedPrice: car.price });
-        assert.deepEqual([bought.ok, bought.cost, bought.owned, bought.balance], [true, car.price * 2, 2, 5000 - car.price * 2]);
+        assert.deepEqual([bought.ok, bought.cost, bought.owned, bought.before, bought.balance], [true, car.price * 2, 2, 5000, 5000 - car.price * 2]);
         assert.equal((await getProfile(client, GUILD, A)).cc, 5000 - car.price * 2);
 
         // The purchase counts as demand for the next hour.
@@ -187,6 +188,7 @@ describe('bourse trading', () => {
         const fee = sellFee(car.price);
         assert.deepEqual([sold.ok, sold.fee, sold.received, sold.paid, sold.profit, sold.owned], [true, fee, car.price - fee, car.price, -fee, 1]);
         assert.equal((await getProfile(client, GUILD, A)).cc, 5000 - car.price - fee);
+        assert.deepEqual([sold.before, sold.balance], [5000 - car.price * 2, 5000 - car.price - fee]);
         assert.equal(client.store.get(`guild:${GUILD}:bourse`).assets.car.flow[A], 1);
 
         const holdings = await getHoldings(client, GUILD, A, options);
@@ -235,7 +237,29 @@ describe('bourse messages', () => {
     test('the prices embed lists every asset', async () => {
         const market = await getMarket(fakeClient(), GUILD, { now: NOW });
         const embed = pricesEmbed(market);
-        for (const asset of bourseAssets) assert.ok(embed.description.includes(asset.name), asset.id);
-        assert.ok(embed.description.length <= 4096);
+        for (const asset of bourseAssets) assert.ok(embed.fields.some((field) => field.name.includes(asset.name) && field.inline), asset.id);
+        assert.ok(embed.fields.length <= 25);
+        assert.ok(embed.footer.text.includes('1.5%'));
+    });
+});
+
+describe('bourse balance', () => {
+    test('buying takes exactly the price from the balance', async () => {
+        const client = fakeClient();
+        client.store.set(`guild:${GUILD}:economy:${A}`, { wallet: 999, bank: 5, cc: 710 });
+        const result = await invest(client, GUILD, A, 'gold', 1, { now: NOW, rng: () => 0.5 });
+        assert.deepEqual([result.price, result.before, result.balance], [600, 710, 110]);
+        assert.equal((await getProfile(client, GUILD, A)).cc, 110);
+    });
+});
+
+describe('bourse words', () => {
+    test('run with an asset name without the prefix, but not in a normal sentence', () => {
+        assert.deepEqual(applyWordAliases('استثمار', ['عربية'], false), { commandName: 'bourse', args: ['invest', 'عربية'] });
+        assert.deepEqual(applyWordAliases('بيع', ['سبيكة', 'دهب', '2'], false), { commandName: 'bourse', args: ['sell', 'سبيكة', 'دهب', '2'] });
+        assert.deepEqual(applyWordAliases('بيع', ['3'], false), { commandName: 'bourse', args: ['sell', '3'] });
+        assert.equal(applyWordAliases('بيع', ['العربية', 'دي'], false), null);
+        assert.equal(applyWordAliases('استثمار', ['في', 'الدهب', 'حلو'], false), null);
+        assert.equal(applyWordAliases('اسعار', ['الدهب'], false), null);
     });
 });
