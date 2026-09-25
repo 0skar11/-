@@ -11,6 +11,7 @@ import { publishArabicModerationCommands } from "../services/moderationCommandsB
 import { publishTrustedBoard } from "../services/trustedBoardService.js";
 import { publishSavedIdeasBoard } from "../services/savedIdeasBoardService.js";
 import { startCCTopBoard } from "../services/games/ccTopBoard.js";
+import { startStoreChannel } from "../services/cc/storeChannel.js";
 
 export default {
   name: Events.ClientReady,
@@ -44,6 +45,9 @@ export default {
       }
       const ccTopBoard = await startCCTopBoard(client);
       startupLog(`Top CC board: ${ccTopBoard.status} (channel ${ccTopBoard.channelId})`);
+      for (const result of await startStoreChannel(client)) {
+        startupLog(`Store room: ${result.status} (channel ${result.channelId})`);
+      }
       await ensureAuditLogChannels(client);
 
       if (client.config?.features?.music) initRiffyAfterReady(client);

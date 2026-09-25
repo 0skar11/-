@@ -1,0 +1,190 @@
+// storeUi.js — the store's embeds and buttons, shared by the `store` command
+// (src/commands/Games/store.js), the store room panel (storeChannel.js) and its buttons
+// (src/interactions/buttons/store/storePanel.js). Plain embed objects so the emojis stay.
+
+import { ActionRowBuilder, ButtonBuilder, ButtonStyle, StringSelectMenuBuilder } from 'discord.js';
+import { CC, ccEmbed, formatCC, ccBoostLine } from '../../config/cc.js';
+import { ccStoreItems, ccStoreDemoItems, ccStoreSettings, storeRoomSettings } from '../../config/store/ccStoreItems.js';
+import { storeMode, storeCatalog, buyItem } from './ccStoreService.js';
+
+export const STORE_BUTTON_PREFIX = 'storepanel';
+export const STORE_PANEL_FOOTER = `🛒 متجر ${CC.short} • الرسالة دي بتنزل تاني كل ${storeRoomSettings.repostEvery} رسايل`;
+const TRIAL_LINE = '🧪 **المتجر تجريبي دلوقتي**: الشراء بيتجرب بس، ومفيش CC بيتخصم ولا حاجة بتتسلم.';
+const CLOSED_LINE = '🔒 **المتجر مقفول دلوقتي**، هيفتح قريب.';
+
+export const STORE_COMMANDS = [
+    ['`متجر`', 'يعرض المنتجات وأسعارها'],
+    ['`شراء 1`', 'تشتري المنتج رقم 1 (أو `شراء 1 3` لـ 3 قطع)'],
+    ['`مخزني`', 'الحاجات اللي اشتريتها'],
+    ['`رصيد`', `رصيدك من الـ ${CC.short}`],
+    ['`توب cc`', `ترتيب الـ ${CC.short} في السيرفر`],
+];
+
+function modeLine(mode = storeMode()) {
+    if (mode === 'trial') return TRIAL_LINE;
+    return mode === 'closed' ? CLOSED_LINE : '';
+}
+
+function itemLabel(item) {
+    return `${item.emoji ? `${item.emoji} ` : ''}${item.name}`;
+}
+
+/** `\`1\` 💎 **رتبة VIP** — 5,000 🌀 CC` plus the description under it. */
+export function itemLines(items) {
+    return items.map((item, index) => [
+        `\`${index + 1}\` ${item.emoji || '🔹'} **${item.name}** — ${formatCC(item.price)}`,
+        `> ${item.description || '—'}${item.maxOwned ? ` ・ أقصى عدد: ${item.maxOwned}` : ''}`,
+    ].join('\n'));
+}
+
+function itemsField(items) {
+    const value = itemLines(items).join('\n').slice(0, 1024);
+    return { name: '🛍️ المنتجات', value: value || '> لسه مفيش منتجات، هتتضاف قريب.' };
+}
+
+/** The pinned panel of the store room: what the store sells, the commands and the buttons. */
+export function buildStorePanel(guild, { settings = ccStoreSettings } = {}) {
+    const mode = storeMode(settings);
+    const items = storeCatalog(settings);
+    const boost = ccBoostLine();
+    const embed = ccEmbed(`🛒 متجر ${CC.name}`, [
+        `اصرف الـ ${CC.emoji} ${CC.short} بتاعتك على حاجات مميزة في **${guild.name}** ✨`,
+        ...(modeLine(mode) ? ['', modeLine(mode)] : []),
+        ...(boost ? ['', boost] : []),
+    ].join('\n'), {
+        thumbnail: guild.iconURL?.({ size: 256 }) || null,
+        fields: [
+            itemsField(items),
+            { name: '⌨️ الأوامر', value: STORE_COMMANDS.map(([command, text]) => `${command} ・ ${text}`).join('\n') },
+            { name: `💡 ازاي تكسب ${CC.short}`, value: '🎮 تكسب في الألعاب ・ 📈 تعلى لفل ・ 🔁 حد يحوّلك', inline: false },
+            { name: '📌 قواعد الروم', value: 'الروم ده لأوامر المتجر بس، أي رسالة تانية بتتمسح لوحدها.' },
+        ],
+    });
+    embed.footer = { text: STORE_PANEL_FOOTER };
+
+    return {
+        content: '',
+        embeds: [embed],
+        components: storePanelComponents(items, mode),
+        allowedMentions: { parse: [] },
+    };
+}
+
+function storePanelComponents(items, mode) {
+    const rows = [];
+    if (items.length && mode !== 'closed') {
+        rows.push(new ActionRowBuilder().addComponents(
+            new StringSelectMenuBuilder()
+                .setCustomId(`${STORE_BUTTON_PREFIX}:buy`)
+                .setPlaceholder(mode === 'trial' ? '🧪 اختار منتج تجرب تشتريه...' : '🛍️ اختار منتج تشتريه...')
+                .addOptions(items.slice(0, 25).map((item, index) => ({
+                    label: `${index + 1}. ${item.name}`.slice(0, 100),
+                    description: `${item.price.toLocaleString('en-US')} ${CC.short} ・ ${item.description || ''}`.slice(0, 100),
+                    value: item.id,
+                    ...(item.emoji ? { emoji: item.emoji } : {}),
+                }))),
+        ));
+    }
+    rows.push(new ActionRowBuilder().addComponents(
+        new ButtonBuilder().setCustomId(`${STORE_BUTTON_PREFIX}:balance`).setLabel('رصيدي').setEmoji('💰').setStyle(ButtonStyle.Success),
+        new ButtonBuilder().setCustomId(`${STORE_BUTTON_PREFIX}:inventory`).setLabel('مخزني').setEmoji('🎒').setStyle(ButtonStyle.Primary),
+        new ButtonBuilder().setCustomId(`${STORE_BUTTON_PREFIX}:top`).setLabel('توب CC').setEmoji('🏆').setStyle(ButtonStyle.Secondary),
+        new ButtonBuilder().setCustomId(`${STORE_BUTTON_PREFIX}:help`).setLabel('المساعدة').setEmoji('❓').setStyle(ButtonStyle.Secondary),
+    ));
+    return rows;
+}
+
+/** `متجر`: the items and their prices. */
+export function storeListEmbed(settings = ccStoreSettings) {
+    const mode = storeMode(settings);
+    const items = storeCatalog(settings);
+    return ccEmbed('🛍️ منتجات المتجر', [
+        ...(modeLine(mode) ? [modeLine(mode), ''] : []),
+        itemLines(items).join('\n') || 'لسه مفيش منتجات، هتتضاف قريب.',
+        '',
+        items.length ? '🛒 للشراء: `شراء <الرقم>` (مثال: `شراء 1`) أو من القايمة في الرسالة المثبتة.' : '',
+    ].join('\n').trim());
+}
+
+export function storeHelpEmbed() {
+    return ccEmbed('❓ ازاي تستخدم المتجر', [
+        ...STORE_COMMANDS.map(([command, text]) => `${command} ・ ${text}`),
+        '',
+        '🛒 تقدر كمان تشتري من القايمة اللي في الرسالة المثبتة، وبعدها تأكد بزرار ✅.',
+        `💡 الـ ${CC.short} بتتجمع من الفوز في الألعاب والـ level up والتحويل.`,
+        ...(modeLine() ? ['', modeLine()] : []),
+    ].join('\n'));
+}
+
+/** `مخزني`: what the member owns (real and demo item names are both known). */
+export function inventoryEmbed(user, inventory = {}) {
+    const known = [...ccStoreItems, ...ccStoreDemoItems];
+    const lines = Object.entries(inventory)
+        .filter(([, count]) => Number(count) > 0)
+        .map(([id, count]) => {
+            const item = known.find((entry) => entry.id === id);
+            return `${item?.emoji || '📦'} **${item?.name || id}** × ${count}`;
+        });
+    return ccEmbed('🎒 مخزني', `${user}\n\n${lines.join('\n') || 'مخزنك فاضي لسه. اكتب `متجر` وشوف المنتجات 🛍️'}`, {
+        thumbnail: user.displayAvatarURL?.() || null,
+    });
+}
+
+/** The "are you sure?" step before buying. The buttons only work for `userId`. */
+export function confirmPurchasePayload(item, quantity, userId, balance, mode = storeMode()) {
+    const cost = item.price * quantity;
+    const after = balance - cost;
+    const embed = ccEmbed(`${mode === 'trial' ? '🧪 ' : ''}تأكيد الشراء`, [
+        `${itemLabel(item)}${quantity > 1 ? ` × ${quantity}` : ''}`,
+        `> ${item.description || '—'}`,
+        '',
+        `💵 السعر: ${formatCC(cost)}`,
+        `💰 رصيدك: ${formatCC(balance)}`,
+        after >= 0 ? `📉 بعد الشراء: ${formatCC(after)}` : `❌ ناقصك ${formatCC(-after)}`,
+        ...(mode === 'trial' ? ['', TRIAL_LINE] : []),
+    ].join('\n'));
+    const row = new ActionRowBuilder().addComponents(
+        new ButtonBuilder()
+            .setCustomId(`${STORE_BUTTON_PREFIX}:confirm:${item.id}:${quantity}:${userId}`)
+            .setLabel(mode === 'trial' ? 'تجربة الشراء' : 'تأكيد')
+            .setEmoji('✅')
+            .setStyle(ButtonStyle.Success)
+            .setDisabled(after < 0),
+        new ButtonBuilder().setCustomId(`${STORE_BUTTON_PREFIX}:cancel:${userId}`).setLabel('إلغاء').setEmoji('✖️').setStyle(ButtonStyle.Secondary),
+    );
+    return { embeds: [embed], components: [row], allowedMentions: { parse: [] } };
+}
+
+const FAILURE_TEXT = {
+    closed: CLOSED_LINE,
+    not_found: '❌ المنتج ده مش موجود. اكتب `متجر` وشوف الأرقام.',
+    bad_quantity: `❌ العدد لازم يكون من 1 لـ ${ccStoreSettings.maxQuantity} (والرتب قطعة واحدة بس).`,
+    owned: '❌ الرتبة دي معاك أصلاً.',
+    max_owned: '❌ وصلت لأقصى عدد تقدر تملكه من المنتج ده.',
+    role_failed: '❌ معرفتش أديك الرتبة، ورجعتلك الـ CC بتاعتك. كلم الإدارة.',
+};
+
+export function purchaseFailureText(result) {
+    if (result.reason === 'no_cc') return `❌ رصيدك ${formatCC(result.balance ?? 0)} مش كفاية.`;
+    return FAILURE_TEXT[result.reason] || '❌ حصلت مشكلة، جرب تاني.';
+}
+
+/** The receipt after a (real or trial) purchase. */
+export function purchaseReceiptEmbed(user, result) {
+    const lines = [
+        `${user}`,
+        '',
+        `${itemLabel(result.item)}${result.quantity > 1 ? ` × ${result.quantity}` : ''}`,
+        `💵 ${result.trial ? 'كان هيتخصم' : 'اتخصم'}: ${formatCC(result.cost)}`,
+        `💰 رصيدك ${result.trial ? 'لسه' : 'دلوقتي'}: ${formatCC(result.balance)}`,
+    ];
+    if (result.trial) lines.push('', '🧪 ده شراء تجريبي، مفيش CC اتخصم ولا حاجة اتسلمت.');
+    return ccEmbed(result.trial ? '🧪 شراء تجريبي تم' : '✅ تم الشراء', lines.join('\n'), { color: 'success' });
+}
+
+/** Buys and returns the reply payload (receipt or the reason it failed). */
+export async function purchase(client, member, itemId, quantity) {
+    const result = await buyItem(client, member, itemId, quantity);
+    if (!result.ok) return { ok: false, payload: { content: purchaseFailureText(result), embeds: [], components: [], allowedMentions: { parse: [] } } };
+    return { ok: true, payload: { content: '', embeds: [purchaseReceiptEmbed(member.user || member, result)], components: [], allowedMentions: { parse: [] } } };
+}
