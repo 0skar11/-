@@ -12,13 +12,24 @@ export const STORE_PANEL_FOOTER = `🛒 متجر ${CC.short} • الرسالة 
 const TRIAL_LINE = '🧪 **المتجر تجريبي دلوقتي**: الشراء بيتجرب بس، ومفيش CC بيتخصم ولا حاجة بتتسلم.';
 const CLOSED_LINE = '🔒 **المتجر مقفول دلوقتي**، هيفتح قريب.';
 
+// Shown as cards side by side (inline fields, 3 per row). Each line starts with Arabic and never
+// mixes a command with its explanation, so Discord doesn't reorder the words.
 export const STORE_COMMANDS = [
-    ['`متجر`', 'يعرض المنتجات وأسعارها'],
-    ['`شراء 1`', 'تشتري المنتج رقم 1 (أو `شراء 1 3` لـ 3 قطع)'],
-    ['`مخزني`', 'الحاجات اللي اشتريتها'],
-    ['`رصيد`', `رصيدك من الـ ${CC.short}`],
-    ['`توب cc`', `ترتيب الـ ${CC.short} في السيرفر`],
+    ['🛍️ متجر', 'يعرض المنتجات وأسعارها'],
+    ['🛒 شراء 1', 'تشتري المنتج رقم 1'],
+    ['🎒 مخزني', 'الحاجات اللي اشتريتها'],
+    ['💰 رصيد', 'تعرف رصيدك'],
+    ['🏆 توب cc', 'ترتيب السيرفر'],
+    ['🔢 شراء 1 3', 'تشتري 3 قطع مرة واحدة'],
 ];
+
+/** The commands as a header field plus one card (inline field) per command. */
+export function commandFields(header = 'اكتب الأمر هنا في الروم 👇') {
+    return [
+        { name: '⌨️ الأوامر', value: header },
+        ...STORE_COMMANDS.map(([name, value]) => ({ name, value, inline: true })),
+    ];
+}
 
 function modeLine(mode = storeMode()) {
     if (mode === 'trial') return TRIAL_LINE;
@@ -29,10 +40,11 @@ function itemLabel(item) {
     return `${item.emoji ? `${item.emoji} ` : ''}${item.name}`;
 }
 
-/** `\`1\` 💎 **رتبة VIP** — 5,000 🌀 CC` plus the description under it. */
+/** Each item as its name, then its price and description on their own lines (so nothing is reordered). */
 export function itemLines(items) {
     return items.map((item, index) => [
-        `\`${index + 1}\` ${item.emoji || '🔹'} **${item.name}** — ${formatCC(item.price)}`,
+        `**${index + 1}.** ${item.emoji || '🔹'} **${item.name}**`,
+        `> السعر: ${formatCC(item.price)}`,
         `> ${item.description || '—'}${item.maxOwned ? ` ・ أقصى عدد: ${item.maxOwned}` : ''}`,
     ].join('\n'));
 }
@@ -55,9 +67,9 @@ export function buildStorePanel(guild, { settings = ccStoreSettings } = {}) {
         thumbnail: guild.iconURL?.({ size: 256 }) || null,
         fields: [
             itemsField(items),
-            { name: '⌨️ الأوامر', value: STORE_COMMANDS.map(([command, text]) => `${command} ・ ${text}`).join('\n') },
-            { name: `💡 ازاي تكسب ${CC.short}`, value: '🎮 تكسب في الألعاب ・ 📈 تعلى لفل ・ 🔁 حد يحوّلك', inline: false },
-            { name: '📌 قواعد الروم', value: 'الروم ده لأوامر المتجر بس، أي رسالة تانية بتتمسح لوحدها.' },
+            ...commandFields(),
+            { name: `💡 ازاي تكسب ${CC.short}`, value: '🎮 تكسب في الألعاب\n📈 لما تعلى لفل\n🔁 لما حد يحوّلك' },
+            { name: '📌 قواعد الروم', value: 'الروم ده لأوامر المتجر بس، وأي رسالة تانية بتتمسح لوحدها.' },
         ],
     });
     embed.footer = { text: STORE_PANEL_FOOTER };
@@ -102,18 +114,15 @@ export function storeListEmbed(settings = ccStoreSettings) {
         ...(modeLine(mode) ? [modeLine(mode), ''] : []),
         itemLines(items).join('\n') || 'لسه مفيش منتجات، هتتضاف قريب.',
         '',
-        items.length ? '🛒 للشراء: `شراء <الرقم>` (مثال: `شراء 1`) أو من القايمة في الرسالة المثبتة.' : '',
+        items.length ? '🛒 للشراء اكتب شراء وبعدها رقم المنتج، أو اختاره من القايمة في الرسالة المثبتة.' : '',
     ].join('\n').trim());
 }
 
 export function storeHelpEmbed() {
     return ccEmbed('❓ ازاي تستخدم المتجر', [
-        ...STORE_COMMANDS.map(([command, text]) => `${command} ・ ${text}`),
-        '',
-        '🛒 تقدر كمان تشتري من القايمة اللي في الرسالة المثبتة، وبعدها تأكد بزرار ✅.',
-        `💡 الـ ${CC.short} بتتجمع من الفوز في الألعاب والـ level up والتحويل.`,
+        '🛒 تقدر تشتري من القايمة اللي في الرسالة المثبتة، وبعدها تأكد بزرار ✅.',
         ...(modeLine() ? ['', modeLine()] : []),
-    ].join('\n'));
+    ].join('\n'), { fields: commandFields('ودي الأوامر اللي تقدر تكتبها 👇') });
 }
 
 /** `مخزني`: what the member owns (real and demo item names are both known). */
