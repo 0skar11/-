@@ -1,8 +1,8 @@
 import { logger } from '../../utils/logger.js';
 
 // Counts every message members send, for `top chat`. Counts are kept in memory and written to the
-// database every 30 seconds (one key per server: { userId: count }), so chat doesn't cause a write per message.
-const FLUSH_EVERY_MS = 30_000;
+// database every 10 seconds and on shutdown (one key per server: { userId: count }), so chat doesn't cause a write per message.
+const FLUSH_EVERY_MS = 10_000;
 const pending = new Map(); // guildId -> Map<userId, count>
 let flushTimer = null;
 

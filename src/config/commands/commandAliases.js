@@ -9,6 +9,7 @@ export const commandAliases = {
   kick: 'kick', ban: 'ban', warn: 'warn', untimeout: 'untimeout',
   rank: 'rank', lvl: 'rank', xp: 'rank', leaderboard: 'leaderboard', lb: 'leaderboard', top: 'leaderboard',
   لفل: 'rank', ليفل: 'rank', مستوى: 'rank', مستوايا: 'rank', رانك: 'rank', توب: 'leaderboard',
+  افك: 'afk', أفك: 'afk',
   user: 'userinfo', avatar: 'avatar', av: 'avatar', pfp: 'avatar', icon: 'avatar', bd: 'birthday', bday: 'birthday', b: 'birthday',
   flip: 'flip', coin: 'flip', roll: 'roll', dice: 'roll', fight: 'fight',
   gstart: 'gcreate', gstop: 'gend', groll: 'greroll', ticket: 'ticket', t: 'ticket', new: 'ticket',

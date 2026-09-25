@@ -36,7 +36,7 @@ describe('level system', () => {
     assert.equal(rank.fields[1].value, '**#2** من 8');
     const top = buildTopEmbed({ name: 'void' }, [{ userId: '1', level: 9, totalXp: 5000 }, { userId: '2', level: 4, totalXp: 900 }], { callerId: '3', callerEntry: null });
     assert.match(top.description, /🥇 <@1> — لفل \*\*9\*\*/u);
-    assert.match(top.description, /لسه مش في الترتيب/u);
+    assert.match(top.description, /لسه ما جمعتش XP/u);
   });
 
   test('chat XP stays within the configured range and multiplier', () => {

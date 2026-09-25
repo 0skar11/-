@@ -18,6 +18,7 @@ import { loadCommands, registerCommands as registerSlashCommands } from './handl
 import { runSafeTask, handleTaskError, ErrorCodes } from './utils/errorHandler.js';
 import { initializeMusic } from './services/music/riffySetup.js';
 import { shutdownMusic } from './services/music/playerHandler.js';
+import { flushChatCounts } from './services/leveling/chatCounter.js';
 import pkg from '../package.json' with { type: 'json' };
 import { EXPECTED_SCHEMA_VERSION, EXPECTED_SCHEMA_LABEL } from './config/database/schemaVersion.js';
 
@@ -361,6 +362,9 @@ class TitanBot extends Client {
       logger.info('Stopping music players...');
       await shutdownMusic(this);
       logger.info('✅ Music players stopped');
+
+      // Save message counts still held in memory before the database closes (top chat).
+      await flushChatCounts(this).catch((error) => logger.error('Failed to save chat counts on shutdown:', error));
 
       if (this.webServer) {
         logger.info('Closing web server...');

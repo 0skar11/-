@@ -23,6 +23,9 @@ import { handleGamesChannelMessage, isGamesOnlyFor, isGameCommandMessage } from 
 import { handleGamesBotWin } from '../services/cc/gamesBotWins.js';
 import { handleMessageXp } from '../services/leveling/messageXp.js';
 import { countMessage } from '../services/leveling/chatCounter.js';
+import { handleAfkMessage } from '../services/afkService.js';
+
+const AFK_COMMAND = /^\s*[^\p{L}\p{N}\s]{0,3}(?:afk|افك|أفك)(?:\s|$)/iu;
 
 export default {
   name: Events.MessageCreate,
@@ -43,6 +46,8 @@ export default {
       // Chat XP (runs in the background; the cooldown keeps it from being farmed with commands or spam).
       handleMessageXp(message, client);
       countMessage(client, message.guild.id, message.author.id);
+      // Clears the author's AFK (unless this is the afk command itself) and announces AFK members they mention.
+      await handleAfkMessage(message, client, { isAfkCommand: AFK_COMMAND.test(message.content || '') });
       // In the games channel only game commands run (the rest there is game answers).
       const gamesOnly = isGamesOnlyFor(message);
       if (!gamesOnly && await handleArabicUtilityShortcuts(message)) return;
