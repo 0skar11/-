@@ -5,6 +5,7 @@ import { INVITE_REWARDS, CHAOS_GUILD_ID, WELCOME_CHANNEL_ID } from '../src/confi
 import {
   STATUS, joinVerdict, isReadyToPay, rankInviters, inviteTier, inviteRoleChanges, inviteWelcomeNotice,
   registerJoin, markLeft, checkInviteReward, sweepInviteRewards, ensureInviteTierRoles, inviteTopEmbed,
+  memberInviteSummary, memberInvitesEmbed,
 } from '../src/services/inviteRewardService.js';
 import { getEconomyKey, getUserLevelKey } from '../src/utils/database/keys.js';
 import { applyWordAliases, resolveCommandAlias } from '../src/config/commands/commandAliases.js';
@@ -124,6 +125,35 @@ describe('invite rewards rules', () => {
     assert.equal(resolveCommandAlias(applyWordAliases('دعواتي', [], false).commandName), 'invitetop');
     assert.equal(applyWordAliases('دعواتي', ['ليك', 'يا', 'صاحبي'], false), null);
   });
+
+  test('انفايت @member runs the invite command, a sentence does not', () => {
+    const mention = `<@${INVITER}>`;
+    assert.deepEqual(applyWordAliases('انفايت', [mention], false), { commandName: 'انفايت', args: [mention] });
+    assert.equal(resolveCommandAlias('انفايت'), 'invite');
+    assert.equal(resolveCommandAlias('انفايتات'), 'invite');
+    assert.equal(applyWordAliases('انفايت', ['الرابط', 'فين'], false), null);
+    assert.equal(applyWordAliases('توب', ['انفايت'], false).commandName, 'invitetop');
+  });
+
+  test('memberInviteSummary counts a member\'s invites by status and finds their next role', () => {
+    const records = [
+      { memberId: 'a', inviterId: INVITER, joinedAt: 1, status: STATUS.PAID },
+      { memberId: 'b', inviterId: INVITER, joinedAt: 3, status: STATUS.PENDING },
+      { memberId: 'c', inviterId: INVITER, joinedAt: 2, status: STATUS.LEFT },
+      { memberId: 'd', inviterId: INVITER, joinedAt: 4, status: STATUS.FAKE },
+      { memberId: 'e', inviterId: OTHER, joinedAt: 5, status: STATUS.PAID },
+      { memberId: 'f', inviterId: OTHER, joinedAt: 6, status: STATUS.PAID },
+      { memberId: INVITER, inviterId: OTHER, joinedAt: 0, status: STATUS.PAID },
+    ];
+    const summary = memberInviteSummary(records, INVITER);
+    assert.deepEqual([summary.paid, summary.pending, summary.left, summary.fake], [1, 1, 1, 1]);
+    assert.equal(summary.rank, 2);
+    assert.equal(summary.earned, INVITE_REWARDS.reward);
+    assert.equal(summary.nextTier.count, 5);
+    assert.equal(summary.invitedBy, OTHER);
+    assert.deepEqual(summary.invited.map((record) => record.memberId), ['d', 'b', 'c', 'a']);
+    assert.equal(memberInviteSummary(records, NEWBIE).rank, null);
+  });
 });
 
 describe('invite rewards flow', () => {
@@ -151,6 +181,10 @@ describe('invite rewards flow', () => {
 
     const top = await inviteTopEmbed(setup.client, setup.guild, INVITER);
     assert.match(top.description, new RegExp(`<@${INVITER}> — \\*\\*1\\*\\* دعوة`));
+
+    const own = await memberInvitesEmbed(setup.client, setup.guild, { id: INVITER, toString: () => `<@${INVITER}>` });
+    assert.match(own.description, /الدعوات المحسوبة: \*\*1\*\*/);
+    assert.match(own.description, new RegExp(`✅ اتحسبت — <@${NEWBIE}>`));
   });
 
   test('leaving before the reward, a rejoin and a new account never pay', async () => {

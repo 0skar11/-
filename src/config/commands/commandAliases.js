@@ -14,6 +14,7 @@ export const commandAliases = {
   لفل: 'rank', ليفل: 'rank', مستوى: 'rank', مستوايا: 'rank', رانك: 'rank', توب: 'leaderboard',
   افك: 'afk', أفك: 'afk',
   invites: 'invitetop', دعواتي: 'invitetop', دعواتى: 'invitetop',
+  انفايت: 'invite', انفايتات: 'invite', انفيت: 'invite', انفايتاتي: 'invite',
   user: 'userinfo', avatar: 'avatar', av: 'avatar', pfp: 'avatar', icon: 'avatar', bd: 'birthday', bday: 'birthday', b: 'birthday',
   flip: 'flip', coin: 'flip', roll: 'roll', dice: 'roll', fight: 'fight',
   gstart: 'gcreate', gstop: 'gend', groll: 'greroll', ticket: 'ticket', t: 'ticket', new: 'ticket',
@@ -121,6 +122,7 @@ export const standaloneOnlyAliases = new Set([
   ...Object.keys(commandArgAliases),
   'رصيد', 'رصيدي', 'رصيدى', 'فلوس', 'كريدت',
   'دعواتي', 'دعواتى', 'invites',
+  'انفايت', 'انفايتات', 'انفيت', 'انفايتاتي', 'invite',
   // `حول`/`تحويل` are everyday words, so they only send CC as `تحويل @member 100`.
   'تحويل', 'حول', 'حوّل',
   // Level words are common in chat (`لفل كام؟`), so they only run as the whole message (+ a mention).

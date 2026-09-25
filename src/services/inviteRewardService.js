@@ -278,3 +278,56 @@ export async function inviteTopEmbed(client, guild, userId = null) {
     `🏅 رولات الدعوات: ${tiers}`,
   ].join('\n'));
 }
+
+/** One member's invites: counts per status, rank among inviters, the members they invited (newest first) and who invited them. */
+export function memberInviteSummary(records, userId) {
+  const invited = records.filter((record) => record.inviterId === userId).sort((a, b) => (b.joinedAt || 0) - (a.joinedAt || 0));
+  const counts = { paid: 0, pending: 0, left: 0, fake: 0 };
+  for (const record of invited) if (record.status in counts) counts[record.status] += 1;
+  const rank = rankInviters(records).findIndex((row) => row.userId === userId);
+  const nextTier = [...INVITE_REWARDS.tiers].sort((a, b) => a.count - b.count).find((tier) => tier.count > counts.paid) || null;
+  return {
+    ...counts,
+    rank: rank >= 0 ? rank + 1 : null,
+    earned: counts.paid * INVITE_REWARDS.reward,
+    tier: inviteTier(counts.paid),
+    nextTier,
+    invited,
+    invitedBy: records.find((record) => record.memberId === userId)?.inviterId || null,
+  };
+}
+
+const STATUS_LABELS = {
+  [STATUS.PAID]: '✅ اتحسبت',
+  [STATUS.PENDING]: '⏳ لسه',
+  [STATUS.LEFT]: '🚪 خرج',
+  [STATUS.FAKE]: '⚠️ حساب جديد',
+};
+
+/** `انفايت @member`: the member's invites, who they invited and how far they are from the next invite role. */
+export async function memberInvitesEmbed(client, guild, target) {
+  const summary = memberInviteSummary(await listInviteRecords(client, guild.id), target.id);
+  const lines = [
+    `${target}`,
+    '',
+    `📨 الدعوات المحسوبة: **${summary.paid}**${summary.pending ? ` (+${summary.pending} لسه)` : ''}`,
+    `🏆 الترتيب: ${summary.rank ? `**#${summary.rank}**` : '—'}`,
+    `💰 كسب من الدعوات: **${summary.earned.toLocaleString('en-US')}** ${CC.emoji} ${CC.short}`,
+  ];
+  if (summary.left || summary.fake) lines.push(`🚫 مش محسوبة: ${summary.left} خرجوا • ${summary.fake} حسابات جديدة`);
+  if (summary.tier) lines.push(`🏅 رول الدعوات: ${summary.tier.name}`);
+  if (summary.nextTier) lines.push(`🎯 الرول الجاي: ${summary.nextTier.name} (فاضل ${summary.nextTier.count - summary.paid})`);
+  if (summary.invitedBy) lines.push(`👋 دعاه: <@${summary.invitedBy}>`);
+
+  lines.push('', '**اللي دعاهم:**');
+  if (summary.invited.length) {
+    lines.push(...summary.invited.slice(0, PAGE_SIZE).map((record) => {
+      const joined = record.joinedAt ? ` • <t:${Math.floor(record.joinedAt / 1000)}:R>` : '';
+      return `${STATUS_LABELS[record.status] || record.status} — <@${record.memberId}>${joined}`;
+    }));
+    if (summary.invited.length > PAGE_SIZE) lines.push(`-# و ${summary.invited.length - PAGE_SIZE} كمان`);
+  } else {
+    lines.push('لسه مدعاش حد.');
+  }
+  return ccEmbed('📨 Invites', lines.join('\n'), { thumbnail: target.displayAvatarURL?.() || null });
+}
