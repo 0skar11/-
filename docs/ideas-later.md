@@ -1,6 +1,7 @@
 # Ideas saved for later
 
 Ideas the owner wants, parked on purpose. Not built yet; pick them up when asked.
+They are also listed in the trusted channel from `src/config/savedIdeas.js`: keep that file in sync when an idea is added or built.
 
 ## Daily streak (instead of the old `daily`)
 
