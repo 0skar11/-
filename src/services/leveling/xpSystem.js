@@ -9,6 +9,7 @@ import { wrapServiceBoundary } from '../../utils/errorHandler.js';
 import { buildLevelUpMessage } from './levelUi.js';
 import { getChatCounts } from './chatCounter.js';
 import { getVoiceMinutes } from './voiceXp.js';
+import { syncMemberLevelRoles } from './levelRoleSyncService.js';
 
 /**
  * Award XP to a member. Returns null when XP is skipped (disabled/invalid amount).
@@ -46,12 +47,12 @@ export const addXp = wrapServiceBoundary(async function addXp(client, guild, mem
       xpNeededForNextLevel = getXpForLevel(levelData.level);
 
       logger.info(`🎉 ${member.user.tag} leveled up to level ${levelData.level} in ${guild.name}`);
+    }
 
-      if (config.roleRewards && config.roleRewards[levelData.level]) {
-        if (await awardRoleReward(guild, member, config.roleRewards[levelData.level], levelData.level)) {
-          rewardRoleIds.push(config.roleRewards[levelData.level]);
-        }
-      }
+    // Every level role the member has reached is given right away, including any they missed before.
+    if (didLevelUp && config.roleRewards) {
+      const { added } = await syncMemberLevelRoles(guild, member, levelData.level, config.roleRewards, { reason: 'Level reward' });
+      rewardRoleIds.push(...added);
     }
 
     if (didLevelUp) {
@@ -95,28 +96,6 @@ export const addXp = wrapServiceBoundary(async function addXp(client, guild, mem
   operation: 'addXp',
   userMessage: 'Failed to award XP. Please try again.',
 });
-
-async function awardRoleReward(guild, member, roleId, level) {
-  try {
-    const role = guild.roles.cache.get(roleId);
-
-    if (!role) {
-      logger.warn(`Role ${roleId} not found for level ${level} reward in guild ${guild.id}`);
-      return false;
-    }
-
-    if (member.roles.cache.has(roleId)) {
-      return false;
-    }
-
-    await member.roles.add(role, `Level ${level} reward`);
-    logger.info(`✅ Awarded role ${role.name} to ${member.user.tag} for reaching level ${level}`);
-    return true;
-  } catch (error) {
-    logger.error(`Failed to award role reward to ${member.user.id}:`, error);
-    return false;
-  }
-}
 
 // Level-up messages go to this channel only, never to the chat. If it's missing, nothing is posted.
 const LEVEL_UP_CHANNEL_ID = '1552786804451573772';
