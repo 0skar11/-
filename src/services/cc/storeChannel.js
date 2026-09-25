@@ -1,5 +1,5 @@
 // storeChannel.js — the store room: a text channel the bot creates in STORE_CATEGORY_ID.
-//   • Only store commands can be written there (`متجر`، `شراء 1`، `مخزني`، `رصيد`، `توب cc`، `/store`...);
+//   • Only store commands can be written there (`متجر`، `شراء 1`، `مخزني`، `اسعار`، `رصيد`، `توب cc`، `/store`...);
 //     anything else is deleted with a short notice that goes away after a few seconds. The server
 //     owners and this bot are left alone. Other slash commands get a private "store only" reply.
 //   • The store panel (storeUi.js) is pinned. Every `repostEvery` member messages under it, the old
@@ -17,7 +17,7 @@ import { typedCommandName } from '../games/gamesChannel.js';
 import { buildStorePanel, isStorePanelFooter } from './storeUi.js';
 import { logger } from '../../utils/logger.js';
 
-export const STORE_COMMAND_NAMES = new Set(['store', 'cc', 'cctop']);
+export const STORE_COMMAND_NAMES = new Set(['store', 'bourse', 'cc', 'cctop']);
 export const STORE_ONLY_NOTICE = '🛒 الروم ده لأوامر المتجر بس. اكتب `متجر` عشان تشوف المنتجات.';
 const CONFIG_KEY = 'storeChannelId';
 const BOARD_KEY = 'store';
