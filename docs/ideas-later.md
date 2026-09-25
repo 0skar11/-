@@ -36,7 +36,8 @@ before the role is made, so nobody buys a rude name or a role that looks like st
   but kept (name, colour, members) for 30 days, so paying again brings it straight back.
 - `رولي الغي` cancels: the role stays until the end of the paid month, then goes.
 - Friends role: any member of it can chip in towards the next month (`رولي ادفع 1000`), so the
-  group can share the cost.
+  group can share the cost. Whatever is paid goes into the role's own balance, and renewal takes
+  from that first, then from the leader's CC. Money paid in is not refunded.
 - A cheaper price for paying 3 months at once (e.g. 3 months for the price of 2.5) is optional.
 
 ### Personal custom role (~4,000 CC a month)
@@ -51,9 +52,14 @@ before the role is made, so nobody buys a rude name or a role that looks like st
 - Same as the personal role, but the buyer also writes their friends (mentions or IDs) and the role
   goes to all of them straight away.
 - Limit: 15 members in total, the owner included.
-- The owner can add or remove friends later (`رولي ضيف @x` / `رولي شيل @x`) while staying at 15 or
-  under; a friend can leave the role themselves.
-- If the owner leaves the server the role stays with the friends; staff can delete it.
+- The buyer is the **leader**. Only the leader can change anything: name, colour, icon, add or
+  remove members (`رولي ضيف @x` / `رولي شيل @x`, staying at 15 or under), cancel the subscription,
+  or hand leadership to another member (`رولي ليدر @x`).
+- The other members can only do two things: chip in towards the subscription (`رولي ادفع 1000`)
+  and leave the role themselves (`رولي اخرج`). `رولي` shows everyone the members, the leader,
+  the role's balance and when it renews.
+- If the leader leaves the server, leadership passes to the member who paid the most; staff can
+  also delete the role.
 
 ### Things to decide when building it
 
