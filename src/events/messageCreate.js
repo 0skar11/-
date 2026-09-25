@@ -19,6 +19,7 @@ import { handleProtectedChannelMessage } from '../services/protectedChannelsServ
 import { handleEveryoneMention } from '../services/everyoneMentionGuardService.js';
 import { handleForeignInviteLink } from '../services/inviteLinkGuardService.js';
 import { handleMediaMessage } from '../services/mediaRoleService.js';
+import { handleImageOnlyChannelMessage } from '../services/imageOnlyChannelService.js';
 import { handleGamesChannelMessage, isGamesOnlyFor, isGameCommandMessage } from '../services/games/gamesChannel.js';
 import { handleGamesBotWin } from '../services/cc/gamesBotWins.js';
 import { handleStoreChannelMessage } from '../services/cc/storeChannel.js';
@@ -44,6 +45,7 @@ export default {
 
       if (await handleEveryoneMention(message)) return;
       if (await handleForeignInviteLink(message)) return;
+      if (await handleImageOnlyChannelMessage(message)) return;
       if (await handleMediaMessage(message)) return;
       if (await handleReportChannelMessage(message, { isCommand: (msg) => isBotCommand(msg, client) })) return;
       // Chat XP (runs in the background; the cooldown keeps it from being farmed with commands or spam).
