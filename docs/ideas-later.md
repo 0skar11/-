@@ -80,6 +80,9 @@ before the role is made, so nobody buys a rude name or a role that looks like st
 - At first the picks are random. Over time the bot tracks who finished their tasks on time and who
   didn't; a task that runs past its deadline is taken back and given to someone else.
 - Never assigned: the `psycho` role and the owners (`src/config/serverOwners.js`).
+- Skips: each staff member can skip (hand back) at most 3 tasks per week. The 4th skip in the same
+  week sends the owner (`1159601661392715906`) a message with a mention saying that member went over
+  the allowed skips.
 - Possible pieces: tasks stored per guild (assignee, difficulty, deadline, status), buttons on each
   task (done / can't do it), a per-member score (done on time, late, handed back), and a summary
   board in the channel. Reports from the report channel (`src/services/reportChannelService.js`)
