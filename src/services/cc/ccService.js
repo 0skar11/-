@@ -9,7 +9,7 @@
 //   ccGamesBot  { day: 'YYYY-MM-DD', earned } — CC from games bot wins today, for its daily cap
 //   ccTransfers [timestamp] — when the member sent CC with `give` in the last 7 days, for the transfer tax
 
-import { CC, ccBoost } from '../../config/cc.js';
+import { CC, ccBoost, gamesBotDailyCap } from '../../config/cc.js';
 import { getEconomyKey, getEconomyPrefix } from '../../utils/database.js';
 import { normalizeEconomyData } from '../../utils/schemas.js';
 import { DEFAULT_ECONOMY_DATA } from '../../utils/constants.js';
@@ -136,7 +136,7 @@ export async function awardSoloWin(client, guildId, userId, game, { now = Date.n
 }
 
 /**
- * Pays a win announced by the games bot, up to the daily cap (CC.gamesBot). `kind` is 'group' for a
+ * Pays a win announced by the games bot, up to today's cap (gamesBotDailyCap: 5000 during the CC event, none after). `kind` is 'group' for a
  * group game win (CC.gamesBot.win) or 'answer' for a solo first-to-answer win (CC.gamesBot.answer).
  * Returns `{ amount, capped, balance }`; `amount` is 0 once the cap is reached (the win is still counted).
  */
@@ -146,7 +146,7 @@ export async function awardGamesBotWin(client, guildId, userId, { now = Date.now
         const earned = record.ccGamesBot?.day === today ? record.ccGamesBot.earned : 0;
         const boost = ccBoost(now);
         const base = kind === 'answer' ? CC.gamesBot.answer : CC.gamesBot.win;
-        const amount = Math.max(0, Math.min(base * boost, CC.gamesBot.dailyCap * boost - earned));
+        const amount = Math.max(0, Math.min(base * boost, gamesBotDailyCap(now) - earned));
         if (amount > 0) credit(state, amount);
         state.stats.gamesPlayed += 1;
         if (kind === 'answer') {

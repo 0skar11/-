@@ -2,12 +2,12 @@
 //
 // When a Clover group game ends it posts the winner as `👑 | @winner` (with a winner card image), and
 // a solo answer game posts `✅ | قام @member بكتابة الاجابة الصحيحة خلال 4.12 ثانية`. This reads those
-// messages and pays the winner CC.gamesBot.win or CC.gamesBot.answer, capped per day (config/cc.js). Only
+// messages and pays the winner CC.gamesBot.win or CC.gamesBot.answer, capped per day only while the CC event runs (config/cc.js). Only
 // messages from the games bot IDs count (config/games.js), so members can't fake a win by typing
 // the same text, and each message pays once.
 
 import { gamesBotIds } from '../../config/games.js';
-import { CC, formatCC, ccBoostLine } from '../../config/cc.js';
+import { CC, formatCC, ccBoostLine, gamesBotDailyCap } from '../../config/cc.js';
 import { awardGamesBotWin } from './ccService.js';
 import { logger } from '../../utils/logger.js';
 
@@ -60,7 +60,7 @@ export async function handleGamesBotWin(message, client) {
         const event = ccBoostLine();
         const text = (amount > 0
             ? `🌀 <@${winnerId}> كسب +${formatCC(amount)} • رصيدك: ${formatCC(balance)}`
-            : `🌀 <@${winnerId}> وصلت لحد الـ CC من الألعاب النهارده (${CC.gamesBot.dailyCap * (boost || 1)} ${CC.short})، الفوز اتحسب في إحصائياتك.`)
+            : `🌀 <@${winnerId}> وصلت لحد الـ CC من الألعاب النهارده (${gamesBotDailyCap()} ${CC.short})، الفوز اتحسب في إحصائياتك.`)
             + (event ? `\n${event}` : '');
         const notice = await message.reply({ content: text, allowedMentions: { parse: [] } }).catch(() => null);
         if (notice) setTimeout(() => notice.delete().catch(() => {}), NOTICE_DELETE_MS).unref?.();
