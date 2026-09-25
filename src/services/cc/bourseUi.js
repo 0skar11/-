@@ -130,30 +130,33 @@ export function confirmSellPayload(asset, quantity, price, userId, { owned, paid
     };
 }
 
+const balanceField = (before, after) => ({ name: '💰 رصيدك', value: `قبل: ${formatCC(before)}\nدلوقتي: ${formatCC(after)}`, inline: true });
+
+/** After buying: what was bought on top, then the numbers as cards (3 per row on a computer). */
 export function investReceiptEmbed(user, result) {
-    return ccEmbed('✅ تم الاستثمار', [
-        `${user}`,
-        '',
-        `${assetLabel(result.asset)} × ${result.quantity}`,
-        `🏷️ سعر القطعة: ${formatCC(result.price)}`,
-        `💵 اتخصم: ${formatCC(result.cost)}`,
-        `💼 معاك دلوقتي: ${result.owned}`,
-        `💰 رصيدك: ${formatCC(result.before)} ⬅️ ${formatCC(result.balance)}`,
-    ].join('\n'), { color: 'success' });
+    return ccEmbed('✅ تم الاستثمار', `${user} اشترى **${assetLabel(result.asset)} × ${result.quantity}**`, {
+        color: 'success',
+        fields: [
+            { name: '🏷️ سعر القطعة', value: formatCC(result.price), inline: true },
+            { name: '💵 اتخصم', value: formatCC(result.cost), inline: true },
+            { name: '💼 معاك دلوقتي', value: `${result.owned}`, inline: true },
+            balanceField(result.before, result.balance),
+        ],
+    });
 }
 
+/** After selling: what was sold on top, then the numbers as cards. */
 export function sellReceiptEmbed(user, result) {
-    return ccEmbed('✅ تم البيع', [
-        `${user}`,
-        '',
-        `${assetLabel(result.asset)} × ${result.quantity}`,
-        `🏷️ سعر القطعة: ${formatCC(result.price)}`,
-        `🧾 الرسوم: ${formatCC(result.fee)}`,
-        `✅ وصلك: ${formatCC(result.received)}`,
-        `📊 ${signedCC(result.profit)}`,
-        `💼 فاضل معاك: ${result.owned}`,
-        `💰 رصيدك: ${formatCC(result.before)} ⬅️ ${formatCC(result.balance)}`,
-    ].join('\n'), { color: 'success' });
+    return ccEmbed('✅ تم البيع', `${user} باع **${assetLabel(result.asset)} × ${result.quantity}**\n${signedCC(result.profit)}`, {
+        color: 'success',
+        fields: [
+            { name: '🏷️ سعر القطعة', value: formatCC(result.price), inline: true },
+            { name: '🧾 الرسوم', value: formatCC(result.fee), inline: true },
+            { name: '✅ وصلك', value: formatCC(result.received), inline: true },
+            { name: '💼 فاضل معاك', value: `${result.owned}`, inline: true },
+            balanceField(result.before, result.balance),
+        ],
+    });
 }
 
 const FAILURE_TEXT = {

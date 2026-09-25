@@ -32,6 +32,10 @@ export const GAMES_MOVED_NOTICE = '🎮 الألعاب اتنقلت لبوت ا�
 // comma separated) in GAMES_BOT_IDS.
 export const CLOVER_BOT_ID = '1006332825571692544';
 
+// Games bots (Clover and the IDs above) play only in this channel (report #121): their messages
+// anywhere else are deleted (services/cc/gamesBotChannel.js). The bourse lives here too.
+export const GAMES_BOTS_CHANNEL_ID = '1547310695006081075';
+
 export function gamesBotIds() {
     const ids = String(process.env.GAMES_BOT_IDS || '').split(',').map((id) => id.trim()).filter((id) => /^\d{17,20}$/.test(id));
     return new Set(ids.length ? ids : [CLOVER_BOT_ID]);

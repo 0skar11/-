@@ -204,17 +204,18 @@ export function purchaseFailureText(result) {
     return FAILURE_TEXT[result.reason] || '❌ حصلت مشكلة، جرب تاني.';
 }
 
-/** The receipt after a (real or trial) purchase. */
+/** The receipt after a (real or trial) purchase: what was bought on top, then the numbers as cards. */
 export function purchaseReceiptEmbed(user, result) {
-    const lines = [
-        `${user}`,
-        '',
-        `${itemLabel(result.item)}${result.quantity > 1 ? ` × ${result.quantity}` : ''}`,
-        `💵 ${result.trial ? 'كان هيتخصم' : 'اتخصم'}: ${formatCC(result.cost)}`,
-        `💰 رصيدك ${result.trial ? 'لسه' : 'دلوقتي'}: ${formatCC(result.balance)}`,
-    ];
-    if (result.trial) lines.push('', '🧪 ده شراء تجريبي، مفيش CC اتخصم ولا حاجة اتسلمت.');
-    return ccEmbed(result.trial ? '🧪 شراء تجريبي تم' : '✅ تم الشراء', lines.join('\n'), { color: 'success' });
+    const bought = `${itemLabel(result.item)}${result.quantity > 1 ? ` × ${result.quantity}` : ''}`;
+    const description = [`${user} ${result.trial ? 'جرب يشتري' : 'اشترى'} **${bought}**`];
+    if (result.trial) description.push('', '🧪 ده شراء تجريبي، مفيش CC اتخصم ولا حاجة اتسلمت.');
+    return ccEmbed(result.trial ? '🧪 شراء تجريبي تم' : '✅ تم الشراء', description.join('\n'), {
+        color: 'success',
+        fields: [
+            { name: `💵 ${result.trial ? 'كان هيتخصم' : 'اتخصم'}`, value: formatCC(result.cost), inline: true },
+            { name: `💰 رصيدك ${result.trial ? 'لسه' : 'دلوقتي'}`, value: formatCC(result.balance), inline: true },
+        ],
+    });
 }
 
 /** Buys and returns the reply payload (receipt or the reason it failed). */
