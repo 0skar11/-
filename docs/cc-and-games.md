@@ -167,7 +167,8 @@ attachments, links, reactions and threads, and has a 3 second slowmode.
 - Only store commands can be written there; anything else is deleted with a notice that goes
   away after 4 seconds. Other slash commands get a private "store only" reply. The server
   owners and this bot are left alone.
-- The store panel is pinned: the items, the commands, and a menu to pick an item plus
+- The store panel is pinned: a card with the items and their prices, a small grey card with the
+  main commands (`متجر`, `شراء 1`, `مخزني`), and a menu to pick an item plus
   buttons (💰 رصيدي, 🎒 مخزني, 🏆 توب CC, ❓ المساعدة) that answer privately.
 - Every **5** member messages under the panel, the old panel is deleted and it is sent and
   pinned again, so it is always near the bottom. Discord's "pinned a message" notice is deleted.
