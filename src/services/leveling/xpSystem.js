@@ -11,6 +11,8 @@ import { getChatCounts } from './chatCounter.js';
 import { getVoiceMinutes } from './voiceXp.js';
 import { syncMemberLevelRoles } from './levelRoleSyncService.js';
 import { awardLevelUp } from '../cc/ccService.js';
+import { checkInviteReward } from '../inviteRewardService.js';
+import { INVITE_REWARDS } from '../../config/inviteRewards.js';
 
 /**
  * Award XP to a member. Returns null when XP is skipped (disabled/invalid amount).
@@ -90,6 +92,12 @@ export const addXp = wrapServiceBoundary(async function addXp(client, guild, mem
     }
 
     await saveUserLevelData(client, guild.id, member.user.id, levelData);
+
+    // Reaching the invite level can pay whoever invited the member. Not awaited: it takes its own lock.
+    if (didLevelUp && levelData.level >= INVITE_REWARDS.level) {
+      checkInviteReward(client, guild, member.user.id, { level: levelData.level })
+        .catch((error) => logger.error(`Failed to check the invite reward for ${member.user.id}:`, error));
+    }
 
     return {
       level: levelData.level,

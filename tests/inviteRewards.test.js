@@ -1,0 +1,200 @@
+import { test, describe } from 'node:test';
+import assert from 'node:assert/strict';
+import { PermissionsBitField, PermissionFlagsBits } from 'discord.js';
+import { INVITE_REWARDS, CHAOS_GUILD_ID, WELCOME_CHANNEL_ID } from '../src/config/inviteRewards.js';
+import {
+  STATUS, joinVerdict, isReadyToPay, rankInviters, inviteTier, inviteRoleChanges, inviteWelcomeNotice,
+  registerJoin, markLeft, checkInviteReward, sweepInviteRewards, ensureInviteTierRoles, inviteTopEmbed,
+} from '../src/services/inviteRewardService.js';
+import { getEconomyKey, getUserLevelKey } from '../src/utils/database/keys.js';
+import { applyWordAliases, resolveCommandAlias } from '../src/config/commands/commandAliases.js';
+
+const DAY = 24 * 60 * 60 * 1000;
+const NOW = Date.parse('2026-09-25T12:00:00Z');
+const INVITER = '300000000000000001';
+const NEWBIE = '300000000000000002';
+const OTHER = '300000000000000003';
+
+function fakeMember(id, { createdTimestamp = NOW - 365 * DAY, bot = false } = {}) {
+  const roles = new Map();
+  return {
+    id,
+    user: { id, bot, tag: `user${id}`, createdTimestamp },
+    roles: {
+      cache: roles,
+      add: async (ids) => ids.forEach((roleId) => roles.set(roleId, { id: roleId })),
+      remove: async (ids) => ids.forEach((roleId) => roles.delete(roleId)),
+    },
+  };
+}
+
+function fakeSetup() {
+  const store = new Map();
+  const sent = [];
+  const members = new Map();
+  const roles = new Map();
+  let nextRoleId = 900000000000000000n;
+  const guild = {
+    id: CHAOS_GUILD_ID,
+    name: 'Chaos',
+    members: {
+      cache: members,
+      me: { permissions: new PermissionsBitField([PermissionFlagsBits.ManageRoles]) },
+      fetch: async (id) => { if (!members.has(id)) throw new Error('Unknown Member'); return members.get(id); },
+    },
+    channels: { cache: new Map([[WELCOME_CHANNEL_ID, { isTextBased: () => true, send: async (payload) => { sent.push(payload); } }]]) },
+    roles: {
+      cache: roles,
+      fetch: async () => roles,
+      create: async ({ name }) => { const role = { id: String(nextRoleId++), name, managed: false }; roles.set(role.id, role); return role; },
+    },
+  };
+  const client = {
+    store,
+    db: {
+      get: async (key, fallback = null) => (store.has(key) ? structuredClone(store.get(key)) : fallback),
+      set: async (key, value) => { store.set(key, structuredClone(value)); return true; },
+      list: async (prefix) => [...store.keys()].filter((key) => key.startsWith(prefix)),
+    },
+    guilds: { cache: new Map([[CHAOS_GUILD_ID, guild]]) },
+  };
+  const join = (member) => { members.set(member.id, member); return { ...member, guild, client }; };
+  const setLevel = (id, level) => store.set(getUserLevelKey(CHAOS_GUILD_ID, id), { xp: 0, level, totalXp: 1000, lastMessage: 0, rank: 0 });
+  const ccOf = (id) => store.get(getEconomyKey(CHAOS_GUILD_ID, id))?.cc || 0;
+  members.set(INVITER, fakeMember(INVITER));
+  return { client, guild, store, sent, members, join, setLevel, ccOf };
+}
+
+describe('invite rewards rules', () => {
+  test('the owner asked for 1000 CC at level 5 after 3 days, and roles at 5, 10 and 25 invites', () => {
+    assert.equal(INVITE_REWARDS.reward, 1000);
+    assert.equal(INVITE_REWARDS.level, 5);
+    assert.equal(INVITE_REWARDS.minStayDays, 3);
+    assert.deepEqual(INVITE_REWARDS.tiers.map((tier) => tier.count), [5, 10, 25]);
+  });
+
+  test('a join counts only for a real, first time member invited by someone else', () => {
+    const base = { memberId: NEWBIE, inviterId: INVITER, accountCreatedAt: NOW - 30 * DAY, now: NOW };
+    assert.equal(joinVerdict(base), null);
+    assert.equal(joinVerdict({ ...base, inviterId: null }), 'unknown');
+    assert.equal(joinVerdict({ ...base, inviterId: NEWBIE }), 'self');
+    assert.equal(joinVerdict({ ...base, inviterIsBot: true }), 'bot');
+    assert.equal(joinVerdict({ ...base, beenHereBefore: true }), 'rejoin');
+    assert.equal(joinVerdict({ ...base, accountCreatedAt: NOW - 2 * DAY }), 'fake');
+  });
+
+  test('pays only a pending invite that reached the level after the stay days', () => {
+    const record = { inviterId: INVITER, joinedAt: NOW - 3 * DAY, status: STATUS.PENDING };
+    assert.equal(isReadyToPay(record, 5, NOW), true);
+    assert.equal(isReadyToPay(record, 4, NOW), false);
+    assert.equal(isReadyToPay({ ...record, joinedAt: NOW - 2 * DAY }, 10, NOW), false);
+    assert.equal(isReadyToPay({ ...record, status: STATUS.PAID }, 10, NOW), false);
+    assert.equal(isReadyToPay({ ...record, status: STATUS.LEFT }, 10, NOW), false);
+  });
+
+  test('ranks inviters by paid invites and keeps only the highest invite role', () => {
+    const records = [
+      { inviterId: 'a', status: STATUS.PAID }, { inviterId: 'b', status: STATUS.PAID }, { inviterId: 'b', status: STATUS.PAID },
+      { inviterId: 'a', status: STATUS.PENDING }, { inviterId: 'a', status: STATUS.PENDING }, { inviterId: 'c', status: STATUS.LEFT },
+    ];
+    assert.deepEqual(rankInviters(records), [{ userId: 'b', paid: 2, pending: 0 }, { userId: 'a', paid: 1, pending: 2 }]);
+    assert.equal(inviteTier(4), null);
+    assert.equal(inviteTier(12).count, 10);
+    const ids = { 5: 'r5', 10: 'r10', 25: 'r25' };
+    assert.deepEqual(inviteRoleChanges(10, ids, new Set(['r5'])), { tier: INVITE_REWARDS.tiers[1], add: ['r10'], remove: ['r5'] });
+    assert.deepEqual(inviteRoleChanges(3, ids, new Set(['r5'])).remove, ['r5']);
+  });
+
+  test('the welcome notice is small (subtext) and says who invited and the conditions', () => {
+    const counted = inviteWelcomeNotice(NEWBIE, { inviterId: INVITER, reason: null });
+    assert.ok(counted.split('\n').every((line) => line.startsWith('-# ')));
+    assert.match(counted, new RegExp(`دعاه <@${INVITER}>`));
+    assert.match(counted, /1,000/);
+    assert.match(counted, /لفل 5/);
+    assert.match(counted, /3 أيام/);
+    assert.match(inviteWelcomeNotice(NEWBIE, { inviterId: INVITER, reason: 'fake' }), /مش محسوبة/);
+    assert.match(inviteWelcomeNotice(NEWBIE, { inviterId: INVITER, reason: 'rejoin' }), /قبل كده/);
+    assert.equal(inviteWelcomeNotice(NEWBIE, { inviterId: null, reason: 'unknown' }), null);
+    assert.equal(inviteWelcomeNotice(NEWBIE, null), null);
+  });
+
+  test('top invites and my invites are commands', () => {
+    assert.equal(applyWordAliases('top', ['invites'], true).commandName, 'invitetop');
+    assert.equal(applyWordAliases('توب', ['دعوات'], false).commandName, 'invitetop');
+    assert.equal(resolveCommandAlias(applyWordAliases('دعواتي', [], false).commandName), 'invitetop');
+    assert.equal(applyWordAliases('دعواتي', ['ليك', 'يا', 'صاحبي'], false), null);
+  });
+});
+
+describe('invite rewards flow', () => {
+  test('pays the inviter 1000 CC once the invited member is level 5 and 3 days in, only once', async () => {
+    const setup = fakeSetup();
+    const newbie = setup.join(fakeMember(NEWBIE));
+    assert.deepEqual(await registerJoin(setup.client, newbie, INVITER, { now: NOW }), { inviterId: INVITER, reason: null });
+
+    // Level 5 on day 1: not yet.
+    assert.equal(await checkInviteReward(setup.client, setup.guild, NEWBIE, { level: 5, now: NOW + DAY }), null);
+    // Day 3 but level 4: not yet.
+    setup.setLevel(NEWBIE, 4);
+    assert.equal(await sweepInviteRewards(setup.client, { now: NOW + 3 * DAY }), 0);
+    assert.equal(setup.ccOf(INVITER), 0);
+
+    setup.setLevel(NEWBIE, 5);
+    assert.equal(await sweepInviteRewards(setup.client, { now: NOW + 3 * DAY }), 1);
+    assert.equal(setup.ccOf(INVITER), 1000);
+    assert.match(setup.sent[0].content, /1,000/);
+    assert.deepEqual(setup.sent[0].allowedMentions, { users: [INVITER] });
+
+    assert.equal(await checkInviteReward(setup.client, setup.guild, NEWBIE, { level: 6, now: NOW + 4 * DAY }), null);
+    assert.equal(await sweepInviteRewards(setup.client, { now: NOW + 4 * DAY }), 0);
+    assert.equal(setup.ccOf(INVITER), 1000, 'paid only once');
+
+    const top = await inviteTopEmbed(setup.client, setup.guild, INVITER);
+    assert.match(top.description, new RegExp(`<@${INVITER}> — \\*\\*1\\*\\* دعوة`));
+  });
+
+  test('leaving before the reward, a rejoin and a new account never pay', async () => {
+    const setup = fakeSetup();
+    const newbie = setup.join(fakeMember(NEWBIE));
+    await registerJoin(setup.client, newbie, INVITER, { now: NOW });
+    await markLeft(setup.client, CHAOS_GUILD_ID, NEWBIE, { now: NOW + DAY });
+    setup.members.delete(NEWBIE);
+
+    // Back through someone else's invite: it's a rejoin, and the old invite stays left.
+    const again = setup.join(fakeMember(NEWBIE));
+    assert.equal((await registerJoin(setup.client, again, OTHER, { now: NOW + 2 * DAY })).reason, 'rejoin');
+    setup.setLevel(NEWBIE, 10);
+    assert.equal(await sweepInviteRewards(setup.client, { now: NOW + 10 * DAY }), 0);
+
+    // A member with CC was in the server before this feature knew them.
+    const oldTimerId = '300000000000000004';
+    setup.store.set(getEconomyKey(CHAOS_GUILD_ID, oldTimerId), { cc: 5 });
+    assert.equal((await registerJoin(setup.client, setup.join(fakeMember(oldTimerId)), INVITER, { now: NOW })).reason, 'rejoin');
+
+    const altId = '300000000000000005';
+    const alt = setup.join(fakeMember(altId, { createdTimestamp: NOW - DAY }));
+    assert.equal((await registerJoin(setup.client, alt, INVITER, { now: NOW })).reason, 'fake');
+    setup.setLevel(altId, 10);
+    assert.equal(await checkInviteReward(setup.client, setup.guild, altId, { now: NOW + 10 * DAY }), null);
+
+    assert.equal(setup.ccOf(INVITER), 0);
+    assert.equal(setup.ccOf(OTHER), 0);
+  });
+
+  test('the 5th paid invite gives the 5 invites role', async () => {
+    const setup = fakeSetup();
+    const roleIds = await ensureInviteTierRoles(setup.client, setup.guild);
+    assert.deepEqual(Object.keys(roleIds), ['5', '10', '25']);
+    assert.deepEqual(await ensureInviteTierRoles(setup.client, setup.guild), roleIds, 'existing roles are reused');
+
+    for (let i = 0; i < 5; i += 1) {
+      const id = `31000000000000000${i}`;
+      await registerJoin(setup.client, setup.join(fakeMember(id)), INVITER, { now: NOW });
+      setup.setLevel(id, 5);
+    }
+    assert.equal(await sweepInviteRewards(setup.client, { now: NOW + 3 * DAY }), 5);
+    assert.equal(setup.ccOf(INVITER), 5000);
+    assert.deepEqual([...setup.members.get(INVITER).roles.cache.keys()], [roleIds[5]]);
+    assert.match(setup.sent.at(-1).content, new RegExp(`<@&${roleIds[5]}>`));
+  });
+});
