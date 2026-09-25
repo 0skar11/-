@@ -4,7 +4,7 @@ import { PermissionsBitField, PermissionFlagsBits } from 'discord.js';
 import { INVITE_REWARDS, CHAOS_GUILD_ID, WELCOME_CHANNEL_ID } from '../src/config/inviteRewards.js';
 import {
   STATUS, joinVerdict, isReadyToPay, rankInviters, inviteTier, inviteRoleChanges, inviteWelcomeNotice,
-  registerJoin, markLeft, checkInviteReward, sweepInviteRewards, ensureInviteTierRoles, inviteTopEmbed,
+  registerJoin, markLeft, checkInviteReward, sweepInviteRewards, findInviteTierRoles, inviteTopEmbed,
   memberInviteSummary, memberInvitesEmbed,
 } from '../src/services/inviteRewardService.js';
 import { getEconomyKey, getUserLevelKey } from '../src/utils/database/keys.js';
@@ -33,8 +33,8 @@ function fakeSetup() {
   const store = new Map();
   const sent = [];
   const members = new Map();
-  const roles = new Map();
-  let nextRoleId = 900000000000000000n;
+  // The owner made the invite roles; the bot must never create one.
+  const roles = new Map(INVITE_REWARDS.tiers.map((tier, index) => [`90000000000000000${index}`, { id: `90000000000000000${index}`, name: tier.name, managed: false }]));
   const guild = {
     id: CHAOS_GUILD_ID,
     name: 'Chaos',
@@ -47,7 +47,7 @@ function fakeSetup() {
     roles: {
       cache: roles,
       fetch: async () => roles,
-      create: async ({ name }) => { const role = { id: String(nextRoleId++), name, managed: false }; roles.set(role.id, role); return role; },
+      create: async () => { throw new Error('the bot must not create roles'); },
     },
   };
   const client = {
@@ -217,9 +217,9 @@ describe('invite rewards flow', () => {
 
   test('the 5th paid invite gives the 5 invites role', async () => {
     const setup = fakeSetup();
-    const roleIds = await ensureInviteTierRoles(setup.client, setup.guild);
+    const roleIds = await findInviteTierRoles(setup.client, setup.guild);
     assert.deepEqual(Object.keys(roleIds), ['5', '10', '25']);
-    assert.deepEqual(await ensureInviteTierRoles(setup.client, setup.guild), roleIds, 'existing roles are reused');
+    assert.deepEqual(await findInviteTierRoles(setup.client, setup.guild), roleIds, 'existing roles are reused');
 
     for (let i = 0; i < 5; i += 1) {
       const id = `31000000000000000${i}`;
@@ -230,5 +230,14 @@ describe('invite rewards flow', () => {
     assert.equal(setup.ccOf(INVITER), 5000);
     assert.deepEqual([...setup.members.get(INVITER).roles.cache.keys()], [roleIds[5]]);
     assert.match(setup.sent.at(-1).content, new RegExp(`<@&${roleIds[5]}>`));
+  });
+
+  test('a missing invite role is skipped, never created', async () => {
+    const setup = fakeSetup();
+    const [firstId] = setup.guild.roles.cache.keys();
+    setup.guild.roles.cache.delete(firstId);
+    const roleIds = await findInviteTierRoles(setup.client, setup.guild);
+    assert.deepEqual(Object.keys(roleIds), ['10', '25']);
+    assert.equal(setup.guild.roles.cache.size, INVITE_REWARDS.tiers.length - 1);
   });
 });

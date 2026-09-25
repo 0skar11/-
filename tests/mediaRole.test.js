@@ -1,7 +1,7 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import { PermissionsBitField, PermissionFlagsBits } from 'discord.js';
-import { hasMediaContent, isPlayCommand, ensureMediaRole, grantMediaRoleToAllMembers, CHAOS_ROLE_ID, MEDIA_PERMISSIONS } from '../src/services/mediaRoleService.js';
+import { hasMediaContent, isPlayCommand, findMediaRole, isMediaRole, grantMediaRoleToAllMembers } from '../src/services/mediaRoleService.js';
 
 const message = (content, attachments = 0) => ({ content, attachments: { size: attachments } });
 
@@ -36,61 +36,30 @@ describe('media lock', () => {
     assert.equal(hasMediaContent(message('3.5 ساعة')), false);
   });
 
-  test('creates the media role right below chaos, locks files for @everyone and chaos, keeps GIF embeds', async () => {
-    const mediaBits = new PermissionsBitField(MEDIA_PERMISSIONS);
-    const role = (id, position, permissions) => ({
-      id, position, name: id, managed: false, editable: true,
-      permissions: new PermissionsBitField(permissions),
-      async setPermissions(value) { this.permissions = new PermissionsBitField(value); },
-      async setPosition(value) { this.position = value; },
-    });
-    // @everyone had Embed Links taken away by the old lock: it gets it back so GIFs show.
-    const everyone = role('everyone', 0, [PermissionFlagsBits.AttachFiles]);
-    const chaos = role(CHAOS_ROLE_ID, 3, mediaBits);
-    let media;
-    const roles = new Map([[everyone.id, everyone], [chaos.id, chaos]]);
-    roles.find = (fn) => [...roles.values()].find(fn);
-    const guild = {
-      name: 'test',
-      members: { me: { permissions: new PermissionsBitField(PermissionsBitField.All), roles: { highest: { position: 10 } } } },
-      roles: {
-        everyone,
-        fetch: async () => roles,
-        create: async ({ name, permissions }) => { media = { ...role(name, 1, permissions) }; return media; },
-      },
-    };
-
-    const result = await ensureMediaRole(guild);
-    assert.deepEqual(result, { created: true, positioned: true, locked: 2 });
-    assert.equal(media.name, 'media');
-    assert.equal(media.permissions.has(MEDIA_PERMISSIONS), true);
-    assert.equal(media.position, chaos.position - 1);
-    assert.equal(everyone.permissions.has(PermissionFlagsBits.AttachFiles), false);
-    assert.equal(everyone.permissions.has(PermissionFlagsBits.EmbedLinks), true);
-    assert.equal(chaos.permissions.has(PermissionFlagsBits.AttachFiles), false);
-  });
-
-  test('an existing media role and @everyone / chaos are never changed back', async () => {
-    const role = (id, position, permissions) => ({
-      id, position, name: id, managed: false, editable: true,
-      permissions: new PermissionsBitField(permissions),
+  test('the media role is only found, never created or edited, and @everyone is never changed', async () => {
+    const role = (id, name) => ({
+      id, name, managed: false, editable: true,
+      permissions: new PermissionsBitField([PermissionFlagsBits.AttachFiles]),
       async setPermissions() { throw new Error('must not change permissions'); },
       async setPosition() { throw new Error('must not move'); },
+      async edit() { throw new Error('must not edit'); },
     });
-    // The owner moved media above chaos, gave chaos Attach Files and took Embed Links off media.
-    const everyone = role('everyone', 0, [PermissionFlagsBits.AttachFiles]);
-    const chaos = role(CHAOS_ROLE_ID, 3, [PermissionFlagsBits.AttachFiles]);
-    const media = role('media', 4, [PermissionFlagsBits.AttachFiles]);
-    const roles = new Map([[everyone.id, everyone], [chaos.id, chaos], [media.id, media]]);
+    const everyone = role('everyone', '@everyone');
+    const roles = new Map([[everyone.id, everyone]]);
     roles.find = (fn) => [...roles.values()].find(fn);
     const guild = {
-      name: 'test',
-      members: { me: { permissions: new PermissionsBitField(PermissionsBitField.All), roles: { highest: { position: 10 } } } },
-      roles: { everyone, fetch: async () => roles },
+      id: 'g-media', name: 'test',
+      roles: { everyone, fetch: async () => roles, create: async () => { throw new Error('must not create'); } },
     };
 
-    assert.deepEqual(await ensureMediaRole(guild), { created: false, positioned: false, locked: 0 });
-    assert.equal(media.position, 4);
+    assert.equal(await findMediaRole(guild), null);
+    const media = role('media-id', 'media');
+    roles.set(media.id, media);
+    assert.equal(await findMediaRole(guild), media);
+    // Renamed by the owner: still the media role.
+    media.name = 'صور';
+    assert.equal(await findMediaRole(guild), media);
+    assert.equal(isMediaRole(media, guild.id), true);
   });
 
   test('gives the media role to every current member once, skipping bots', async () => {

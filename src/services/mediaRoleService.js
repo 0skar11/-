@@ -4,17 +4,10 @@ import { canLiftHardBan } from './moderation/hardBanService.js';
 import { getGuildConfig, updateGuildConfig } from './config/guildConfig.js';
 import { logger } from '../utils/logger.js';
 
-// Images/files and links are locked for everyone except members of the `media` role; GIFs are open
-// to everyone. The role holds Attach Files + Embed Links and sits right below the chaos (member) role.
-// Attach Files is taken off @everyone and chaos, while @everyone keeps Embed Links so GIFs from the
-// GIF picker (Tenor/Giphy links) show. Discord permissions can't stop a plain link from being sent,
-// so the message guard below deletes those.
+// Images/files and links are for members of the `media` role only; GIFs are open to everyone.
+// The role and its permissions are the owner's to set: the bot never changes them. Discord permissions
+// can't stop a plain link from being sent, so the message guard below deletes those.
 const MEDIA_ROLE_NAME = 'media';
-const MEDIA_ROLE_COLOR = '#9b59b6';
-const CHAOS_ROLE_ID = '1155238281861156955';
-const MEDIA_PERMISSIONS = [PermissionFlagsBits.AttachFiles, PermissionFlagsBits.EmbedLinks];
-// Taken off @everyone and chaos. Embed Links stays with everyone, or GIFs would show as bare links.
-const LOCKED_PERMISSIONS = [PermissionFlagsBits.AttachFiles];
 const BLOCKED_NOTICE_DELETE_MS = 5_000;
 // Guild config flag set once every member who was in the server got the media role.
 const GRANTED_TO_ALL_KEY = 'mediaRoleGrantedToAll';
@@ -23,19 +16,6 @@ const LINK = /(?:https?:\/\/|www\.)\S+|(?:discord(?:app)?\.com\/invite|discord\.
 // GIFs anyone may send: GIF picker links (Tenor, Giphy) and .gif files on Discord's CDN. Anything else
 // left in the message (another site around them) is still caught as a link.
 const GIF_LINK = /(?:https?:\/\/)?(?:[\w-]+\.)*(?:tenor\.com|giphy\.com|gph\.is)\/\S*|(?:https?:\/\/)?(?:cdn\.discordapp\.com|media\.discordapp\.net)\/\S+?\.gif(?:[?#]\S*)?(?=\s|$)/giu;
-
-async function stripMediaPermissions(role) {
-  if (!role?.editable || !role.permissions.any(LOCKED_PERMISSIONS)) return false;
-  await role.setPermissions(role.permissions.remove(LOCKED_PERMISSIONS), `Media is limited to the ${MEDIA_ROLE_NAME} role`);
-  return true;
-}
-
-// Gives Embed Links back to @everyone (it used to be locked too) so everyone's GIFs show.
-async function allowGifEmbeds(everyone) {
-  if (!everyone?.editable || everyone.permissions.has(PermissionFlagsBits.EmbedLinks)) return false;
-  await everyone.setPermissions(everyone.permissions.add(PermissionFlagsBits.EmbedLinks), 'GIFs are allowed for everyone');
-  return true;
-}
 
 // The media role's ID per server, so a media role the owner renamed is still the media role.
 const MEDIA_ROLE_ID_KEY = 'mediaRoleId';
@@ -54,47 +34,22 @@ async function savedMediaRoleId(guild) {
 }
 
 /**
- * Creates the media role when it is missing: with its permissions, right below chaos, and locks files for
- * @everyone and chaos (GIF embeds stay open). All of that happens only when the role is created. A media
- * role that already exists, and @everyone / chaos, are never changed again, so the owner's edits stay.
+ * Finds the media role (the saved one, else one named `media`) and remembers its ID. The bot never
+ * creates, edits or moves it, and never changes @everyone's or chaos's permissions.
  */
-export async function ensureMediaRole(guild) {
-  const botMember = guild.members.me || await guild.members.fetchMe().catch(() => null);
-  if (!botMember?.permissions.has(PermissionFlagsBits.ManageRoles)) {
-    logger.warn(`Media role skipped for ${guild.name}: bot needs Manage Roles.`);
-    return { created: false, positioned: false, locked: 0 };
-  }
-
+export async function findMediaRole(guild) {
   const roles = await guild.roles.fetch();
   const savedId = await savedMediaRoleId(guild);
-  let media = (savedId && roles.get(savedId)) || roles.find((role) => role.name === MEDIA_ROLE_NAME && !role.managed);
-  const created = !media;
-  let positioned = false;
-  let locked = 0;
-
-  if (created) {
-    media = await guild.roles.create({ name: MEDIA_ROLE_NAME, color: MEDIA_ROLE_COLOR, mentionable: false, permissions: MEDIA_PERMISSIONS, reason: 'Role that may send images, links and GIFs' });
-    const chaos = roles.get(CHAOS_ROLE_ID);
-    if (chaos && media.editable && chaos.position < botMember.roles.highest.position) {
-      // setPosition works on the sorted index: moving down from above takes chaos's slot, moving up lands one below it.
-      await media.setPosition(media.position > chaos.position ? chaos.position : chaos.position - 1, { reason: `Place ${MEDIA_ROLE_NAME} right below chaos` });
-      positioned = true;
-    } else if (!chaos) {
-      logger.warn(`Media role in ${guild.name}: chaos role ${CHAOS_ROLE_ID} was not found.`);
-    } else {
-      logger.warn(`Media role in ${guild.name} can't be moved next to chaos: the bot's highest role must be higher.`);
-    }
-    for (const role of [guild.roles.everyone, chaos]) {
-      if (await stripMediaPermissions(role)) locked += 1;
-    }
-    await allowGifEmbeds(guild.roles.everyone);
+  const media = (savedId && roles.get(savedId)) || roles.find((role) => role.name === MEDIA_ROLE_NAME && !role.managed);
+  if (!media) {
+    logger.warn(`Media role not found in ${guild.name} (the bot doesn't create roles).`);
+    return null;
   }
-
   mediaRoleIds.set(guild.id, media.id);
   if (guild.client?.db && savedId !== media.id) {
     await updateGuildConfig(guild.client, guild.id, { [MEDIA_ROLE_ID_KEY]: media.id }).catch(() => {});
   }
-  return { created, positioned, locked };
+  return media;
 }
 
 /**
@@ -170,4 +125,4 @@ export async function handleMediaMessage(message) {
   return true;
 }
 
-export { MEDIA_ROLE_NAME, CHAOS_ROLE_ID, MEDIA_PERMISSIONS };
+export { MEDIA_ROLE_NAME };

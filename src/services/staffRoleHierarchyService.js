@@ -115,13 +115,6 @@ const ROLE_DEFINITIONS = [
   { name: '🎫 Support Staff', color: '#95a5a6', permissions: SUPPORT_STAFF_PERMISSIONS },
 ];
 
-// Roles removed from the server on purpose (🧪 Developer and the non-booster VIP); deleted on startup if they still exist.
-const RETIRED_ROLE_IDS = ['1551308801439698965', '1551311500025798736'];
-// Retired roles known only by name (the owner removed Event Manager completely), matched on their letters
-// only so "📢 Event Manager", "Event Manager" or "event manger" all count.
-const RETIRED_ROLE_NAMES = ['eventmanager', 'eventmanger'];
-export const isRetiredRoleName = (name) => RETIRED_ROLE_NAMES.includes(String(name || '').toLowerCase().replace(/[^a-z]/g, ''));
-
 // role.permissions.toArray() returns flag names ('ViewAuditLog'), while the labels are keyed by bit.
 function permissionNames(permissions) {
   return permissions.map((permission) => `✅ ${PERMISSION_LABELS.get(PermissionFlagsBits[permission] ?? permission) || permission}`);
@@ -146,32 +139,7 @@ function buildBoardEmbed(role, definition) {
   };
 }
 
-export async function deleteRetiredRoles(guild) {
-  let deleted = 0;
-  for (const roleId of RETIRED_ROLE_IDS) {
-    const role = await guild.roles.fetch(roleId).catch(() => null);
-    if (!role) continue;
-    await role.delete('Retired role removed by the owner');
-    deleted += 1;
-  }
-  const roles = await guild.roles.fetch().catch(() => null);
-  for (const role of roles?.values() || []) {
-    if (!isRetiredRoleName(role.name) || role.managed || !role.editable) continue;
-    await role.delete('Retired role removed by the owner');
-    deleted += 1;
-  }
-  return deleted;
-}
-
-function grantablePermissions(botMember, definition) {
-  const wanted = new PermissionsBitField(definition.permissions);
-  if (botMember.permissions.has(PermissionFlagsBits.Administrator)) return wanted.bitfield;
-  const missing = botMember.permissions.missing(wanted, false);
-  if (missing.length) logger.warn(`${definition.name}: the bot lacks ${missing.join(', ')} and cannot grant it. Give the bot Administrator.`);
-  return new PermissionsBitField(wanted.bitfield & botMember.permissions.bitfield).bitfield;
-}
-
-// Staff role IDs the bot created, by definition name, so a role the owner renamed is still recognised.
+// Staff role IDs, by definition name, so a role the owner renamed is still recognised.
 const STAFF_ROLE_IDS_KEY = 'staffRoleIds';
 
 async function savedStaffRoleIds(guild) {
@@ -185,55 +153,22 @@ function findStaffRole(roles, definition, savedIds) {
     || roles.find((candidate) => candidate.name === definition.name && !candidate.managed);
 }
 
-// discord.js setPosition index: right below `above` (moving up lands one below the target index's role).
-async function placeBelow(role, above, reason) {
-  if (typeof role.setPosition !== 'function' || !above) return false;
-  await role.setPosition(role.position < above.position ? above.position - 1 : above.position, { reason });
-  return true;
-}
-
 /**
- * Creates the staff roles that are missing, with their colour and permissions, each placed right below
- * the staff role above it (or below the bot's highest role). A staff role that already exists is never
- * changed: the owner's edits to its name, colour, permissions or position stay as they are.
+ * Remembers the IDs of the staff roles that exist, so a role the owner renamed is still found for the
+ * permission board. The bot never creates, edits, moves or deletes a role: that is the owner's alone.
  */
-export async function synchronizeStaffRoles(guild) {
-  const botMember = guild.members.me || await guild.members.fetchMe().catch(() => null);
-  if (!botMember?.permissions.has(PermissionFlagsBits.ManageRoles)) {
-    logger.warn(`Role hierarchy skipped for ${guild.name}: bot needs Manage Roles.`);
-    return { created: 0, updated: 0, positioned: 0 };
-  }
-
+export async function rememberStaffRoles(guild) {
   const roles = await guild.roles.fetch();
   const savedIds = await savedStaffRoleIds(guild);
-  let created = 0;
-  let positioned = 0;
-  let above = botMember.roles?.highest || null;
-
+  let found = 0;
   for (const definition of ROLE_DEFINITIONS) {
-    let role = findStaffRole(roles, definition, savedIds);
-    if (!role) {
-      // Discord only lets the bot grant permissions it holds itself (all of them when it is an Administrator).
-      const permissions = grantablePermissions(botMember, definition);
-      try {
-        role = await guild.roles.create({ name: definition.name, color: definition.color, hoist: true, mentionable: false, permissions, reason: 'Create missing staff role' });
-        created += 1;
-        if (await placeBelow(role, above, 'Place the new staff role in the hierarchy').catch((error) => {
-          logger.warn(`Could not place ${definition.name} in ${guild.name}: ${error.message}`);
-          return false;
-        })) positioned += 1;
-      } catch (error) {
-        logger.error(`Failed to create ${definition.name} in ${guild.name}:`, error);
-      }
-    }
-    if (role) {
-      savedIds[definition.name] = role.id;
-      above = role;
-    }
+    const role = findStaffRole(roles, definition, savedIds);
+    if (!role) continue;
+    savedIds[definition.name] = role.id;
+    found += 1;
   }
-
   if (guild.client?.db) await updateGuildConfig(guild.client, guild.id, { [STAFF_ROLE_IDS_KEY]: savedIds }).catch(() => {});
-  return { created, updated: 0, positioned };
+  return { found };
 }
 
 const BOARD_KEY = 'staffPermissions';
@@ -325,4 +260,4 @@ export async function refreshStaffPermissionBoard(guild) {
   return result;
 }
 
-export { ROLE_DEFINITIONS, ALL_EXCEPT_ADMINISTRATOR, CHAT_MODERATOR_PERMISSIONS, VOICE_MODERATOR_PERMISSIONS, TRIAL_MODERATOR_PERMISSIONS, SUPPORT_STAFF_PERMISSIONS, ROLE_PERMISSIONS_CHANNEL_ID, RETIRED_ROLE_IDS, BOARD_RESET_VERSION };
+export { ROLE_DEFINITIONS, ALL_EXCEPT_ADMINISTRATOR, CHAT_MODERATOR_PERMISSIONS, VOICE_MODERATOR_PERMISSIONS, TRIAL_MODERATOR_PERMISSIONS, SUPPORT_STAFF_PERMISSIONS, ROLE_PERMISSIONS_CHANNEL_ID, BOARD_RESET_VERSION };

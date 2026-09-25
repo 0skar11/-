@@ -4,7 +4,7 @@ import config from "../config/application.js";
 import { reconcileReactionRoleMessages } from "../services/reactionRoleService.js";
 import { reconcileTicketPanels, reconcileVerificationPanels, reconcileReactionRolePanelHealth } from "../services/panelHealthService.js";
 import { reconcileLevelRoles } from "../services/leveling/levelRoleSyncService.js";
-import { ensureLevelTierRoles } from "../services/leveling/levelTierRoles.js";
+import { findLevelTierRoles } from "../services/leveling/levelTierRoles.js";
 import { initRiffyAfterReady } from "../services/music/riffySetup.js";
 import { ensureAuditLogChannels } from "../services/auditLogChannelsService.js";
 import { publishArabicModerationCommands } from "../services/moderationCommandsBoardService.js";
@@ -66,13 +66,13 @@ export default {
       startupLog(`Verification panel health: scanned ${verificationPanelSummary.scannedGuilds}, healthy ${verificationPanelSummary.healthyPanels}, deleted ${verificationPanelSummary.deletedPanels}`);
       const reactionRolePanelSummary = await reconcileReactionRolePanelHealth(client);
       startupLog(`Reaction role panel health: scanned ${reactionRolePanelSummary.scannedPanels}, healthy ${reactionRolePanelSummary.healthyPanels}, missing channel ${reactionRolePanelSummary.missingChannels}`);
-      // Level roles are set up first so the sync below hands them to members who already passed their level.
+      // Level roles are found first so the sync below hands them to members who already passed their level.
       for (const guild of client.guilds.cache.values()) {
         try {
-          const tiers = await ensureLevelTierRoles(client, guild);
-          startupLog(`Level roles in ${guild.name}: created ${tiers.created}, moved ${tiers.moved}, rewards saved ${tiers.rewardsSaved}`);
+          const tiers = await findLevelTierRoles(client, guild);
+          startupLog(`Level roles in ${guild.name}: found ${tiers.found}, missing ${tiers.missing.length}, rewards saved ${tiers.rewardsSaved}`);
         } catch (error) {
-          logger.error(`Failed to set up level roles in ${guild.name}:`, error);
+          logger.error(`Failed to find level roles in ${guild.name}:`, error);
         }
       }
       const levelRoleSummary = await reconcileLevelRoles(client);
