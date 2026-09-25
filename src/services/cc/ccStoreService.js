@@ -1,8 +1,10 @@
 // ccStoreService.js — buying from the CC store. The catalog is src/config/store/ccStoreItems.js.
-// There is no store command yet; when it is added it only needs listStoreItems() and buyItem().
+// Used by the `store` command (src/commands/Games/store.js) and the store room panel
+// (src/services/cc/storeChannel.js). While the store is in trial mode the demo items are shown and a
+// purchase is only a preview: the balance is checked but no CC is taken and nothing is given.
 
-import { ccStoreItems, ccStoreSettings } from '../../config/store/ccStoreItems.js';
-import { updateCCState } from './ccService.js';
+import { ccStoreItems, ccStoreDemoItems, ccStoreSettings } from '../../config/store/ccStoreItems.js';
+import { getProfile, updateCCState } from './ccService.js';
 import { logger } from '../../utils/logger.js';
 
 const ITEM_TYPES = new Set(['role', 'item']);
@@ -28,16 +30,38 @@ export function listStoreItems(items = ccStoreItems) {
     });
 }
 
+/** 'open' (real buying), 'trial' (demo items, preview only) or 'closed'. */
+export function storeMode(settings = ccStoreSettings) {
+    if (settings.open) return 'open';
+    return settings.trial ? 'trial' : 'closed';
+}
+
+/** The items the store shows right now: the real catalog, the demo items in trial mode, or none. */
+export function storeCatalog(settings = ccStoreSettings, { items = ccStoreItems, demoItems = ccStoreDemoItems } = {}) {
+    const mode = storeMode(settings);
+    if (mode === 'open') return listStoreItems(items);
+    return mode === 'trial' ? listStoreItems(demoItems) : [];
+}
+
 export function getStoreItem(itemId, items = ccStoreItems) {
     return listStoreItems(items).find((item) => item.id === String(itemId || '').toLowerCase()) || null;
+}
+
+/** Finds an item by its id or by its number in the list (`1` is the first item). */
+export function findStoreItem(query, items) {
+    const text = String(query || '').trim().toLowerCase();
+    if (/^\d{1,3}$/u.test(text)) return items[Number(text) - 1] || null;
+    return items.find((item) => item.id === text) || null;
 }
 
 /**
  * Buys `quantity` of an item for `member`. Returns `{ ok: true, item, quantity, cost, balance }` or
  * `{ ok: false, reason }` with reason one of: closed, not_found, bad_quantity, owned, max_owned, no_cc, role_failed.
  */
-export async function buyItem(client, member, itemId, quantity = 1, { items = ccStoreItems, settings = ccStoreSettings } = {}) {
-    if (!settings.open) return { ok: false, reason: 'closed' };
+export async function buyItem(client, member, itemId, quantity = 1, { items = ccStoreItems, demoItems = ccStoreDemoItems, settings = ccStoreSettings } = {}) {
+    const mode = storeMode(settings);
+    if (mode === 'closed') return { ok: false, reason: 'closed' };
+    if (mode === 'trial') return previewPurchase(client, member, itemId, quantity, { items: demoItems, settings });
     const item = getStoreItem(itemId, items);
     if (!item) return { ok: false, reason: 'not_found' };
     if (!Number.isSafeInteger(quantity) || quantity < 1 || quantity > settings.maxQuantity || (item.type === 'role' && quantity !== 1)) {
@@ -73,4 +97,17 @@ export async function buyItem(client, member, itemId, quantity = 1, { items = cc
 
     logger.info('[CC_STORE] Purchase', { guildId, userId: member.id, itemId: item.id, quantity, cost });
     return { ok: true, item, quantity, cost, balance: result.balance };
+}
+
+/** Trial mode: the same checks as buyItem, but nothing is saved. Returns buyItem's result with `trial: true`. */
+async function previewPurchase(client, member, itemId, quantity, { items, settings }) {
+    const item = getStoreItem(itemId, items);
+    if (!item) return { ok: false, reason: 'not_found' };
+    if (!Number.isSafeInteger(quantity) || quantity < 1 || quantity > settings.maxQuantity || (item.type === 'role' && quantity !== 1)) {
+        return { ok: false, reason: 'bad_quantity' };
+    }
+    const { cc } = await getProfile(client, member.guild.id, member.id);
+    const cost = item.price * quantity;
+    if (cc < cost) return { ok: false, reason: 'no_cc', balance: cc, trial: true };
+    return { ok: true, trial: true, item, quantity, cost, balance: cc };
 }

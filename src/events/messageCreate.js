@@ -21,6 +21,7 @@ import { handleForeignInviteLink } from '../services/inviteLinkGuardService.js';
 import { handleMediaMessage } from '../services/mediaRoleService.js';
 import { handleGamesChannelMessage, isGamesOnlyFor, isGameCommandMessage } from '../services/games/gamesChannel.js';
 import { handleGamesBotWin } from '../services/cc/gamesBotWins.js';
+import { handleStoreChannelMessage } from '../services/cc/storeChannel.js';
 import { handleMessageXp } from '../services/leveling/messageXp.js';
 import { countMessage } from '../services/leveling/chatCounter.js';
 import { handleAfkMessage } from '../services/afkService.js';
@@ -34,6 +35,8 @@ export default {
       // Runs before the bot check so other bots cannot post in the protected board channels either.
       if (await handleProtectedChannelMessage(message)) return;
       if (await handleGamesChannelMessage(message, client)) return;
+      // The store room only keeps store commands (and reposts its panel every few messages).
+      if (await handleStoreChannelMessage(message, client)) return;
       // Wins announced by the games bot (Clover) pay CC here.
       if (await handleGamesBotWin(message, client)) return;
       if (message.author.bot || !message.guild) return;

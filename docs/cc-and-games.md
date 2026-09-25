@@ -154,13 +154,37 @@ CC is stored in each member's economy record (`guild:<id>:economy:<user>`):
 The old `wallet` / `bank` values are left untouched and are no longer used, so everyone starts
 from 0 CC. Every change goes through `src/services/cc/ccService.js`, which locks per member.
 
-## The store (next step)
+## The store
 
-- Catalog: `src/config/store/ccStoreItems.js` (item format documented at the top).
+The store is **in trial mode** for now: it shows sample items (`ccStoreDemoItems`), and buying
+one checks the balance and shows a receipt but takes no CC and gives nothing.
+
+**The store room.** On startup the bot creates a text channel `🛒・المتجر` in category
+`1547310323994853438` (or reuses it; its ID is saved as `storeChannelId` in the guild config, so it
+can be renamed). The room copies the category's permissions, lets members type, blocks
+attachments, links, reactions and threads, and has a 3 second slowmode.
+
+- Only store commands can be written there; anything else is deleted with a notice that goes
+  away after 4 seconds. Other slash commands get a private "store only" reply. The server
+  owners and this bot are left alone.
+- The store panel is pinned: the items, the commands, and a menu to pick an item plus
+  buttons (💰 رصيدي, 🎒 مخزني, 🏆 توب CC, ❓ المساعدة) that answer privately.
+- Every **5** member messages under the panel, the old panel is deleted and it is sent and
+  pinned again, so it is always near the bottom. Discord's "pinned a message" notice is deleted.
+
+| Chat word | Slash | What it does |
+|---|---|---|
+| `متجر` / `shop` | `/store list` | The items and their prices |
+| `شراء 1` / `شراء 1 3` / `buy` | `/store buy item [quantity]` | Buy item 1 (or 3 of it); a ✅ button confirms, only for the buyer |
+| `مخزني` / `inventory` | `/store inventory` | What the member bought |
+| `رصيد`, `توب cc` | `/cc`, `/cctop` | Also allowed in the store room |
+
+- Catalog and settings: `src/config/store/ccStoreItems.js` (item format documented at the top;
+  `repostEvery`, slowmode, category and channel name at the bottom).
 - Buying: `buyItem()` in `src/services/cc/ccStoreService.js` checks the price, takes the CC,
   gives roles (refunding if Discord refuses) and fills `ccInventory` for stackable items.
-- Still to do: a store command that lists `listStoreItems()` and calls `buyItem()`, then set
-  `ccStoreSettings.open = true`.
+- The room: `src/services/cc/storeChannel.js`; the panel and embeds: `src/services/cc/storeUi.js`.
+- To open it for real: put the real items in `ccStoreItems` and set `ccStoreSettings.open = true`.
 
 ## Clover wins
 

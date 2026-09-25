@@ -18,6 +18,7 @@ import { isCommandEnabled } from '../services/commandAccessService.js';
 import { resolveSlashAccessKey } from '../utils/messageAdapter.js';
 import { isCollectorManagedComponent } from '../utils/collectorComponents.js';
 import { isBlockedSlashCommand, GAMES_ONLY_NOTICE } from '../services/games/gamesChannel.js';
+import { isBlockedStoreSlashCommand, STORE_ONLY_NOTICE } from '../services/cc/storeChannel.js';
 import { ResponseCoordinator } from '../utils/responseCoordinator.js';
 import { enforceDefaultCommandPermissions } from '../utils/permissionGuard.js';
 
@@ -126,6 +127,15 @@ export default {
                 `Command ${interaction.commandName} used in the games channel`,
                 ErrorTypes.VALIDATION,
                 GAMES_ONLY_NOTICE,
+                withTraceContext({ commandName: interaction.commandName, expected: true }, interactionTraceContext)
+              );
+            }
+
+            if (isBlockedStoreSlashCommand(interaction.channelId, interaction.commandName, interaction.user.id)) {
+              throw createError(
+                `Command ${interaction.commandName} used in the store room`,
+                ErrorTypes.VALIDATION,
+                STORE_ONLY_NOTICE,
                 withTraceContext({ commandName: interaction.commandName, expected: true }, interactionTraceContext)
               );
             }
