@@ -78,12 +78,12 @@ export function buildTopChatEmbed(guild, entries, { callerId, callerEntry } = {}
     });
     const you = callerEntry
         ? `\n\n👤 **ترتيبك:** #${callerEntry.rank} — ${number(callerEntry.messages)} رسالة`
-        : callerId ? '\n\n👤 لسه مش في الترتيب، اتكلم في الشات.' : '';
+        : callerId && entries.length ? '\n\n👤 رسايلك لسه ما اتحسبتش، اتكلم شوية وهتظهر هنا.' : '';
     return {
         color: COLORS.chat,
         title: `💬 توب الشات — ${guild.name}`,
         thumbnail: guild.iconURL?.() ? { url: guild.iconURL({ size: 256 }) } : undefined,
-        description: (lines.join('\n') || 'لسه محدش اتكلم.') + you,
+        description: (lines.join('\n') || '📭 عداد الرسايل لسه بادئ، الرسايل بتتحسب من وقت ما اتضاف.\nاتكلموا في الشات والترتيب هيظهر هنا.') + you,
         footer: { text: 'الترتيب حسب عدد الرسايل • top level لتوب اللفلات' },
     };
 }
@@ -96,12 +96,12 @@ export function buildTopEmbed(guild, entries, { callerId, callerEntry } = {}) {
     });
     const you = callerEntry
         ? `\n\n👤 **ترتيبك:** #${callerEntry.rank} — لفل ${callerEntry.level} • ${number(callerEntry.totalXp)} XP`
-        : callerId ? '\n\n👤 لسه مش في الترتيب، اتكلم في الشات عشان تجمع XP.' : '';
+        : callerId && entries.length ? '\n\n👤 لسه ما جمعتش XP، اتكلم في الشات وهتظهر هنا.' : '';
     return {
         color: COLORS.top,
         title: `🏆 توب اللفلات — ${guild.name}`,
         thumbnail: guild.iconURL?.() ? { url: guild.iconURL({ size: 256 }) } : undefined,
-        description: (lines.join('\n') || 'لسه محدش جمع XP. اتكلموا في الشات!') + you,
+        description: (lines.join('\n') || '📭 لسه محدش جمع XP.\nكل رسالة في الشات بتدي XP، والترتيب هيظهر هنا.') + you,
         footer: { text: 'الترتيب حسب إجمالي XP • top chat لتوب الشات' },
     };
 }
