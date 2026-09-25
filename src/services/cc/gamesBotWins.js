@@ -1,7 +1,8 @@
 // gamesBotWins.js — pays CC for wins in the games bot (Clover).
 //
-// When a Clover game ends it posts the winner as `👑 | @winner` (with a winner card image). This
-// reads those messages and pays the winner CC.gamesBot.win, capped per day (config/cc.js). Only
+// When a Clover group game ends it posts the winner as `👑 | @winner` (with a winner card image), and
+// a solo answer game posts `✅ | قام @member بكتابة الاجابة الصحيحة خلال 4.12 ثانية`. This reads those
+// messages and pays the winner CC.gamesBot.win or CC.gamesBot.answer, capped per day (config/cc.js). Only
 // messages from the games bot IDs count (config/games.js), so members can't fake a win by typing
 // the same text, and each message pays once.
 
@@ -12,13 +13,24 @@ import { logger } from '../../utils/logger.js';
 
 // `👑 | <@id>`: the crown, an optional bar, one mention and nothing else.
 const WIN_MESSAGE = /^\s*👑️?\s*\|?\s*<@!?(\d{17,20})>\s*$/u;
+// `✅ | قام <@id> بكتابة الاجابة الصحيحة خلال **__4.12__** ثانية`: the first member to type the answer.
+const ANSWER_MESSAGE = /^\s*✅️?\s*\|?\s*قام\s+<@!?(\d{17,20})>\s+بكتابة\s+ال[اإأ]جابة\s+الصحيحة/u;
 const NOTICE_DELETE_MS = 15_000;
 const PAID_MEMORY = 500;
 const paidMessages = new Set();
 
+/** `{ userId, kind }` when `content` is a games bot win message ('group' or 'answer'), otherwise null. */
+export function parseWin(content) {
+    const text = String(content || '');
+    const group = WIN_MESSAGE.exec(text)?.[1];
+    if (group) return { userId: group, kind: 'group' };
+    const answer = ANSWER_MESSAGE.exec(text)?.[1];
+    return answer ? { userId: answer, kind: 'answer' } : null;
+}
+
 /** The winner's user ID when `content` is a games bot win message, otherwise null. */
 export function parseWinner(content) {
-    return WIN_MESSAGE.exec(String(content || ''))?.[1] || null;
+    return parseWin(content)?.userId || null;
 }
 
 function rememberPaid(messageId) {
@@ -32,8 +44,9 @@ function rememberPaid(messageId) {
  */
 export async function handleGamesBotWin(message, client) {
     if (!message.guild || !message.author?.bot || !gamesBotIds().has(message.author.id)) return false;
-    const winnerId = parseWinner(message.content);
-    if (!winnerId) return false;
+    const win = parseWin(message.content);
+    if (!win) return false;
+    const winnerId = win.userId;
     if (paidMessages.has(message.id)) return true;
     rememberPaid(message.id);
 
@@ -41,8 +54,8 @@ export async function handleGamesBotWin(message, client) {
     if (winner?.bot) return true;
 
     try {
-        const { amount, balance, boost } = await awardGamesBotWin(client, message.guild.id, winnerId);
-        logger.info('[CC] Games bot win paid', { guildId: message.guild.id, userId: winnerId, amount, boost, messageId: message.id });
+        const { amount, balance, boost } = await awardGamesBotWin(client, message.guild.id, winnerId, { kind: win.kind });
+        logger.info('[CC] Games bot win paid', { guildId: message.guild.id, userId: winnerId, kind: win.kind, amount, boost, messageId: message.id });
         // While a CC event runs the notice says so and when it ends (`🔥 CC ×5 — بيخلص بعد 4 أيام`).
         const event = ccBoostLine();
         const text = (amount > 0

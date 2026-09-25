@@ -41,7 +41,7 @@ async function buildDashboardEmbed(guild, client) {
             { name: `${CC.emoji} Total in circulation`, value: `\`${total.toLocaleString('en-US')} ${CC.short}\``, inline: true },
             { name: '👥 Members with CC', value: `\`${holders.toLocaleString('en-US')}\``, inline: true },
             { name: '📊 Average', value: `\`${(holders ? Math.floor(total / holders) : 0).toLocaleString('en-US')} ${CC.short}\``, inline: true },
-            { name: '🍀 Clover win / daily cap', value: `\`${CC.gamesBot.win} / ${CC.gamesBot.dailyCap} ${CC.short}\``, inline: true },
+            { name: '🍀 Clover group win / answer win / daily cap', value: `\`${CC.gamesBot.win} / ${CC.gamesBot.answer} / ${CC.gamesBot.dailyCap} ${CC.short}\``, inline: true },
             { name: '🙋 Solo win / daily cap', value: `\`${CC.solo.win} / ${CC.solo.dailyCap} ${CC.short}\``, inline: true },
         );
 }
