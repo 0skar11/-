@@ -1,6 +1,6 @@
 import { SlashCommandBuilder } from 'discord.js';
 import { getLeaderboard } from '../../services/cc/ccService.js';
-import { CC, ccEmbed } from '../../config/cc.js';
+import { CC, ccEmbed, ccBoostLine } from '../../config/cc.js';
 import { MEDALS } from '../../services/games/text.js';
 import { InteractionHelper } from '../../utils/interactionHelper.js';
 
@@ -24,6 +24,7 @@ export async function ccTopEmbed(client, guild, userId = null) {
         lines.join('\n') || 'لسه محدش معاه CC. العبوا واكسبوا!',
         '',
         summary.join(' • '),
+        ...(ccBoostLine() ? ['', ccBoostLine()] : []),
     ].join('\n'));
 }
 

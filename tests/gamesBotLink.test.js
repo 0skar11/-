@@ -6,6 +6,10 @@ import { GAMES_CHANNEL_ID, handleGamesChannelMessage, isGamesOnlyFor, isBlockedS
 import gamesPanelButton from '../src/interactions/buttons/games/gamesPanel.js';
 import { createCCApiRouter, isAuthorized } from '../src/services/cc/ccApi.js';
 import { getProfile } from '../src/services/cc/ccService.js';
+import { CC } from '../src/config/cc.js';
+
+// These tests check the normal reward rules; a running CC event (CC.boost) is tested on its own.
+CC.boost = { multiplier: 1, until: null };
 
 const GUILD = '100000000000000001';
 const A = '200000000000000001';
@@ -156,7 +160,6 @@ describe('CC API for the games bot', () => {
 describe('games bot (Clover) wins', async () => {
     const { handleGamesBotWin, parseWinner } = await import('../src/services/cc/gamesBotWins.js');
     const { CLOVER_BOT_ID } = await import('../src/config/games.js');
-    const { CC } = await import('../src/config/cc.js');
     let nextId = 1;
 
     function winMessage(content, { authorId = CLOVER_BOT_ID, bot = true, winnerBot = false, id = String(nextId++) } = {}) {

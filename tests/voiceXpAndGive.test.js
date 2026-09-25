@@ -139,3 +139,41 @@ describe('give (CC transfer)', () => {
         assert.equal(applyWordAliases('حول', ['البيت'], false), null);
     });
 });
+
+describe('CC event (boost)', () => {
+    test('multiplies game rewards and caps until it ends, then goes back to normal by itself', async () => {
+        const { CC, ccBoost, ccBoostLine } = await import('../src/config/cc.js');
+        const { groupRewards, soloRewardLeft, awardGamesBotWin } = await import('../src/services/cc/ccService.js');
+        const saved = CC.boost;
+        CC.boost = { multiplier: 5, until: '2026-09-30T08:15:00Z' };
+        try {
+            const during = Date.parse('2026-09-27T12:00:00Z');
+            const after = Date.parse('2026-09-30T08:15:00Z');
+            assert.equal(ccBoost(during), 5);
+            assert.equal(ccBoost(after), 1);
+            assert.match(ccBoostLine(during), /CC ×5.*<t:\d+:R>/u);
+            assert.equal(ccBoostLine(after), '');
+
+            assert.deepEqual(groupRewards(10, { now: during }), [250, 150, 100]);
+            assert.deepEqual(groupRewards(10, { now: after }), [50, 30, 20]);
+            assert.equal(soloRewardLeft(0, { now: during }), CC.solo.win * 5);
+            assert.equal(soloRewardLeft(CC.solo.dailyCap, { now: during }), CC.solo.win * 5);
+            assert.equal(soloRewardLeft(CC.solo.dailyCap * 5, { now: during }), 0);
+
+            const client = fakeClient();
+            const win = await awardGamesBotWin(client, GUILD, A, { now: during });
+            assert.deepEqual([win.amount, win.boost], [CC.gamesBot.win * 5, 5]);
+            const normal = await awardGamesBotWin(client, GUILD, B, { now: after });
+            assert.deepEqual([normal.amount, normal.boost], [CC.gamesBot.win, 1]);
+        } finally {
+            CC.boost = saved;
+        }
+    });
+
+    test('transfers are never multiplied', async () => {
+        const client = fakeClient();
+        await grantCC(client, GUILD, A, 100);
+        const result = await transferCC(client, GUILD, A, B, 100);
+        assert.equal(result.received, 95);
+    });
+});

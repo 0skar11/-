@@ -114,6 +114,16 @@ guild config (`boardMessageIds.cctop`), so a restart keeps editing the same post
 channel it is, and deleting it makes the bot post a new one on the next refresh. `top cc` replies
 look the same but have no footer, so they are never mistaken for the board.
 
+## CC events (`CC.boost`)
+
+`CC.boost` in `src/config/cc.js` multiplies every CC earned from games (group games, solo wins,
+Clover wins and the games bot's API rewards) and their daily caps until the `until` time, then stops
+by itself. While it runs, `رصيد` and `top cc` show `🔥 CC ×5` with when it ends, and Clover win
+notices show the multiplier. Transfers and staff changes are never multiplied. To end it early, set
+`multiplier: 1`.
+
+Current event: ×5 until 2026-09-30 08:15 UTC.
+
 ## Sending CC (`give`)
 
 `تحويل @member 100` (also `حول`, `transfer`, `cc give`, `/give`) sends CC to another member. The

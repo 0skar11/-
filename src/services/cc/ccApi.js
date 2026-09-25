@@ -21,6 +21,7 @@ import crypto from 'node:crypto';
 import express from 'express';
 import { logger } from '../../utils/logger.js';
 import { awardGroupGame, awardSoloWin, getLeaderboard, getProfile, grantCC, spendCC } from './ccService.js';
+import { ccBoost } from '../../config/cc.js';
 
 export const CC_API_MAX_AMOUNT = 10_000;
 const MIN_TOKEN_LENGTH = 16;
@@ -168,7 +169,8 @@ export function createCCApiRouter(client, { token = () => process.env.CC_API_TOK
     }));
 
     router.post('/:guildId/add', handle(async (guildId, body) => {
-        const result = await grantCC(client, guildId, userId(body.userId), amount(body.amount), { source: 'games-bot', reason: reason(body.reason) });
+        // Custom rewards follow the CC event multiplier like every other game reward.
+        const result = await grantCC(client, guildId, userId(body.userId), amount(body.amount) * ccBoost(), { source: 'games-bot', reason: reason(body.reason) });
         return { ok: true, amount: result.amount, balance: result.balance };
     }));
 

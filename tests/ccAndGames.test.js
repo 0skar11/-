@@ -18,6 +18,9 @@ import { commandArgAliases, standaloneOnlyAliases, isStandaloneInvocation, twoWo
 import gameCommand from '../src/commands/Games/game.js';
 import soloCommand from '../src/commands/Games/solo.js';
 
+// These tests check the normal reward rules; a running CC event (CC.boost) is tested on its own.
+CC.boost = { multiplier: 1, until: null };
+
 const GUILD = '100000000000000001';
 const A = '200000000000000001';
 const B = '200000000000000002';

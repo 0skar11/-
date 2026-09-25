@@ -9,7 +9,7 @@
 //   ccGamesBot  { day: 'YYYY-MM-DD', earned } — CC from games bot wins today, for its daily cap
 //   ccTransfers [timestamp] — when the member sent CC with `give` in the last 7 days, for the transfer tax
 
-import { CC } from '../../config/cc.js';
+import { CC, ccBoost } from '../../config/cc.js';
 import { getEconomyKey, getEconomyPrefix } from '../../utils/database.js';
 import { normalizeEconomyData } from '../../utils/schemas.js';
 import { DEFAULT_ECONOMY_DATA } from '../../utils/constants.js';
@@ -19,19 +19,21 @@ import { logger } from '../../utils/logger.js';
 const EMPTY_STATS = { earned: 0, spent: 0, gamesPlayed: 0, podiums: 0, groupWins: 0, soloWins: 0, sent: 0, received: 0 };
 const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
 
-/** CC for 1st, 2nd and 3rd place in a group game with `playerCount` players. */
-export function groupRewards(playerCount) {
+/** CC for 1st, 2nd and 3rd place in a group game with `playerCount` players (with the CC event multiplier). */
+export function groupRewards(playerCount, { now = Date.now() } = {}) {
     const players = Math.floor(Number(playerCount) || 0);
     if (players < 2) return [];
     const pool = Math.min(players, CC.group.maxCountedPlayers) * CC.group.perPlayer;
     // Fewer places than players, so a 2 player game can't pay both of them.
     const places = Math.min(CC.group.split.length, players - 1);
-    return CC.group.split.slice(0, places).map((share) => Math.max(1, Math.round(pool * share)));
+    const boost = ccBoost(now);
+    return CC.group.split.slice(0, places).map((share) => Math.max(1, Math.round(pool * share)) * boost);
 }
 
-/** How much of a solo win is still allowed today, given what was already earned. */
-export function soloRewardLeft(alreadyEarnedToday) {
-    return Math.max(0, Math.min(CC.solo.win, CC.solo.dailyCap - (alreadyEarnedToday || 0)));
+/** How much of a solo win is still allowed today, given what was already earned (win and cap follow the CC event). */
+export function soloRewardLeft(alreadyEarnedToday, { now = Date.now() } = {}) {
+    const boost = ccBoost(now);
+    return Math.max(0, Math.min(CC.solo.win * boost, CC.solo.dailyCap * boost - (alreadyEarnedToday || 0)));
 }
 
 export function utcDay(now = Date.now()) {
@@ -88,8 +90,8 @@ export async function getProfile(client, guildId, userId) {
  * Pays a finished group game. `ranking` is the finishing order (user IDs, 1st first); only the top
  * places get CC. Every player in `playerIds` gets a game counted in their stats.
  */
-export async function awardGroupGame(client, guildId, { game, ranking, playerIds }) {
-    const rewards = groupRewards(playerIds.length);
+export async function awardGroupGame(client, guildId, { game, ranking, playerIds, now = Date.now() }) {
+    const rewards = groupRewards(playerIds.length, { now });
     const winners = ranking.slice(0, rewards.length).map((userId, index) => ({ userId, place: index + 1, amount: rewards[index] }));
     const winnerIds = new Set(winners.map((w) => w.userId));
 
@@ -121,11 +123,11 @@ export async function awardSoloWin(client, guildId, userId, game, { now = Date.n
         return await updateRecord(client, guildId, userId, (state, record) => {
             const today = utcDay(now);
             const solo = record.ccSolo?.day === today ? record.ccSolo : { day: today, earned: 0 };
-            const amount = soloRewardLeft(solo.earned);
+            const amount = soloRewardLeft(solo.earned, { now });
             state.stats.soloWins += 1;
             if (amount > 0) credit(state, amount);
             record.ccSolo = { day: today, earned: solo.earned + amount };
-            return { amount, capped: amount < CC.solo.win, game };
+            return { amount, capped: amount < CC.solo.win * ccBoost(now), game };
         });
     } catch (error) {
         logger.error(`[CC] Failed to pay solo ${game} win for ${userId}`, error);
@@ -141,13 +143,14 @@ export async function awardGamesBotWin(client, guildId, userId, { now = Date.now
     return updateRecord(client, guildId, userId, (state, record) => {
         const today = utcDay(now);
         const earned = record.ccGamesBot?.day === today ? record.ccGamesBot.earned : 0;
-        const amount = Math.max(0, Math.min(CC.gamesBot.win, CC.gamesBot.dailyCap - earned));
+        const boost = ccBoost(now);
+        const amount = Math.max(0, Math.min(CC.gamesBot.win * boost, CC.gamesBot.dailyCap * boost - earned));
         if (amount > 0) credit(state, amount);
         state.stats.gamesPlayed += 1;
         state.stats.podiums += 1;
         state.stats.groupWins += 1;
         record.ccGamesBot = { day: today, earned: earned + amount };
-        return { amount, capped: amount < CC.gamesBot.win };
+        return { amount, capped: amount < CC.gamesBot.win * boost, boost };
     });
 }
 

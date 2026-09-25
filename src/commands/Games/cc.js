@@ -1,6 +1,6 @@
 import { SlashCommandBuilder } from 'discord.js';
 import { getProfile, getLeaderboard } from '../../services/cc/ccService.js';
-import { CC, formatCC, ccEmbed } from '../../config/cc.js';
+import { CC, formatCC, ccEmbed, ccBoostLine } from '../../config/cc.js';
 import { InteractionHelper } from '../../utils/interactionHelper.js';
 
 /** A member's CC balance, rank and game stats (`cc` / `رصيد` and the games panel). */
@@ -11,7 +11,8 @@ export async function ccProfileEmbed(client, guildId, target) {
     ]);
     const rank = board.findIndex((row) => row.userId === target.id) + 1;
 
-    return ccEmbed(`${CC.emoji} ${CC.name}`, `${target}\n\n💰 الرصيد: ${formatCC(cc)}\n🏆 الترتيب: ${rank ? `#${rank} من ${board.length}` : '—'}`, {
+    const boost = ccBoostLine();
+    return ccEmbed(`${CC.emoji} ${CC.name}`, `${target}\n\n💰 الرصيد: ${formatCC(cc)}\n🏆 الترتيب: ${rank ? `#${rank} من ${board.length}` : '—'}${boost ? `\n\n${boost}` : ''}`, {
         thumbnail: target.displayAvatarURL?.() || null,
         fields: [
             { name: '📈 اتجمع', value: `${stats.earned.toLocaleString('en-US')}`, inline: true },
