@@ -9,23 +9,47 @@ const permissionsOf = (name) => new PermissionsBitField(ROLE_DEFINITIONS.find((d
 const VOICE = [PermissionFlagsBits.MoveMembers, PermissionFlagsBits.MuteMembers, PermissionFlagsBits.DeafenMembers, PermissionFlagsBits.ModerateMembers];
 
 describe('staff role permissions', () => {
-  test('Head Admin is Administrator', () => {
-    assert.ok(permissionsOf('⚡ Head Admin').has(PermissionFlagsBits.Administrator, false));
+  test('hierarchy order, highest first', () => {
+    assert.deepEqual(ROLE_DEFINITIONS.map((definition) => definition.name), [
+      '👑 Owner', '⚡ Head Admin', '🛡️ Admin', '🎖️ Supervisor', '⚔️ Senior Moderator',
+      '🔨 Moderator', '💬 Chat Moderator', '🎧 Voice Moderator', '🔰 Trial Moderator', '🎫 Support Staff',
+    ]);
   });
 
-  test('Admin has every permission except Administrator', () => {
-    const admin = permissionsOf('🛡️ Admin');
-    assert.equal(admin.has(PermissionFlagsBits.Administrator, false), false);
-    assert.equal(admin.bitfield | PermissionFlagsBits.Administrator, PermissionsBitField.All);
-  });
-
-  for (const name of ['🔨 Moderator', '🔰 Trial Moderator']) {
-    test(`${name} can disconnect, mute, deafen and timeout but not ban or kick`, () => {
-      const permissions = permissionsOf(name);
-      assert.ok(permissions.has(VOICE, false));
-      assert.equal(permissions.any([PermissionFlagsBits.BanMembers, PermissionFlagsBits.KickMembers, PermissionFlagsBits.Administrator], false), false);
+  for (const name of ['👑 Owner', '⚡ Head Admin', '🛡️ Admin', '🎖️ Supervisor', '⚔️ Senior Moderator']) {
+    test(`${name} is Administrator`, () => {
+      assert.ok(permissionsOf(name).has(PermissionFlagsBits.Administrator, false));
     });
   }
+
+  test('Moderator has every permission except Administrator', () => {
+    const moderator = permissionsOf('🔨 Moderator');
+    assert.equal(moderator.has(PermissionFlagsBits.Administrator, false), false);
+    assert.equal(moderator.bitfield | PermissionFlagsBits.Administrator, PermissionsBitField.All);
+  });
+
+  test('Chat Moderator can timeout, warn and write notes but not kick or ban', () => {
+    const permissions = permissionsOf('💬 Chat Moderator');
+    assert.ok(permissions.has([PermissionFlagsBits.ModerateMembers, PermissionFlagsBits.ManageMessages], false));
+    assert.equal(permissions.any([PermissionFlagsBits.BanMembers, PermissionFlagsBits.KickMembers, PermissionFlagsBits.Administrator], false), false);
+  });
+
+  test('Voice Moderator has every voice permission and no chat or member moderation', () => {
+    const permissions = permissionsOf('🎧 Voice Moderator');
+    assert.ok(permissions.has([...VOICE.filter((flag) => flag !== PermissionFlagsBits.ModerateMembers), PermissionFlagsBits.Connect, PermissionFlagsBits.Speak, PermissionFlagsBits.Stream], false));
+    assert.equal(permissions.any([PermissionFlagsBits.ModerateMembers, PermissionFlagsBits.ManageMessages, PermissionFlagsBits.BanMembers, PermissionFlagsBits.KickMembers, PermissionFlagsBits.Administrator], false), false);
+  });
+
+  test('Trial Moderator can warn, kick, timeout and write notes but not ban', () => {
+    const permissions = permissionsOf('🔰 Trial Moderator');
+    assert.ok(permissions.has([PermissionFlagsBits.ModerateMembers, PermissionFlagsBits.KickMembers, PermissionFlagsBits.ManageMessages], false));
+    assert.equal(permissions.any([PermissionFlagsBits.BanMembers, PermissionFlagsBits.Administrator], false), false);
+  });
+
+  test('Support Staff has no moderation permission', () => {
+    const permissions = permissionsOf('🎫 Support Staff');
+    assert.equal(permissions.any([...VOICE, PermissionFlagsBits.ManageMessages, PermissionFlagsBits.BanMembers, PermissionFlagsBits.KickMembers, PermissionFlagsBits.Administrator], false), false);
+  });
 
   test('sync grants only what a non-admin bot holds and keeps going after a failed role', async () => {
     const botPermissions = new PermissionsBitField([PermissionFlagsBits.ManageRoles, PermissionFlagsBits.ViewChannel]);
