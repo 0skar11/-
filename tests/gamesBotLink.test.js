@@ -265,12 +265,31 @@ describe('games bot (Clover) wins', async () => {
         }
     });
 
-    test('daily cap', async () => {
+    test('no daily cap outside the CC event', async () => {
         const client = { db: memoryDb() };
-        const wins = Math.ceil(CC.gamesBot.dailyCap / CC.gamesBot.win) + 2;
-        for (let i = 0; i < wins; i += 1) await handleGamesBotWin(winMessage(`👑 | <@${C}>`), client);
+        for (let i = 0; i < 150; i += 1) await handleGamesBotWin(winMessage(`👑 | <@${C}>`), client);
         const profile = await getProfile(client, GUILD, C);
-        assert.equal(profile.cc, CC.gamesBot.dailyCap);
-        assert.equal(profile.stats.groupWins, wins);
+        assert.equal(profile.cc, 150 * CC.gamesBot.win);
+        assert.equal(profile.stats.groupWins, 150);
+    });
+
+    test('during the CC event the daily cap is a flat 5000, not multiplied', async () => {
+        const saved = CC.boost;
+        CC.boost = { multiplier: 5, until: '2999-01-01T00:00:00Z' };
+        try {
+            const client = { db: memoryDb() };
+            const wins = Math.ceil(5000 / (CC.gamesBot.win * 5)) + 2;
+            let last;
+            for (let i = 0; i < wins; i += 1) {
+                last = winMessage(`👑 | <@${C}>`);
+                await handleGamesBotWin(last, client);
+            }
+            const profile = await getProfile(client, GUILD, C);
+            assert.equal(profile.cc, 5000);
+            assert.equal(profile.stats.groupWins, wins);
+            assert.match(last.replies[0].content, /\(5000 CC\)/u);
+        } finally {
+            CC.boost = saved;
+        }
     });
 });

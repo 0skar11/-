@@ -30,13 +30,14 @@ export const CC = {
     // Wins announced by the games bot (Clover), read from its messages (services/cc/gamesBotWins.js):
     // - a group game win, `👑 | @winner`, pays `win`;
     // - a solo win, `✅ | قام @member بكتابة الاجابة الصحيحة خلال ... ثانية` (first to type the answer), pays `answer`.
-    // Its messages don't say how many played, so a win pays a fixed amount (times the CC event
-    // multiplier), with a daily cap shared by both so a game with a friend over and over can't be farmed.
+    // Its messages don't say how many played, so a win pays a fixed amount (times the CC event multiplier).
     gamesBot: {
         win: 50,
         answer: 10,
-        // Most CC a member can get from games bot wins per day (UTC).
-        dailyCap: 200,
+        // Most CC a member can get from games bot wins per day (UTC), both kinds together: `boostDailyCap`
+        // while the CC event runs (a flat amount, not multiplied), `dailyCap` after it (null = no cap).
+        boostDailyCap: 5000,
+        dailyCap: null,
     },
 
     // Leveling up (chat or voice XP) pays `perLevel × the new level`: level 1 = 10 CC, level 10 = 100,
@@ -47,7 +48,7 @@ export const CC = {
     },
 
     // A limited-time event: every CC earned from games (group, solo, Clover wins and the games bot's
-    // API rewards), level-ups, and the daily caps are multiplied until `until`, then it stops by itself. Transfers
+    // API rewards), level-ups, and the daily caps (except Clover's, see gamesBot) are multiplied until `until`, then it stops by itself. Transfers
     // and staff changes are never multiplied. Set `multiplier: 1` to end it early.
     boost: {
         multiplier: 5,
@@ -71,6 +72,12 @@ export function ccBoost(now = Date.now()) {
     const { multiplier, until } = CC.boost || {};
     const end = Date.parse(until);
     return Number.isInteger(multiplier) && multiplier > 1 && Number.isFinite(end) && now < end ? multiplier : 1;
+}
+
+/** Today's cap on CC from games bot wins: `boostDailyCap` during the CC event, otherwise `dailyCap` (Infinity when null). */
+export function gamesBotDailyCap(now = Date.now()) {
+    const cap = ccBoost(now) > 1 ? CC.gamesBot.boostDailyCap : CC.gamesBot.dailyCap;
+    return Number.isFinite(cap) ? cap : Infinity;
 }
 
 /** `🔥 CC ×5 — بيخلص in 4 days (date)` while the event runs, otherwise ''. Discord shows the time in each member's timezone. */
