@@ -1,6 +1,10 @@
 """Soundtrack for a CHAOS promo video, synthesized from scratch (no samples, no copyright issues).
 
     python3 music.py v1-main.html out/v1-main.wav
+    python3 music.py v1-main.html out/v1-main-sfx.wav --sfx-only
+
+--sfx-only keeps only the whooshes and impacts (no beat), for the "-nomusic" version that gets a
+trending sound added on top in the TikTok / Instagram app.
 
 120 BPM dark trap/EDM loop in A minor, with a whoosh before every cut and an impact on the times
 listed in the page's <body data-hits="3.5,19.5">. The length and the cuts come from the HTML
@@ -105,7 +109,7 @@ PROG = ['A1', 'F1', 'C2', 'G1']
 ARP = {'A1': [0, 3, 7, 12], 'F1': [0, 4, 7, 12], 'C2': [0, 4, 7, 12], 'G1': [0, 4, 7, 10]}
 
 
-def build(duration, cuts, hits):
+def build(duration, cuts, hits, sfx_only=False):
     total = duration + 1.5
     drums = np.zeros(int(SR * total))
     music = np.zeros_like(drums)
@@ -142,6 +146,10 @@ def build(duration, cuts, hits):
             add(fx, whoosh(0.5), cut - 0.5, 0.8)
     for h in hits:
         add(fx, impact(), h, 1.0)
+    if sfx_only:
+        fade = int(SR * 1.2)
+        fx[-fade:] *= np.linspace(1, 0, fade)
+        return fx / (np.max(np.abs(fx)) / 0.8)
     # Sidechain-style ducking of the music on every kick for pump.
     duck = np.ones_like(music)
     for b in range(beats):
@@ -167,7 +175,7 @@ def main():
     cuts = [float(x) for x in re.findall(r'class="scene"[^>]*data-start="([\d.]+)"', src)]
     m = re.search(r'data-hits="([\d.,]+)"', src)
     hits = [float(x) for x in m.group(1).split(',')] if m else []
-    mix = build(duration, cuts, hits)
+    mix = build(duration, cuts, hits, sfx_only='--sfx-only' in sys.argv)
     stereo = np.stack([mix, mix], axis=1)
     pcm = (stereo * 32767).astype('<i2')
     with wave.open(out, 'wb') as w:

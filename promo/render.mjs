@@ -4,6 +4,10 @@
 //   node render.mjs v2-bourse           one video
 //   node render.mjs --invite discord.gg/xxxx   put the invite link on the last scene
 //   node render.mjs --preview           quick 12 fps check, no music
+//   node render.mjs --remux             redo only the audio of already rendered videos
+//
+// Each video comes out twice: NAME.mp4 with the soundtrack, and NAME-nomusic.mp4 with only the
+// whooshes/impacts, to add a trending sound on top in the TikTok / Instagram app.
 //
 // Needs Playwright (Chromium), and ffmpeg (on PATH, or FFMPEG=/path/to/ffmpeg, or
 // `pip install imageio-ffmpeg`). The music is made by music.py (numpy + scipy).
@@ -18,6 +22,7 @@ const args = process.argv.slice(2);
 const flag = name => { const i = args.indexOf(name); if (i < 0) return null; const v = args[i + 1]; args.splice(i, 2); return v; };
 const invite = flag('--invite');
 const preview = args.includes('--preview');
+const remux = args.includes('--remux');
 const names = args.filter(a => !a.startsWith('--'));
 const FPS = preview ? 12 : 30;
 
@@ -31,13 +36,30 @@ const pages = (names.length ? names : readdirSync(here).filter(f => /^v\d.*\.htm
 const out = join(here, 'out');
 mkdirSync(out, { recursive: true });
 const ffmpeg = ffmpegPath();
-const browser = await chromium.launch();
 
+// Soundtrack (-14 LUFS) and SFX-only (-20 LUFS, so the in-app song stays on top) versions.
+function mux(name) {
+  const html = join(here, name + '.html');
+  const video = join(out, name + '.video.mp4');
+  for (const [suffix, extra, lufs] of [['', [], -14], ['-nomusic', ['--sfx-only'], -20]]) {
+    const wav = join(out, name + suffix + '.wav');
+    execFileSync('python3', [join(here, 'music.py'), html, wav, ...extra], { stdio: 'inherit' });
+    execFileSync(ffmpeg, ['-y', '-loglevel', 'error', '-i', video, '-i', wav, '-map', '0:v', '-map', '1:a', '-c:v', 'copy',
+      '-af', `loudnorm=I=${lufs}:TP=-1.5:LRA=11`, '-ar', '44100', '-c:a', 'aac', '-b:a', '192k', '-shortest',
+      '-movflags', '+faststart', join(out, name + suffix + '.mp4')]);
+  }
+  console.log(`${name}: ${name}.mp4 + ${name}-nomusic.mp4`);
+}
+
+if (remux) {
+  pages.forEach(mux);
+  process.exit(0);
+}
+
+const browser = await chromium.launch();
 for (const name of pages) {
   const html = join(here, name + '.html');
-  const wav = join(out, name + '.wav');
-  const mp4 = join(out, name + (preview ? '.preview' : '') + '.mp4');
-  if (!preview) execFileSync('python3', [join(here, 'music.py'), html, wav], { stdio: 'inherit' });
+  const target = join(out, name + (preview ? '.preview.mp4' : '.video.mp4'));
 
   const page = await browser.newPage({ viewport: { width: 1080, height: 1920 }, deviceScaleFactor: 1 });
   const url = pathToFileURL(html).href + '?render=1' + (invite ? '&invite=' + encodeURIComponent(invite) : '');
@@ -48,10 +70,8 @@ for (const name of pages) {
   const ff = spawn(ffmpeg, [
     '-y', '-loglevel', 'error',
     '-f', 'image2pipe', '-framerate', String(FPS), '-c:v', 'mjpeg', '-i', '-',
-    ...(preview ? [] : ['-i', wav]),
     '-c:v', 'libx264', '-pix_fmt', 'yuv420p', '-preset', preview ? 'veryfast' : 'slow', '-crf', preview ? '28' : '18',
-    ...(preview ? [] : ['-af', 'loudnorm=I=-14:TP=-1.5:LRA=11', '-ar', '44100', '-c:a', 'aac', '-b:a', '192k', '-shortest']),
-    '-movflags', '+faststart', mp4,
+    '-movflags', '+faststart', target,
   ], { stdio: ['pipe', 'inherit', 'inherit'] });
   const done = new Promise((res, rej) => ff.on('close', c => (c ? rej(new Error('ffmpeg exited ' + c)) : res())));
 
@@ -65,11 +85,12 @@ for (const name of pages) {
   }
   ff.stdin.end();
   await done;
-  console.log(`\r${name}: ${frames} frames in ${((Date.now() - t0) / 1000).toFixed(0)}s -> ${mp4}`);
+  console.log(`\r${name}: ${frames} frames in ${((Date.now() - t0) / 1000).toFixed(0)}s`);
 
   // Cover image (thumbnail) at data-cover.
   await page.evaluate(t => window.CHAOS.renderAt(t), cover);
   await page.screenshot({ path: join(out, name + '-cover.png') });
   await page.close();
+  if (!preview) mux(name);
 }
 await browser.close();

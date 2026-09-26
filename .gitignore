@@ -149,3 +149,4 @@ backups/
 promo/node_modules/
 promo/out/*.wav
 promo/out/*.preview.mp4
+promo/vo/
