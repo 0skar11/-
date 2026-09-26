@@ -91,16 +91,34 @@ export function demandMove(flow = {}, demand = bourseSettings.demand) {
     return percent / 100;
 }
 
+/** Pieces of the asset bought during the hour, net of the ones sold (all members together). */
+export function netUnits(flow = {}) {
+    return Object.values(flow).reduce((total, net) => total + (Number.isSafeInteger(net) ? net : 0), 0);
+}
+
+/**
+ * The sure rise when members bought at least `guaranteedRiseUnits` pieces in the hour: `perUnitPercent`
+ * per piece, at most `maxMove`. 0 when fewer pieces were bought.
+ */
+export function guaranteedRise(flow, maxMove, demand = bourseSettings.demand) {
+    const units = netUnits(flow);
+    if (!demand.guaranteedRiseUnits || units < demand.guaranteedRiseUnits) return 0;
+    return Math.min(maxMove, (units * demand.perUnitPercent) / 100);
+}
+
 /**
  * One hour of an asset: a random move of at most `maxMovePercent` (10%) up or down from the last
  * price. Near the top of its range the move leans down, near the bottom up, so it doesn't stick to a
  * limit; demand pushes it (each net buyer up by `demand.perBuyerPercent`, each net seller down). The
- * whole move, demand included, never goes past `maxMovePercent` in one hour.
+ * whole move, demand included, never goes past `maxMovePercent` in one hour. When members bought
+ * 20+ pieces in the hour, the price rises for sure by `guaranteedRise` instead.
  */
 export function tickAsset(asset, entry, { settings = bourseSettings, rng = Math.random } = {}) {
     const { min } = asset;
     const maxMove = settings.maxMovePercent / 100;
-    const demand = demandMove(entry.flow, settings.demand);
+    // 20+ pieces bought in the hour: a sure rise that grows with the number of pieces, no random part.
+    const sureRise = guaranteedRise(entry.flow, maxMove, settings.demand);
+    const demand = sureRise || demandMove(entry.flow, settings.demand);
     const raise = demand > 0
         ? Math.min(settings.demand.maxRaisePercent, entry.raise + demand * 100)
         : Math.max(0, entry.raise - settings.demand.raiseDecayPercent);
@@ -112,7 +130,7 @@ export function tickAsset(asset, entry, { settings = bourseSettings, rng = Math.
     else if (demand <= 0 && position > 0.85) lean = -maxMove / 2;
     else if (position < 0.15) lean = maxMove / 2;
 
-    const move = clamp((rng() * 2 - 1) * maxMove + lean + demand, -maxMove, maxMove);
+    const move = sureRise || clamp((rng() * 2 - 1) * maxMove + lean + demand, -maxMove, maxMove);
     const price = keepInside(Math.round(entry.price * (1 + move)), min, ceiling, rng);
     return { price, previous: entry.price, raise: Math.round(raise * 100) / 100, flow: {} };
 }

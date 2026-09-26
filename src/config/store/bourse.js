@@ -10,7 +10,9 @@
 //
 // Demand: every member who bought an asset during the hour (more than they sold) pushes its next
 // move up by `demand.perBuyerPercent`, every net seller pushes it down, together at most
-// `demand.maxPercent` (the whole move still stays within `maxMovePercent`). Buying also lifts the asset's ceiling above `max` (by the same percent, up to
+// `demand.maxPercent` (the whole move still stays within `maxMovePercent`). When 20 or more pieces
+// were bought in the hour (net of sales), the price is sure to go up at the next update, by
+// `demand.perUnitPercent` per piece (see `guaranteedRiseUnits` below), with no random part. Buying also lifts the asset's ceiling above `max` (by the same percent, up to
 // `demand.maxRaisePercent`); an hour with no buying demand lowers it again by
 // `demand.raiseDecayPercent`, so the price comes back to its normal range by itself.
 //
@@ -41,6 +43,11 @@ export const bourseSettings = {
         maxPercent: 15,
         maxRaisePercent: 50,
         raiseDecayPercent: 5,
+        // When members bought at least this many pieces of an asset in the hour (net of sales), its
+        // price is sure to rise at the next update, by `perUnitPercent` per piece (20 pieces = +5%,
+        // 40 or more = +10%), still at most `maxMovePercent`.
+        guaranteedRiseUnits: 20,
+        perUnitPercent: 0.25,
     },
     // After the bot was off, at most this many missed hours are replayed.
     maxCatchUpHours: 168,
