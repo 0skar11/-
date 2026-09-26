@@ -4,6 +4,7 @@ import { findAsset } from '../store/bourse.js';
 export const commandAliases = {
   bal: 'cc', balance: 'cc', money: 'cc', cash: 'cc', credits: 'cc', h: 'help', info: 'help',
   رصيد: 'cc', رصيدي: 'cc', رصيدى: 'cc', فلوس: 'cc', كريدت: 'cc',
+  شرح: 'guide', الشرح: 'guide',
   تحويل: 'give', حول: 'give', حوّل: 'give', transfer: 'give',
   بان: 'ban', انبان: 'unban', تايم: 'timeout', انتايم: 'untimeout', mute: 'timeout', unmute: 'untimeout',
   وارن: 'warn', وارنات: 'warnings', كلير: 'clear', clear: 'clear',
@@ -122,6 +123,8 @@ export const commandArgAliases = {
 export const standaloneOnlyAliases = new Set([
   ...Object.keys(commandArgAliases),
   'رصيد', 'رصيدي', 'رصيدى', 'فلوس', 'كريدت',
+  // `شرح` is common in chat (`شرح الدرس`), so it only sends the guide as the whole message.
+  'شرح', 'الشرح',
   'دعواتي', 'دعواتى', 'invites',
   'انفايت', 'انفايتات', 'انفيت', 'انفايتاتي', 'invite',
   // `حول`/`تحويل` are everyday words, so they only send CC as `تحويل @member 100`.
