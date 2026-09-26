@@ -76,7 +76,7 @@ export class ModerationService {
     }
 
     // Told by DM before the ban: after it the bot shares no server with them and can't DM.
-    await sendPunishmentDm(guild, user, 'ban', reason);
+    await sendPunishmentDm(guild, user, 'ban', reason, moderator);
     await guild.members.ban(user.id, {
       reason,
       deleteMessageSeconds: Math.min(Math.max(Number(deleteDays) || 0, 0) * 86400, 7 * 86400),
@@ -94,7 +94,7 @@ export class ModerationService {
     this.assertModerationHierarchy(moderator, member, 'طرد');
     if (!member.kickable) throw new TitanBotError('Member not kickable', ErrorTypes.PERMISSION, '❌ Can\'t Kick This Member');
 
-    await sendPunishmentDm(guild, member.user, 'kick', reason);
+    await sendPunishmentDm(guild, member.user, 'kick', reason, moderator);
     await member.kick(reason);
     const caseId = await logModerationAction({ client: guild.client, guild, event: {
       action: 'Member Kicked', target: `${member.user.tag} (${member.id})`, executor: `${moderator.user?.tag || moderator.id} (${moderator.id})`, reason,
