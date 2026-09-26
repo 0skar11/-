@@ -2,20 +2,21 @@
 // price of the hour. Run by src/services/cc/bourseService.js, commands in src/commands/Games/bourse.js
 // (`اسعار`، `استثمار 3`، `بيع 3`، `ممتلكاتي`).
 //
-// Prices change at the start of every hour (5:00, 6:00, 7:00...). The owner wanted big, unpredictable
-// moves (report #130), so each hour the price is drawn at random anywhere between `min` and `max`,
-// whatever it was the hour before: 1,300 can become 820 or 1,950 the next hour. A price never lands
-// on a limit itself, so prices always look random (1,325, not 2,000).
+// Prices change at the start of every hour (5:00, 6:00, 7:00...). Each hour an asset moves up or down
+// by a random amount of at most `maxMovePercent` (10%) of its last price (the owner's rule: never
+// more than 10% in one update), and never leaves [min, max]. Near a limit the move leans back towards
+// the middle so the price doesn't stick to it, and a price never lands on a limit itself, so prices
+// always look random (1,325, not 2,000).
 //
-// Demand: every member who bought an asset during the hour (more than they sold) nudges its next
-// draw up by `demand.perBuyerPercent` of the range, every net seller nudges it down, together at most
-// `demand.maxPercent`. Buying also lifts the asset's ceiling above `max` (by the same percent, up to
+// Demand: every member who bought an asset during the hour (more than they sold) pushes its next
+// move up by `demand.perBuyerPercent`, every net seller pushes it down, together at most
+// `demand.maxPercent` (the whole move still stays within `maxMovePercent`). Buying also lifts the asset's ceiling above `max` (by the same percent, up to
 // `demand.maxRaisePercent`); an hour with no buying demand lowers it again by
 // `demand.raiseDecayPercent`, so the price comes back to its normal range by itself.
 //
 // Asset fields: id (lowercase, stays the same forever: it is the key in members' holdings), name,
 // emoji, min, max, start and volatility (the very first price is random around `start`, up to
-// `volatility` away; after that every hour is fully random between min and max).
+// `volatility` away; after that every hour moves at most `maxMovePercent`).
 
 export const bourseAssets = [
     { id: 'motorcycle', name: 'موتوسيكل', emoji: '🏍️', min: 200, max: 600, start: 400, volatility: 0.08 },
@@ -33,6 +34,8 @@ export const bourseSettings = {
     sellFeePercent: 1.5,
     // Most pieces of one asset a member can own.
     maxOwnedPerAsset: 10,
+    // Most a price can go up or down in one hourly update, demand included.
+    maxMovePercent: 10,
     demand: {
         perBuyerPercent: 1,
         maxPercent: 15,
