@@ -101,7 +101,8 @@ export const commandArgAliases = {
   العاب: 'game list', ألعاب: 'game list', games: 'game list',
   وقف: 'game stop', ايقاف: 'game stop', إيقاف: 'game stop',
   متجر: 'store list', المتجر: 'store list', shop: 'store list',
-  شراء: 'store buy', اشتري: 'store buy', buy: 'store buy',
+  // `شراء` buys in the bourse like `استثمار`; the store buys with `متجر <item>` or from its panel.
+  شراء: 'bourse invest', اشتري: 'bourse invest', buy: 'store buy',
   مخزني: 'store inventory', مخزن: 'store inventory', inventory: 'store inventory', inv: 'store inventory',
   اسعار: 'bourse prices', أسعار: 'bourse prices', الاسعار: 'bourse prices', الأسعار: 'bourse prices', prices: 'bourse prices',
   بورصة: 'bourse prices', بورصه: 'bourse prices', البورصة: 'bourse prices', البورصه: 'bourse prices',

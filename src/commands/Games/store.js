@@ -3,11 +3,12 @@ import { CC } from '../../config/cc.js';
 import { ccStoreSettings } from '../../config/store/ccStoreItems.js';
 import { getProfile } from '../../services/cc/ccService.js';
 import { storeCatalog, findStoreItem, storeMode } from '../../services/cc/ccStoreService.js';
-import { storeListEmbed, inventoryEmbed, confirmPurchasePayload, purchaseFailureText } from '../../services/cc/storeUi.js';
+import { buildStorePanel, inventoryEmbed, confirmPurchasePayload, purchaseFailureText } from '../../services/cc/storeUi.js';
 import { InteractionHelper } from '../../utils/interactionHelper.js';
 
-// The CC store: `متجر` (list), `شراء 1` / `شراء 1 3` (buy, confirmed with a button), `مخزني`
-// (inventory). The store room and its pinned panel are src/services/cc/storeChannel.js.
+// The CC store: `متجر` alone sends the store panel (items, buy menu and buttons), `متجر 1` /
+// `متجر رتبة vip` / `متجر 1 3` buys (confirmed with a button), `مخزني` shows the inventory.
+// (`شراء` is the bourse's buy.) The store room and its pinned panel are src/services/cc/storeChannel.js.
 export default {
     data: new SlashCommandBuilder()
         .setName('store')
@@ -17,7 +18,7 @@ export default {
         .addSubcommand((sub) => sub
             .setName('buy')
             .setDescription('Buy an item from the store')
-            .addStringOption((option) => option.setName('item').setDescription('Item number or id').setRequired(true))
+            .addStringOption((option) => option.setName('item').setDescription('Item number or name').setRequired(true))
             .addIntegerOption((option) => option
                 .setName('quantity')
                 .setDescription('How many (default 1)')
@@ -26,16 +27,21 @@ export default {
                 .setRequired(false)))
         .addSubcommand((sub) => sub.setName('inventory').setDescription('What you bought')),
 
-    // `store` / `shop` alone shows the list.
+    // `store` / `shop` alone shows the panel; `متجر <item> [quantity]` buys, the item being a number
+    // or a name of several words.
     normalizePrefixArgs(args) {
-        return args.length ? args : ['list'];
+        if (!args.length) return ['list'];
+        const [sub, ...rest] = args;
+        if (sub !== 'list' || !rest.length) return args;
+        const quantity = rest.length > 1 && /^\d+$/u.test(rest[rest.length - 1]) ? [rest.pop()] : [];
+        return ['buy', rest.join(' '), ...quantity];
     },
 
     async execute(interaction, config, client) {
         const reply = (payload) => InteractionHelper.safeReply(interaction, { allowedMentions: { parse: [] }, ...payload });
         const sub = interaction.options.getSubcommand();
 
-        if (sub === 'list') return reply({ embeds: [storeListEmbed()] });
+        if (sub === 'list') return reply(buildStorePanel(interaction.guild));
 
         if (sub === 'inventory') {
             const { inventory } = await getProfile(client, interaction.guildId, interaction.user.id);

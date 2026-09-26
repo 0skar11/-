@@ -19,21 +19,21 @@ const CLOSED_LINE = '🔒 **المتجر مقفول دلوقتي**، هيفتح 
 // Shown as cards side by side (inline fields, 3 per row). Each line starts with Arabic and never
 // mixes a command with its explanation, so Discord doesn't reorder the words.
 export const STORE_COMMANDS = [
-    ['🛍️ متجر', 'يعرض المنتجات وأسعارها'],
-    ['🛒 شراء 1', 'تشتري المنتج رقم 1'],
+    ['🛍️ متجر', 'يفتح المتجر بالقايمة والزراير'],
+    ['🛒 متجر 1', 'تشتري المنتج رقم 1 (أو اكتب اسمه)'],
     ['🎒 مخزني', 'الحاجات اللي اشتريتها'],
     ['💰 رصيد', 'تعرف رصيدك'],
     ['🏆 توب cc', 'ترتيب السيرفر'],
-    ['🔢 شراء 1 3', 'تشتري 3 قطع مرة واحدة'],
+    ['🔢 متجر 1 3', 'تشتري 3 قطع مرة واحدة'],
     ['📈 اسعار', 'أسعار البورصة'],
-    ['💵 استثمار عربية', 'تشتري من البورصة'],
+    ['💵 شراء عربية', 'تشتري من البورصة (أو استثمار)'],
     ['💼 ممتلكاتي', 'اللي معاك في البورصة'],
 ];
 
 // The short commands card under the panel (the full list is in ❓ المساعدة).
 const PANEL_COMMANDS = [
     ['متجر', 'المنتجات'],
-    ['شراء 1', 'تشتري منتج'],
+    ['متجر 1', 'تشتري منتج'],
     ['مخزني', 'مشترياتك'],
 ];
 
@@ -56,15 +56,6 @@ function modeLine(mode = storeMode()) {
 
 function itemLabel(item) {
     return `${item.emoji ? `${item.emoji} ` : ''}${item.name}`;
-}
-
-/** Each item as its name, then its price and description on their own lines (so nothing is reordered). */
-export function itemLines(items) {
-    return items.map((item, index) => [
-        `**${index + 1}.** ${item.emoji || '🔹'} **${item.name}**`,
-        `> السعر: ${formatCC(item.price)}`,
-        `> ${item.description || '—'}${item.maxOwned ? ` ・ أقصى عدد: ${item.maxOwned}` : ''}`,
-    ].join('\n'));
 }
 
 /** One full-width field per item: `1 ・ 💎 رتبة VIP`, then its price and description on their own lines. */
@@ -125,18 +116,6 @@ function storePanelComponents(items, mode) {
         new ButtonBuilder().setCustomId(`${STORE_BUTTON_PREFIX}:help`).setLabel('المساعدة').setEmoji('❓').setStyle(ButtonStyle.Secondary),
     ));
     return rows;
-}
-
-/** `متجر`: the items and their prices. */
-export function storeListEmbed(settings = ccStoreSettings) {
-    const mode = storeMode(settings);
-    const items = storeCatalog(settings);
-    return ccEmbed('🛍️ منتجات المتجر', [
-        ...(modeLine(mode) ? [modeLine(mode), ''] : []),
-        itemLines(items).join('\n') || 'لسه مفيش منتجات، هتتضاف قريب.',
-        '',
-        items.length ? '🛒 للشراء اكتب شراء وبعدها رقم المنتج، أو اختاره من القايمة في الرسالة المثبتة.' : '',
-    ].join('\n').trim());
 }
 
 export function storeHelpEmbed() {

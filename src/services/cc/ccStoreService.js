@@ -6,6 +6,7 @@
 import { ccStoreItems, ccStoreDemoItems, ccStoreSettings } from '../../config/store/ccStoreItems.js';
 import { getProfile, updateCCState } from './ccService.js';
 import { logger } from '../../utils/logger.js';
+import { normalizeName } from '../../config/store/bourse.js';
 
 const ITEM_TYPES = new Set(['role', 'item']);
 
@@ -48,10 +49,18 @@ export function getStoreItem(itemId, items = ccStoreItems) {
 }
 
 /** Finds an item by its id or by its number in the list (`1` is the first item). */
+/** Finds an item by its number (`1` is the first), its id or its name (`رتبة vip`, `vip`). */
 export function findStoreItem(query, items) {
     const text = String(query || '').trim().toLowerCase();
     if (/^\d{1,3}$/u.test(text)) return items[Number(text) - 1] || null;
-    return items.find((item) => item.id === text) || null;
+    const byId = items.find((item) => item.id === text);
+    if (byId || !text) return byId || null;
+    const name = normalizeName(text);
+    const exact = items.find((item) => normalizeName(item.name) === name);
+    if (exact) return exact;
+    // Part of a name only counts when it points to a single item.
+    const partial = items.filter((item) => normalizeName(item.name).includes(name));
+    return partial.length === 1 ? partial[0] : null;
 }
 
 /**

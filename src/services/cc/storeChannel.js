@@ -1,5 +1,5 @@
 // storeChannel.js — the store room: a text channel the bot creates in STORE_CATEGORY_ID.
-//   • Only store commands can be written there (`متجر`، `شراء 1`، `مخزني`، `اسعار`، `رصيد`، `توب cc`، `/store`...);
+//   • Only store commands can be written there (`متجر`، `متجر 1`، `مخزني`، `اسعار`، `شراء عربية`، `رصيد`، `توب cc`، `/store`...);
 //     anything else is deleted with a short notice that goes away after a few seconds. The server
 //     owners and this bot are left alone. Other slash commands get a private "store only" reply.
 //   • The store panel (storeUi.js) is pinned. Every `repostEvery` member messages under it, the old

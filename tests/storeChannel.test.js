@@ -39,10 +39,11 @@ describe('store room', () => {
 
     test('recognises store commands', () => {
         assert.equal(typedCommandName('متجر', '!'), 'store');
-        assert.equal(typedCommandName('شراء 1', '!'), 'store');
-        assert.equal(typedCommandName('شراء 1 3', '!'), 'store');
+        assert.equal(typedCommandName('متجر 1', '!'), 'store');
+        assert.equal(typedCommandName('متجر 1 3', '!'), 'store');
+        // `شراء` is the bourse's buy now (report #134); the bourse is allowed in the store room too.
+        assert.equal(typedCommandName('شراء عربية', '!'), 'bourse');
         assert.equal(typedCommandName('مخزني', '!'), 'store');
-        assert.equal(typedCommandName('متجر ايه ده', '!'), null);
         assert.ok(isStoreCommandMessage('رصيد', ['!']));
         assert.ok(isStoreCommandMessage('top cc', ['!']));
         assert.ok(isStoreCommandMessage('!store buy demo_vip', ['!']));
@@ -133,7 +134,7 @@ describe('store panel', () => {
         assert.ok(items.fields[0].name.includes(ccStoreDemoItems[0].name));
         assert.match(items.fields[0].value, /السعر/u);
         assert.equal(commands.footer.text, STORE_PANEL_FOOTER);
-        assert.deepEqual(commands.fields.map((field) => field.name), ['متجر', 'شراء 1', 'مخزني']);
+        assert.deepEqual(commands.fields.map((field) => field.name), ['متجر', 'متجر 1', 'مخزني']);
         assert.ok(commands.fields.every((field) => field.inline));
         const [menuRow, buttonRow] = panel.components.map((row) => row.toJSON());
         assert.equal(menuRow.components[0].custom_id, 'storepanel:buy');
@@ -206,5 +207,41 @@ describe('store room permissions', () => {
         assert.ok(!(everyone.deny & 2048n), 'members can send commands');
         assert.ok(everyone.deny & 32768n, 'no attachments');
         assert.ok(overwrites.find((overwrite) => overwrite.id === BOT_ID).allow & 8192n, 'the bot can manage messages');
+    });
+});
+
+describe('store and bourse buy words (report #134)', async () => {
+    const { default: store } = await import('../src/commands/Games/store.js');
+    const { findStoreItem } = await import('../src/services/cc/ccStoreService.js');
+    const { commandArgAliases: commandAliases } = await import('../src/config/commands/commandAliases.js');
+
+    test('`شراء` and `استثمار` both buy in the bourse', () => {
+        assert.equal(commandAliases['شراء'], 'bourse invest');
+        assert.equal(commandAliases['استثمار'], 'bourse invest');
+        assert.equal(commandAliases['متجر'], 'store list');
+    });
+
+    test('`متجر` alone opens the panel, `متجر <item> [qty]` buys', () => {
+        assert.deepEqual(store.normalizePrefixArgs(['list']), ['list']);
+        assert.deepEqual(store.normalizePrefixArgs([]), ['list']);
+        assert.deepEqual(store.normalizePrefixArgs(['list', '1']), ['buy', '1']);
+        assert.deepEqual(store.normalizePrefixArgs(['list', '1', '3']), ['buy', '1', '3']);
+        assert.deepEqual(store.normalizePrefixArgs(['list', 'رتبة', 'VIP']), ['buy', 'رتبة VIP']);
+        assert.deepEqual(store.normalizePrefixArgs(['buy', 'demo_vip']), ['buy', 'demo_vip']);
+    });
+
+    test('items are found by number, id or name', () => {
+        const items = [
+            { id: 'vip', name: 'رتبة VIP' },
+            { id: 'color', name: 'لون مميز' },
+            { id: 'color2', name: 'لون ذهبي' },
+        ];
+        assert.equal(findStoreItem('1', items).id, 'vip');
+        assert.equal(findStoreItem('color', items).id, 'color');
+        assert.equal(findStoreItem('رتبة vip', items).id, 'vip');
+        assert.equal(findStoreItem('الرتبة VIP', items).id, 'vip');
+        assert.equal(findStoreItem('ذهبي', items).id, 'color2');
+        assert.equal(findStoreItem('لون', items), null); // two items match: not a guess
+        assert.equal(findStoreItem('عربية', items), null);
     });
 });

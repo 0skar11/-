@@ -8,6 +8,7 @@ import { TitanBotError, replyUserError, ErrorTypes } from '../../utils/errorHand
 
 import { InteractionHelper } from '../../utils/interactionHelper.js';
 import { groupLeadingUsers } from '../../utils/prefixArgs.js';
+import { sendPunishmentDm } from '../../services/moderation/punishmentDm.js';
 export default {
     data: new SlashCommandBuilder()
         .setName("masskick")
@@ -109,6 +110,7 @@ export default {
                         continue;
                     }
 
+                    await sendPunishmentDm(interaction.guild, member.user, 'kick', reason);
                     await member.kick(reason);
 
                     results.successful.push({

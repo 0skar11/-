@@ -10,6 +10,7 @@ import { InteractionHelper } from '../../utils/interactionHelper.js';
 import { groupLeadingUsers } from '../../utils/prefixArgs.js';
 import { addHardBans, canLiftHardBan } from '../../services/moderation/hardBanService.js';
 import { sendModerationActionLog } from '../../services/moderation/moderationActionLogService.js';
+import { sendPunishmentDm } from '../../services/moderation/punishmentDm.js';
 export default {
     data: new SlashCommandBuilder()
         .setName("massban")
@@ -120,6 +121,8 @@ export default {
                         }
                     }
 
+                    // Only members still in the server can be told (the bot must share a server to DM).
+                    if (member) await sendPunishmentDm(interaction.guild, user, 'ban', reason);
                     await interaction.guild.members.ban(userId, {
                         reason: reason,
                         deleteMessageSeconds: deleteDays * 24 * 60 * 60
