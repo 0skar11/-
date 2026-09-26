@@ -3,14 +3,16 @@
 // (`اسعار`، `استثمار 3`، `بيع 3`، `ممتلكاتي`).
 //
 // Prices change at the start of every hour (5:00, 6:00, 7:00...). Each hour an asset moves up or down
-// by a random amount of at most `maxMovePercent` (10%) of its last price (the owner's rule: never
-// more than 10% in one update), and never leaves [min, max]. Near a limit the move leans back towards
+// by a random amount of at most `maxMovePercent` (20%) of its last price (the owner's rule: never
+// more than 20% up or down in one hour, reports #139 and #140), and never leaves [min, max]. Near a limit the move leans back towards
 // the middle so the price doesn't stick to it, and a price never lands on a limit itself, so prices
 // always look random (1,325, not 2,000).
 //
 // Demand: every member who bought an asset during the hour (more than they sold) pushes its next
 // move up by `demand.perBuyerPercent`, every net seller pushes it down, together at most
-// `demand.maxPercent` (the whole move still stays within `maxMovePercent`). Buying also lifts the asset's ceiling above `max` (by the same percent, up to
+// `demand.maxPercent` (the whole move still stays within `maxMovePercent`). When 20 or more pieces
+// were bought in the hour (net of sales), the price is sure to go up at the next update, by
+// `demand.perUnitPercent` per piece (see `guaranteedRiseUnits` below), with no random part. Buying also lifts the asset's ceiling above `max` (by the same percent, up to
 // `demand.maxRaisePercent`); an hour with no buying demand lowers it again by
 // `demand.raiseDecayPercent`, so the price comes back to its normal range by itself.
 //
@@ -35,12 +37,17 @@ export const bourseSettings = {
     // Most pieces of one asset a member can own.
     maxOwnedPerAsset: 10,
     // Most a price can go up or down in one hourly update, demand included.
-    maxMovePercent: 10,
+    maxMovePercent: 20,
     demand: {
         perBuyerPercent: 1,
         maxPercent: 15,
         maxRaisePercent: 50,
         raiseDecayPercent: 5,
+        // When members bought at least this many pieces of an asset in the hour (net of sales), its
+        // price is sure to rise at the next update, by `perUnitPercent` per piece (20 pieces = +5%,
+        // 40 = +10%, 80 or more = +20%), still at most `maxMovePercent`.
+        guaranteedRiseUnits: 20,
+        perUnitPercent: 0.25,
     },
     // After the bot was off, at most this many missed hours are replayed.
     maxCatchUpHours: 168,
