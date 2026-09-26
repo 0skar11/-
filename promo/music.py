@@ -152,8 +152,11 @@ def build(duration, cuts, hits):
     mix = drums * 0.9 + music * duck * 0.8 + fx
     fade = int(SR * 1.2)
     mix[-fade:] *= np.linspace(1, 0, fade)
-    mix = np.tanh(mix * 1.1)
-    mix /= np.max(np.abs(mix)) / 0.89
+    # Gentle saturation; render.mjs then normalizes to -14 LUFS / -1.5 dBTP, the level TikTok / Reels /
+    # Shorts normalize to, so the platforms don't squash it further.
+    mix /= np.max(np.abs(mix))
+    mix = np.tanh(mix * 1.4)
+    mix /= np.max(np.abs(mix)) / 0.8
     return mix
 
 

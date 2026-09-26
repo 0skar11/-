@@ -50,7 +50,7 @@ for (const name of pages) {
     '-f', 'image2pipe', '-framerate', String(FPS), '-c:v', 'mjpeg', '-i', '-',
     ...(preview ? [] : ['-i', wav]),
     '-c:v', 'libx264', '-pix_fmt', 'yuv420p', '-preset', preview ? 'veryfast' : 'slow', '-crf', preview ? '28' : '18',
-    ...(preview ? [] : ['-c:a', 'aac', '-b:a', '192k', '-shortest']),
+    ...(preview ? [] : ['-af', 'loudnorm=I=-14:TP=-1.5:LRA=11', '-ar', '44100', '-c:a', 'aac', '-b:a', '192k', '-shortest']),
     '-movflags', '+faststart', mp4,
   ], { stdio: ['pipe', 'inherit', 'inherit'] });
   const done = new Promise((res, rej) => ff.on('close', c => (c ? rej(new Error('ffmpeg exited ' + c)) : res())));
