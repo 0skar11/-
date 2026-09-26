@@ -69,3 +69,46 @@ before the role is made, so nobody buys a rude name or a role that looks like st
   month of play and the friends role needs the group to share it.
 - Block names that copy staff roles or other members' roles, and colours too close to staff colours.
 - One role of each kind per member.
+
+## Staff task system
+
+- A dedicated channel where the bot hands out tasks to staff: reports to solve, or something to add
+  or do. Each task has a deadline.
+- Who gets what comes from the staff roles: the bot looks at a role (e.g. Admin), lists its members
+  and picks one. Easy tasks go to the members who solve the least; hard tasks go to the role above,
+  and so on up the hierarchy.
+- At first the picks are random. Over time the bot tracks who finished their tasks on time and who
+  didn't; a task that runs past its deadline is taken back and given to someone else.
+- Never assigned: the `psycho` role and the owners (`src/config/serverOwners.js`).
+- Skips: each staff member can skip (hand back) at most 3 tasks per week. The 4th skip in the same
+  week sends the owner (`1159601661392715906`) a message with a mention saying that member went over
+  the allowed skips.
+- The owner's example of the task board, one row per task (problem, solution, who is responsible,
+  deadline). The responsible can be a team or role, and the deadline a weekday or a duration:
+
+  | المشكلة        | الحل            | المسؤول     | الموعد |
+  | -------------- | --------------- | ----------- | ------ |
+  | قلة النشاط     | Events أسبوعية  | Events Team | الجمعة |
+  | Spam           | تحسين AutoMod   | Bot Team    | 3 أيام |
+  | Staff inactive | Activity system | Admins      | أسبوع  |
+
+- The GUI: same information as that table, but simpler and easier to read. Discord doesn't draw
+  tables, so each task is its own small card (an embed field) with emojis, e.g.:
+
+  ```
+  📉 قلة النشاط
+  ✅ Events أسبوعية
+  👥 Events Team ・ ⏰ الجمعة
+
+  🚫 Spam
+  ✅ تحسين AutoMod
+  👥 Bot Team ・ ⏰ خلال 3 أيام
+  ```
+
+  The deadline shows as a Discord timestamp (`<t:…:R>`, "in 3 days") and the card colour or a dot
+  (🟢 on time, 🟡 due soon, 🔴 late) shows the state at a glance.
+
+- Possible pieces: tasks stored per guild (assignee, difficulty, deadline, status), buttons on each
+  task (done / can't do it), a per-member score (done on time, late, handed back), and a summary
+  board in the channel. Reports from the report channel (`src/services/reportChannelService.js`)
+  could become tasks automatically.
