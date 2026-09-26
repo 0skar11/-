@@ -179,3 +179,25 @@ export function bourseFailureText(result) {
 }
 
 export const PRICE_CHANGED_NOTE = '⚠️ **السعر اتغير!** ده السعر الجديد، أكد تاني لو لسه عايز.';
+
+/** `⬆️ هيطلع حوالي 4%`, `⬇️ هينزل حوالي 3%` or `➖ تقريباً ثابت`. */
+export function forecastLine(changePercent) {
+    const rounded = Math.round(Math.abs(changePercent));
+    if (changePercent > 0) return `⬆️ هيطلع${rounded ? ` حوالي ${rounded}%` : ' شوية'}`;
+    if (changePercent < 0) return `⬇️ هينزل${rounded ? ` حوالي ${rounded}%` : ' شوية'}`;
+    return '➖ تقريباً ثابت';
+}
+
+/** The store's bourse forecast (shown only to the buyer): a card per asset with its price now and where it goes. */
+export function forecastEmbed({ forecasts, nextChangeAt }) {
+    const next = Math.floor(nextChangeAt / 1000);
+    const embed = ccEmbed('🔮 تنبؤ البورصة', `الأسعار الجاية <t:${next}:R>، ودي الأصول هتروح فين:`, {
+        fields: forecasts.map(({ asset, current, changePercent }) => ({
+            name: assetLabel(asset),
+            value: `${forecastLine(changePercent)}\nدلوقتي **${number(current)}** ${CC.emoji}`,
+            inline: true,
+        })),
+    });
+    embed.footer = { text: 'الشراء والبيع لحد آخر الساعة ممكن يغيّروا النتيجة شوية ・ التنبؤ ليك إنت بس' };
+    return embed;
+}

@@ -7,7 +7,7 @@ import {
 } from '../src/services/cc/storeChannel.js';
 import { buildStorePanel, confirmPurchasePayload, STORE_PANEL_FOOTER } from '../src/services/cc/storeUi.js';
 import { buyItem, storeCatalog, storeMode, findStoreItem } from '../src/services/cc/ccStoreService.js';
-import { ccStoreDemoItems, storeRoomSettings } from '../src/config/store/ccStoreItems.js';
+import { ccStoreItems, storeRoomSettings } from '../src/config/store/ccStoreItems.js';
 import { typedCommandName } from '../src/services/games/gamesChannel.js';
 import { SERVER_OWNER_IDS } from '../src/config/serverOwners.js';
 
@@ -124,21 +124,21 @@ describe('store room', () => {
 });
 
 describe('store panel', () => {
-    test('shows the demo items, a commands card, a buy menu and the buttons', () => {
+    test('shows the items, a commands card, a buy menu and the buttons', () => {
         const guild = { name: 'Void', iconURL: () => null };
         const panel = buildStorePanel(guild);
         const [items, commands] = panel.embeds;
         assert.ok(isStorePanel(panel));
         assert.match(items.description, /تجريبي/u);
-        assert.equal(items.fields.length, ccStoreDemoItems.length);
-        assert.ok(items.fields[0].name.includes(ccStoreDemoItems[0].name));
+        assert.equal(items.fields.length, ccStoreItems.length);
+        assert.ok(items.fields[0].name.includes(ccStoreItems[0].name));
         assert.match(items.fields[0].value, /السعر/u);
         assert.equal(commands.footer.text, STORE_PANEL_FOOTER);
         assert.deepEqual(commands.fields.map((field) => field.name), ['متجر', 'متجر 1', 'مخزني']);
         assert.ok(commands.fields.every((field) => field.inline));
         const [menuRow, buttonRow] = panel.components.map((row) => row.toJSON());
         assert.equal(menuRow.components[0].custom_id, 'storepanel:buy');
-        assert.equal(menuRow.components[0].options.length, ccStoreDemoItems.length);
+        assert.equal(menuRow.components[0].options.length, ccStoreItems.length);
         assert.deepEqual(buttonRow.components.map((button) => button.custom_id),
             ['storepanel:balance', 'storepanel:inventory', 'storepanel:top', 'storepanel:help']);
     });
@@ -150,7 +150,7 @@ describe('store panel', () => {
     });
 
     test('the confirmation is only for the buyer and is disabled without enough CC', () => {
-        const item = ccStoreDemoItems[0];
+        const item = ccStoreItems[0];
         const rich = confirmPurchasePayload(item, 1, MEMBER, item.price * 2, 'trial').components[0].toJSON();
         assert.equal(rich.components[0].custom_id, `storepanel:confirm:${item.id}:1:${MEMBER}`);
         assert.ok(!rich.components[0].disabled);
@@ -160,17 +160,17 @@ describe('store panel', () => {
 });
 
 describe('trial buying', () => {
-    test('the store is in trial mode and shows the demo items', () => {
+    test('the store is in trial mode and shows its items', () => {
         assert.equal(storeMode(), 'trial');
-        assert.equal(storeCatalog().length, ccStoreDemoItems.length);
-        assert.equal(findStoreItem('1', storeCatalog()).id, ccStoreDemoItems[0].id);
-        assert.equal(findStoreItem(ccStoreDemoItems[1].id, storeCatalog()).id, ccStoreDemoItems[1].id);
+        assert.equal(storeCatalog().length, ccStoreItems.length);
+        assert.equal(findStoreItem('1', storeCatalog()).id, ccStoreItems[0].id);
+        assert.equal(findStoreItem(ccStoreItems[1].id, storeCatalog()).id, ccStoreItems[1].id);
         assert.equal(findStoreItem('99', storeCatalog()), null);
     });
 
     test('a trial purchase checks the balance but takes no CC', async () => {
         let saved = 0;
-        const item = ccStoreDemoItems[3];
+        const item = ccStoreItems.find((entry) => entry.id === 'xp_boost');
         const db = {
             get: async () => ({ cc: item.price * 2 }),
             set: async () => { saved += 1; return true; },
