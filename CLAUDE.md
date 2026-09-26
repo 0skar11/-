@@ -4,8 +4,9 @@
 
 The bot's only server is **1155236281706627173** (`HOME_GUILD_ID` in `src/config/homeGuild.js`).
 
-The owner's rule: **every update is for this server only.** Other servers the bot is in keep what they
-already have and get no new feature or change unless the owner explicitly asks for it.
+The owner's rule, literally: **anything new is for this server only.** Every new feature, every change
+to an existing one, every new command, board, role, timer or setting. Other servers the bot is in keep
+exactly what they already have and get nothing new unless the owner explicitly asks for it.
 
 - A new feature checks `isHomeGuild(guildId)` (from `src/config/homeGuild.js`) before it does anything:
   startup work, timers and sweeps skip other servers; commands, buttons and forms answer there with

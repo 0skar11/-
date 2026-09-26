@@ -5,7 +5,8 @@ import { bourseAssets } from '../src/config/store/bourse.js';
 import { buyItem, drawLuckBoxPrize, listStoreItems, maxQuantityOf, storeMode } from '../src/services/cc/ccStoreService.js';
 import { getProfile } from '../src/services/cc/ccService.js';
 import { addXpBoost, clearXpBoostCache, extendBoost, pruneBoosts, xpBoostMultiplier } from '../src/services/leveling/xpBoostService.js';
-import { normalizeMarket, tickAsset, forecastAsset } from '../src/services/cc/bourseService.js';
+import { normalizeMarket, tickAsset, forecastAsset, getMarket } from '../src/services/cc/bourseService.js';
+import { addXp } from '../src/services/leveling/xpSystem.js';
 import { forecastLine } from '../src/services/cc/bourseUi.js';
 import { ensureTraderRole } from '../src/services/cc/traderRoleService.js';
 import { validateRoleName, parseRoleColor, renewalStep } from '../src/services/cc/customRoleService.js';
@@ -81,6 +82,29 @@ describe('our server only', () => {
         const demo = await buyItem(client, member, 'demo_box', 1, { settings: OPEN });
         assert.equal(demo.trial, true);
         assert.equal((await getProfile(client, OTHER, MEMBER)).cc, 50_000);
+    });
+});
+
+describe('our server only: shared code', () => {
+    test('another server\'s bourse keeps no move drawn in advance; ours does', async () => {
+        const client = fakeClient();
+        await getMarket(client, '100000000000000099');
+        await getMarket(client, HOME_GUILD_ID);
+        const other = client.store.get('guild:100000000000000099:bourse');
+        const ours = client.store.get(`guild:${HOME_GUILD_ID}:bourse`);
+        assert.ok(Object.values(other.assets).every((entry) => !('roll' in entry)));
+        assert.ok(Object.values(ours.assets).every((entry) => typeof entry.roll === 'number'));
+    });
+
+    test('an XP boost does nothing in another server', async () => {
+        const client = fakeClient();
+        await addXpBoost(client, '100000000000000099', MEMBER, ['chat'], 60);
+        client.store.set('guild:100000000000000099:config', { leveling: { enabled: true, roleRewards: {} } });
+        const guild = { id: '100000000000000099', name: 'other', channels: { cache: new Map(), fetch: async () => null } };
+        const member = { user: { id: MEMBER, tag: 'm' }, id: MEMBER };
+        const result = await addXp(client, guild, member, 10);
+        // Not doubled: 10 XP given, 10 XP counted.
+        assert.equal(result.totalXp, 10);
     });
 });
 

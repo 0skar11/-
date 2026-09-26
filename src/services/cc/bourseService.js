@@ -9,6 +9,7 @@
 // economy record (`cost` is what they paid for the pieces they still have).
 // `roll` is the random draw of the next hour's move, made in advance so the store's forecast
 // (`forecastMarket`) can tell which way each asset goes; buying and selling during the hour still push it.
+// Only in our server (src/config/homeGuild.js): other servers keep no `roll`, so their bourse works as before.
 
 import { bourseAssets, bourseSettings, findAsset } from '../../config/store/bourse.js';
 
@@ -17,6 +18,7 @@ import { getBourseKey, getEconomyKey } from '../../utils/database/keys.js';
 import { Mutex } from '../../utils/mutex.js';
 import { logger } from '../../utils/logger.js';
 import { updateCCState } from './ccService.js';
+import { isHomeGuild } from '../../config/homeGuild.js';
 
 export const HOUR_MS = 60 * 60 * 1000;
 
@@ -164,6 +166,11 @@ export function advanceMarket(market, hour, { assets = bourseAssets, settings = 
     return true;
 }
 
+/** Other servers than ours: no move drawn in advance (each hour draws its own, as before). */
+function stripRolls(market) {
+    for (const entry of Object.values(market.assets)) delete entry.roll;
+}
+
 /**
  * Runs `change(market)` on the guild's market, moved to the current hour, one change per guild at a
  * time. The market is saved when anything changed.
@@ -173,9 +180,12 @@ async function withMarket(client, guildId, change, { now = Date.now(), rng = Mat
     return Mutex.runExclusive(`bourse:${guildId}`, async () => {
         const key = getBourseKey(guildId);
         const raw = await client.db.get(key, null);
+        const preRoll = isHomeGuild(guildId);
         const market = normalizeMarket(raw, { assets, hour: hourOf(now), rng });
+        if (!preRoll) stripRolls(market);
         const before = JSON.stringify(market);
         advanceMarket(market, hourOf(now), { assets, rng });
+        if (!preRoll) stripRolls(market);
         const result = await change(market);
         if (!raw || JSON.stringify(market) !== before) {
             const saved = await client.db.set(key, market);

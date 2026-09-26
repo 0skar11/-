@@ -14,6 +14,7 @@ import { awardLevelUp } from '../cc/ccService.js';
 import { checkInviteReward } from '../inviteRewardService.js';
 import { INVITE_REWARDS } from '../../config/inviteRewards.js';
 import { xpBoostMultiplier } from './xpBoostService.js';
+import { isHomeGuild } from '../../config/homeGuild.js';
 
 /**
  * Award XP to a member. Returns null when XP is skipped (disabled/invalid amount).
@@ -35,8 +36,8 @@ export const addXp = wrapServiceBoundary(async function addXp(client, guild, mem
 
     const levelData = await getUserLevelData(client, guild.id, member.user.id);
 
-    // An XP ×2 boost bought in the CC store; a failed read must not lose the XP.
-    const boost = await xpBoostMultiplier(client, guild.id, member.user.id, fromVoice ? 'voice' : 'chat').catch((error) => {
+    // An XP ×2 boost bought in the CC store (our server only); a failed read must not lose the XP.
+    const boost = !isHomeGuild(guild.id) ? 1 : await xpBoostMultiplier(client, guild.id, member.user.id, fromVoice ? 'voice' : 'chat').catch((error) => {
       logger.warn(`Failed to read the XP boost of ${member.user.id}: ${error.message}`);
       return 1;
     });
