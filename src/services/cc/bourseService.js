@@ -107,7 +107,7 @@ export function guaranteedRise(flow, maxMove, demand = bourseSettings.demand) {
 }
 
 /**
- * One hour of an asset: a random move of at most `maxMovePercent` (10%) up or down from the last
+ * One hour of an asset: a random move of at most `maxMovePercent` (20%) up or down from the last
  * price. Near the top of its range the move leans down, near the bottom up, so it doesn't stick to a
  * limit; demand pushes it (each net buyer up by `demand.perBuyerPercent`, each net seller down). The
  * whole move, demand included, never goes past `maxMovePercent` in one hour. When members bought

@@ -82,27 +82,27 @@ describe('bourse prices', () => {
         }
     });
 
-    test('random moves stay between min and max and never move more than 10% an hour', () => {
+    test('random moves stay between min and max and never move more than 20% an hour', () => {
         const rng = seeded(7);
         for (const asset of bourseAssets) {
             let entry = normalizeMarket(null, { rng }).assets[asset.id];
             for (let hour = 0; hour < 2000; hour += 1) {
                 const next = tickAsset(asset, entry, { rng });
                 assert.ok(next.price > asset.min && next.price < asset.max, `${asset.id} ${next.price}`);
-                assert.ok(Math.abs(next.price - entry.price) <= Math.ceil(entry.price * 0.1) + 1, `${asset.id} ${entry.price} -> ${next.price}`);
+                assert.ok(Math.abs(next.price - entry.price) <= Math.ceil(entry.price * 0.2) + 1, `${asset.id} ${entry.price} -> ${next.price}`);
                 entry = next;
             }
         }
     });
 
-    test('an hour moves by at most 10%, whatever the demand (the owner\'s rule)', () => {
-        assert.equal(bourseSettings.maxMovePercent, 10);
+    test('an hour moves by at most 20% up or down, whatever the demand (reports #139, #140)', () => {
+        assert.equal(bourseSettings.maxMovePercent, 20);
         const car = byId('car');
         const entry = { price: 1300, previous: 1300, raise: 0, flow: {} };
-        assert.equal(tickAsset(car, entry, { rng: () => 1 }).price, Math.round(1300 * 1.1));
-        assert.equal(tickAsset(car, entry, { rng: () => 0 }).price, Math.round(1300 * 0.9));
-        const rush = { ...entry, flow: Object.fromEntries(Array.from({ length: 60 }, (_, i) => [`u${i}`, 1])) };
-        assert.equal(tickAsset(car, rush, { rng: () => 1 }).price, Math.round(1300 * 1.1));
+        assert.equal(tickAsset(car, entry, { rng: () => 1 }).price, Math.round(1300 * 1.2));
+        assert.equal(tickAsset(car, entry, { rng: () => 0 }).price, Math.round(1300 * 0.8));
+        const rush = { ...entry, flow: Object.fromEntries(Array.from({ length: 100 }, (_, i) => [`u${i}`, 1])) };
+        assert.equal(tickAsset(car, rush, { rng: () => 1 }).price, Math.round(1300 * 1.2));
         // At the top the move leans down, at the bottom up.
         assert.ok(tickAsset(car, { ...entry, price: 1990 }, { rng: () => 0.5 }).price < 1990);
         assert.ok(tickAsset(car, { ...entry, price: 810 }, { rng: () => 0.5 }).price > 810);
@@ -130,12 +130,13 @@ describe('bourse prices', () => {
         const bought = (pieces) => ({ price: 1300, previous: 1300, raise: 0, flow: { a: pieces - 5, b: 5 } });
         // Below 20 pieces, a low random draw can still bring the price down.
         assert.ok(tickAsset(car, bought(19), { rng: () => 0 }).price < 1300);
-        // 20 pieces: +5% whatever the random draw; 30: +7.5%; 40 or more: +10% (the hourly cap).
+        // 20 pieces: +5% whatever the random draw; 30: +7.5%; 80 or more: +20% (the hourly cap).
         for (const rng of [() => 0, () => 0.5, () => 0.99]) {
             assert.equal(tickAsset(car, bought(20), { rng }).price, Math.round(1300 * 1.05));
         }
         assert.equal(tickAsset(car, bought(30), { rng: () => 0 }).price, Math.round(1300 * 1.075));
-        assert.equal(tickAsset(car, bought(80), { rng: () => 0 }).price, Math.round(1300 * 1.1));
+        assert.equal(tickAsset(car, bought(80), { rng: () => 0 }).price, Math.round(1300 * 1.2));
+        assert.equal(tickAsset(car, bought(200), { rng: () => 0 }).price, Math.round(1300 * 1.2));
         // Sales count against the purchases.
         assert.ok(tickAsset(car, { ...bought(20), flow: { a: 25, b: -6 } }, { rng: () => 0 }).price < 1300);
         // Near the top the ceiling rises with it, so the sure rise isn't cut off.
