@@ -13,6 +13,8 @@ import { publishSavedIdeasBoard } from "../services/savedIdeasBoardService.js";
 import { startCCTopBoard } from "../services/games/ccTopBoard.js";
 import { startStoreChannel } from "../services/cc/storeChannel.js";
 import { startInviteRewards } from "../services/inviteRewardService.js";
+import { ensureTraderRole } from "../services/cc/traderRoleService.js";
+import { startCustomRoles } from "../services/cc/customRoleService.js";
 
 export default {
   name: Events.ClientReady,
@@ -50,6 +52,12 @@ export default {
         startupLog(`Store room: ${result.status} (channel ${result.channelId})`);
       }
       try {
+        const customRoles = await startCustomRoles(client);
+        startupLog(`Custom roles: ${customRoles.status}`);
+      } catch (error) {
+        logger.error("Failed to start custom roles:", error);
+      }
+      try {
         const inviteRewards = await startInviteRewards(client);
         startupLog(`Invite rewards: ${inviteRewards.status}`);
       } catch (error) {
@@ -73,6 +81,13 @@ export default {
           startupLog(`Level roles in ${guild.name}: found ${tiers.found}, missing ${tiers.missing.length}, rewards saved ${tiers.rewardsSaved}`);
         } catch (error) {
           logger.error(`Failed to find level roles in ${guild.name}:`, error);
+        }
+        // The CC store's trader role, made once above the Level 100 role (the owner asked for it).
+        try {
+          const trader = await ensureTraderRole(client, guild);
+          startupLog(`Trader role in ${guild.name}: ${trader.status}`);
+        } catch (error) {
+          logger.error(`Failed to set up the trader role in ${guild.name}:`, error);
         }
       }
       const levelRoleSummary = await reconcileLevelRoles(client);

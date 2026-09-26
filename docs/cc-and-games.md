@@ -185,8 +185,42 @@ from 0 CC. Every change goes through `src/services/cc/ccService.js`, which locks
 
 ## The store
 
-The store is **in trial mode** for now: it shows sample items (`ccStoreDemoItems`), and buying
-one checks the balance and shows a receipt but takes no CC and gives nothing.
+The store is **in trial mode** for now: it shows the real items below, and buying one checks the
+balance and shows a receipt but takes no CC and gives nothing (a custom role shows its form and a
+preview of the role). `ccStoreSettings.open = true` opens it.
+
+| # | Item | Price | What it gives |
+|---|---|---|---|
+| 1 | 🎁 صندوق حظ | 1,500 | Opened right away: 500–3,000 CC most of the time, 7,500 CC rarely (2%), or a chat XP ×2 hour (11%). About 1,235 CC back on average, so boxes don't create CC (`luckBoxPrizes`) |
+| 2 | ⚡ بوست XP ×2 | 1,000 | Chat XP ×2 for an hour; buying more adds hours |
+| 3 | 🎨 رول مميزة باسمك | 7,500 a month | A role for the buyer only |
+| 4 | 👥 رول ليك ولصحابك | 25,000 a month | A role for the buyer (the leader) and up to 15 friends they invite |
+| 5 | 🚀 لفل ×2 | 1,500 | Chat and voice XP ×2 for an hour |
+| 6 | 💼 رول تاجر | 2,500 | The trader role |
+| 7 | 🔮 تنبؤ البورصة | 6,500 | Shown to the buyer only: which way each bourse asset moves at the next hour, and roughly how much |
+
+- **XP boosts** are saved at `guild:<id>:xpboosts` (`{ userId: { chat, voice } }`, when each ends)
+  and read by `addXp` (`src/services/leveling/xpBoostService.js`). Two boosts never make ×4.
+- **Forecast:** the bourse draws each hour's random move one hour in advance (`roll` in the market),
+  so the forecast is what will happen with the demand so far; buying and selling before the hour
+  ends can still push it a little.
+- **Trader role (`💼 تاجر`):** the owner asked the bot to make it. On startup it is found (saved ID
+  `traderRoleId` in the guild config, else by name) or, the first time only, created with no
+  permissions just above the `🌌 Level 100` role (`src/services/cc/traderRoleService.js`). If the
+  owner deletes it, it is not made again. Not made in a server without the Level 100 role.
+- **Custom roles** (`src/services/cc/customRoleService.js`): confirming the purchase opens a form
+  for the name, the colour (`#ff0000` or a name like `احمر`) and an icon (only on servers with role
+  icons, boost level 2). Names that look like staff roles, links, mentions and names of other roles
+  are refused. These are the only roles the bot creates besides the trader role: no permissions,
+  just above the trader role, deleted when the subscription ends.
+  - Every 30 days the price is taken from the leader's CC; a DM 3 days before. Not enough CC → 3
+    more days (tried again every 30 minutes), then the role is deleted. `رولي الغي` stops the
+    renewal (the role stays to the end of the paid month), `رولي كمل` restarts it.
+  - Friends role: only the leader invites (`رولي انفايت @member`, accepted with a button within 24
+    hours), removes (`رولي شيل @member`) or hands the role over (`رولي ليدر @member`, the renewal is
+    then paid by the new leader); members can leave (`رولي اخرج`). 16 members at most, the leader
+    included. One role of each kind per leader.
+  - Saved at `guild:<id>:customroles`, keyed by role ID.
 
 **The store room.** On startup the bot creates a text channel `🛒・المتجر` in category
 `1547310323994853438` (or reuses it; its ID is saved as `storeChannelId` in the guild config, so it
@@ -207,14 +241,25 @@ attachments, links, reactions and threads, and has a 3 second slowmode.
 | `متجر` / `shop` | `/store list` | The store panel: items, buy menu and buttons |
 | `متجر 1` / `متجر رتبة vip` / `متجر 1 3` / `buy` | `/store buy item [quantity]` | Buy item 1 (by number or name, or 3 of it); a ✅ button confirms, only for the buyer |
 | `مخزني` / `inventory` | `/store inventory` | What the member bought |
+| `رولي` | `/myrole info` | The member's custom roles: members, leader, renewal |
+| `رولي انفايت @x` / `رولي شيل @x` / `رولي ليدر @x` | `/myrole invite\|kick\|leader user` | The friends role leader invites, removes or hands over |
+| `رولي اخرج` | `/myrole leave [role]` | Leave a friends role |
+| `رولي الغي` / `رولي كمل` (`شخصي` / `صحاب`) | `/myrole cancel\|resume [kind]` | Stop or restart the renewal |
 | `رصيد`, `توب cc` | `/cc`, `/cctop` | Also allowed in the store room |
+
+Without the prefix `رولي` runs only alone or followed by one of its words (`انفايت`, `شيل`,
+`اخرج`, `الغي`...), so chat like `رولي اتمسحت` is left alone. (`رول` stays the staff shortcut
+for giving a role.)
 
 - Catalog and settings: `src/config/store/ccStoreItems.js` (item format documented at the top;
   `repostEvery`, slowmode, category and channel name at the bottom).
-- Buying: `buyItem()` in `src/services/cc/ccStoreService.js` checks the price, takes the CC,
-  gives roles (refunding if Discord refuses) and fills `ccInventory` for stackable items.
-- The room: `src/services/cc/storeChannel.js`; the panel and embeds: `src/services/cc/storeUi.js`.
-- To open it for real: put the real items in `ccStoreItems` and set `ccStoreSettings.open = true`.
+- Buying: `buyItem()` in `src/services/cc/ccStoreService.js` checks the price, takes the CC and
+  delivers the item (role, luck box prize, boost, forecast), refunding if delivery fails. Custom
+  roles go through their form: `src/interactions/modals/store/customRole.js`.
+- The room: `src/services/cc/storeChannel.js`; the panel and embeds: `src/services/cc/storeUi.js`;
+  custom roles' form, invites and `رولي`: `src/services/cc/customRoleUi.js`,
+  `src/interactions/buttons/store/customRole.js`, `src/commands/Games/myrole.js`.
+- To open it for real: set `ccStoreSettings.open = true`.
 
 ## The bourse (البورصة)
 
@@ -260,7 +305,7 @@ name, optionally with a number (`بيع سبيكة دهب 2`, `استثمار ا
 - Assets and rules: `src/config/store/bourse.js`. Changing a price range takes effect at the next
   read; never change an asset's `id` (it is the key in members' holdings).
 - The market of a guild is saved at `guild:<id>:bourse` (`hour`, and per asset `price`,
-  `previous`, `raise`, `flow`). There is no timer: whenever the market is read in a later hour,
+  `previous`, `raise`, `roll` (the next hour's random draw, for the store's forecast), `flow`). There is no timer: whenever the market is read in a later hour,
   the missed hours are played in order (at most 168), so a restart changes nothing.
 - Logic: `src/services/cc/bourseService.js`; embeds: `src/services/cc/bourseUi.js`; command:
   `src/commands/Games/bourse.js`; confirm buttons: `src/interactions/buttons/store/bourse.js`.

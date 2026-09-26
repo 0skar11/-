@@ -1,12 +1,15 @@
 import { MessageFlags } from 'discord.js';
 import { STORE_BUTTON_PREFIX, storeHelpEmbed, inventoryEmbed, purchase } from '../../../services/cc/storeUi.js';
 import { getProfile } from '../../../services/cc/ccService.js';
+import { getStoreItem, storeMode } from '../../../services/cc/ccStoreService.js';
+import { customRoleModal } from '../../../services/cc/customRoleUi.js';
 import { ccProfileEmbed } from '../../../commands/Games/cc.js';
 import { ccTopEmbed } from '../../../commands/Games/cctop.js';
 
 // Buttons of the store panel and of the buy confirmation (`storepanel:<action>`). The panel answers
 // privately so the store room stays clean. The confirmation buttons carry the buyer's ID and only
 // work for them: `storepanel:confirm:<itemId>:<quantity>:<userId>` and `storepanel:cancel:<userId>`.
+// Confirming a custom role opens its form instead of buying right away.
 const PRESS_COOLDOWN_MS = 2_000;
 const lastPress = new Map();
 
@@ -28,12 +31,19 @@ async function execute(interaction, client, [action, ...args]) {
         if (action === 'cancel') {
             return interaction.update({ content: '✖️ اتلغى الشراء.', embeds: [], components: [] }).catch(() => {});
         }
+        const [itemId, quantity] = args;
+        // A custom role is bought through its form (name, colour, icon): src/interactions/modals/store/customRole.js.
+        const item = getStoreItem(itemId);
+        if (item?.type === 'custom_role' && storeMode() !== 'closed') {
+            return interaction.showModal(customRoleModal(item, interaction.guild)).catch(() => {});
+        }
         if (onCooldown(interaction.user.id)) return privately(interaction, { content: '⏳ استنى ثانية.' });
         await interaction.deferUpdate().catch(() => {});
-        const [itemId, quantity] = args;
         const member = interaction.member?.roles?.cache ? interaction.member : await interaction.guild.members.fetch(interaction.user.id);
-        const { payload } = await purchase(client, member, itemId, Number(quantity) || 1);
+        const { payload, privatePayload } = await purchase(client, member, itemId, Number(quantity) || 1);
         await interaction.editReply(payload).catch(() => {});
+        // The bourse forecast is shown to the buyer only.
+        if (privatePayload) await interaction.followUp({ ...privatePayload, flags: MessageFlags.Ephemeral }).catch(() => {});
         return;
     }
 

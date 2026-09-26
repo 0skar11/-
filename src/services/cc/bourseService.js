@@ -2,11 +2,13 @@
 // The assets and rules are src/config/store/bourse.js; the embeds are bourseUi.js.
 //
 // The market of a guild is saved at `guild:<id>:bourse`:
-//   { hour, assets: { <assetId>: { price, previous, raise, flow: { <userId>: net pieces this hour } } } }
+//   { hour, assets: { <assetId>: { price, previous, raise, roll, flow: { <userId>: net pieces this hour } } } }
 // `hour` is the hour (hours since 1970, UTC) the prices belong to. The prices move lazily: whenever the
 // market is read in a later hour, every missed hour is played in order, so no timer is needed and a
 // restart changes nothing. A member's holdings are `ccBourse: { <assetId>: { qty, cost } }` in their
 // economy record (`cost` is what they paid for the pieces they still have).
+// `roll` is the random draw of the next hour's move, made in advance so the store's forecast
+// (`forecastMarket`) can tell which way each asset goes; buying and selling during the hour still push it.
 
 import { bourseAssets, bourseSettings, findAsset } from '../../config/store/bourse.js';
 
@@ -47,10 +49,12 @@ export function keepInside(price, low, high, rng = Math.random) {
     return price;
 }
 
+const isRoll = (value) => typeof value === 'number' && value >= 0 && value <= 1;
+
 /** A new asset starts at a random price around `start` (up to its volatility away). */
 function freshEntry(asset, rng = Math.random) {
     const price = keepInside(Math.round(asset.start * (1 + (rng() * 2 - 1) * asset.volatility)), asset.min, asset.max, rng);
-    return { price, previous: price, raise: 0, flow: {} };
+    return { price, previous: price, raise: 0, roll: rng(), flow: {} };
 }
 
 /** Repairs a saved market (or makes a new one) so every asset has a valid entry. */
@@ -68,7 +72,8 @@ export function normalizeMarket(raw, { assets = bourseAssets, hour = hourOf(), r
         const raise = clamp(Number(saved.raise) || 0, 0, bourseSettings.demand.maxRaisePercent);
         // A price outside the range (after the range was changed in the config) is moved inside it.
         const price = keepInside(saved.price, asset.min, assetCeiling(asset, raise), rng);
-        const entry = { price, previous: Number.isSafeInteger(saved.previous) ? saved.previous : price, raise, flow: {} };
+        const roll = isRoll(saved.roll) ? saved.roll : rng();
+        const entry = { price, previous: Number.isSafeInteger(saved.previous) ? saved.previous : price, raise, roll, flow: {} };
         if (saved.flow && typeof saved.flow === 'object') {
             for (const [userId, net] of Object.entries(saved.flow)) {
                 if (Number.isSafeInteger(net) && net !== 0) entry.flow[userId] = net;
@@ -112,9 +117,21 @@ export function tickAsset(asset, entry, { settings = bourseSettings, rng = Math.
     else if (demand <= 0 && position > 0.85) lean = -maxMove / 2;
     else if (position < 0.15) lean = maxMove / 2;
 
-    const move = clamp((rng() * 2 - 1) * maxMove + lean + demand, -maxMove, maxMove);
+    // The draw made in advance for this hour (see `roll` at the top), or a fresh one.
+    const roll = isRoll(entry.roll) ? entry.roll : rng();
+    const move = clamp((roll * 2 - 1) * maxMove + lean + demand, -maxMove, maxMove);
     const price = keepInside(Math.round(entry.price * (1 + move)), min, ceiling, rng);
-    return { price, previous: entry.price, raise: Math.round(raise * 100) / 100, flow: {} };
+    return { price, previous: entry.price, raise: Math.round(raise * 100) / 100, roll: rng(), flow: {} };
+}
+
+/**
+ * Where an asset's price goes at the next hour with the demand so far: `{ price, changePercent }`.
+ * Buying and selling before the hour ends can still change it a little.
+ */
+export function forecastAsset(asset, entry, { settings = bourseSettings } = {}) {
+    const next = tickAsset(asset, entry, { settings, rng: () => 0.5 });
+    const changePercent = entry.price ? Math.round(((next.price - entry.price) / entry.price) * 1000) / 10 : 0;
+    return { price: next.price, changePercent };
 }
 
 /** Plays every hour between the market's hour and `hour`. Returns true when something changed. */
@@ -168,6 +185,17 @@ export async function getMarket(client, guildId, options = {}) {
     const assets = options.assets || bourseAssets;
     const quotes = await withMarket(client, guildId, (market) => assets.map((asset) => quote(asset, market.assets[asset.id])), options);
     return { quotes, nextChangeAt: nextChangeAt(options.now) };
+}
+
+/** The store's forecast: `{ forecasts: [{ asset, current, next, changePercent }], nextChangeAt }`, one per asset. */
+export async function forecastMarket(client, guildId, options = {}) {
+    const assets = options.assets || bourseAssets;
+    const forecasts = await withMarket(client, guildId, (market) => assets.map((asset) => {
+        const entry = market.assets[asset.id];
+        const { price, changePercent } = forecastAsset(asset, entry);
+        return { asset, current: entry.price, next: price, changePercent };
+    }), options);
+    return { forecasts, nextChangeAt: nextChangeAt(options.now) };
 }
 
 /** The sell fee on `gross` CC: sellFeePercent, rounded up, at least 1 CC. */

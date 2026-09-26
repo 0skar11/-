@@ -13,11 +13,12 @@ import { syncMemberLevelRoles } from './levelRoleSyncService.js';
 import { awardLevelUp } from '../cc/ccService.js';
 import { checkInviteReward } from '../inviteRewardService.js';
 import { INVITE_REWARDS } from '../../config/inviteRewards.js';
+import { xpBoostMultiplier } from './xpBoostService.js';
 
 /**
  * Award XP to a member. Returns null when XP is skipped (disabled/invalid amount).
  * Throws on storage or unexpected failures. Voice XP passes `fromVoice` so it doesn't start the
- * chat XP cooldown (`lastMessage`).
+ * chat XP cooldown (`lastMessage`). An XP boost from the CC store (xpBoostService.js) doubles the amount.
  */
 export const addXp = wrapServiceBoundary(async function addXp(client, guild, member, xpToAdd, { fromVoice = false } = {}) {
   const lockKey = `leveling:${guild.id}:${member.user.id}`;
@@ -33,6 +34,13 @@ export const addXp = wrapServiceBoundary(async function addXp(client, guild, mem
     }
 
     const levelData = await getUserLevelData(client, guild.id, member.user.id);
+
+    // An XP ×2 boost bought in the CC store; a failed read must not lose the XP.
+    const boost = await xpBoostMultiplier(client, guild.id, member.user.id, fromVoice ? 'voice' : 'chat').catch((error) => {
+      logger.warn(`Failed to read the XP boost of ${member.user.id}: ${error.message}`);
+      return 1;
+    });
+    xpToAdd *= boost;
 
     levelData.xp += xpToAdd;
     levelData.totalXp += xpToAdd;

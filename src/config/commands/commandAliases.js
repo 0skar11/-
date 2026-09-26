@@ -24,6 +24,7 @@ export const commandAliases = {
   jtc: 'jointocreate', jointocreate: 'jointocreate', np: 'nowplaying', now: 'nowplaying',
   شغل: 'play',
   اكس: 'xo', حجر: 'rps',
+  رولي: 'myrole', رولى: 'myrole',
 };
 
 export const subcommandAliases = {
@@ -130,6 +131,17 @@ export const standaloneOnlyAliases = new Set([
   'لفل', 'ليفل', 'مستوى', 'مستوايا', 'رانك', 'توب',
 ]);
 
+/** `رولي <word>`: the words of the `myrole` command (src/commands/Games/myrole.js) and their subcommands. */
+export const myRoleWords = {
+  انفايت: 'invite', انفيت: 'invite', دعوة: 'invite', ضيف: 'invite', invite: 'invite',
+  شيل: 'kick', اطرد: 'kick', kick: 'kick', remove: 'kick',
+  اخرج: 'leave', خروج: 'leave', leave: 'leave',
+  الغي: 'cancel', إلغي: 'cancel', الغاء: 'cancel', إلغاء: 'cancel', cancel: 'cancel',
+  كمل: 'resume', جدد: 'resume', resume: 'resume',
+  ليدر: 'leader', سلم: 'leader', leader: 'leader',
+};
+const MY_ROLE_TYPED = new Set(['رولي', 'رولى']);
+
 export function isStandaloneInvocation(args) {
   return args.every((arg) => /^(?:\d+|<@!?\d{17,20}>)$/u.test(arg));
 }
@@ -160,6 +172,8 @@ export function applyWordAliases(typedCommand, args, prefixed) {
   let commandName = typedCommand;
   let rest = args;
   if (!prefixed && standaloneOnlyAliases.has(typedCommand) && !isStandaloneInvocation(rest) && !isBourseNameInvocation(typedCommand, rest)) return null;
+  // `رولي` is a chat word too (`رولي اتمسحت`): without the prefix it runs alone or with one of its words.
+  if (!prefixed && MY_ROLE_TYPED.has(typedCommand) && rest.length && !myRoleWords[rest[0].toLowerCase()]) return null;
   const argAlias = commandArgAliases[typedCommand];
   if (argAlias) {
     const [aliasCommand, ...aliasArgs] = argAlias.split(' ');

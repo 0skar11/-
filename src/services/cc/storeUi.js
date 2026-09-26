@@ -4,8 +4,9 @@
 
 import { ActionRowBuilder, ButtonBuilder, ButtonStyle, StringSelectMenuBuilder } from 'discord.js';
 import { CC, ccEmbed, formatCC } from '../../config/cc.js';
-import { ccStoreItems, ccStoreDemoItems, ccStoreSettings, storeRoomSettings } from '../../config/store/ccStoreItems.js';
+import { ccStoreItems, ccStoreSettings, storeRoomSettings, customRoleSettings } from '../../config/store/ccStoreItems.js';
 import { storeMode, storeCatalog, buyItem } from './ccStoreService.js';
+import { forecastEmbed } from './bourseUi.js';
 
 export const STORE_BUTTON_PREFIX = 'storepanel';
 // The footer of the panel's commands card; it marks the panel so a restart edits it instead of posting a new one.
@@ -28,6 +29,9 @@ export const STORE_COMMANDS = [
     ['📈 اسعار', 'أسعار البورصة'],
     ['💵 شراء عربية', 'تشتري من البورصة (أو استثمار)'],
     ['💼 ممتلكاتي', 'اللي معاك في البورصة'],
+    ['🎨 رولي', 'الرول المميزة بتاعتك'],
+    ['📨 رولي انفايت @عضو', 'تضيف صاحبك لرولك'],
+    ['🚪 رولي اخرج', 'تخرج من رول صحابك'],
 ];
 
 // The short commands card under the panel (the full list is in ❓ المساعدة).
@@ -58,12 +62,17 @@ function itemLabel(item) {
     return `${item.emoji ? `${item.emoji} ` : ''}${item.name}`;
 }
 
+/** `🌀 7,500` or `🌀 7,500 في الشهر` for a monthly item. */
+function priceText(item) {
+    return `${CC.emoji} ${item.price.toLocaleString('en-US')}${item.type === 'custom_role' ? ' في الشهر' : ''}`;
+}
+
 /** One full-width field per item: `1 ・ 💎 رتبة VIP`, then its price and description on their own lines. */
 function itemFields(items) {
     if (!items.length) return [{ name: '🛍️ المنتجات', value: '> لسه مفيش منتجات، هتتضاف قريب.' }];
     return items.slice(0, 20).map((item, index) => ({
         name: `${index + 1} ・ ${itemLabel(item)}`.slice(0, 256),
-        value: [`> السعر: ${CC.emoji} ${item.price.toLocaleString('en-US')}`, `> ${item.description || '—'}`].join('\n').slice(0, 1024),
+        value: [`> السعر: ${priceText(item)}`, `> ${item.description || '—'}`].join('\n').slice(0, 1024),
     }));
 }
 
@@ -103,7 +112,7 @@ function storePanelComponents(items, mode) {
                 .setPlaceholder(mode === 'trial' ? '🧪 اختار منتج تجرب تشتريه...' : '🛍️ اختار منتج تشتريه...')
                 .addOptions(items.slice(0, 25).map((item, index) => ({
                     label: `${index + 1}. ${item.name}`.slice(0, 100),
-                    description: `${item.price.toLocaleString('en-US')} ${CC.short} ・ ${item.description || ''}`.slice(0, 100),
+                    description: `${item.price.toLocaleString('en-US')} ${CC.short}${item.type === 'custom_role' ? ' في الشهر' : ''} ・ ${item.description || ''}`.slice(0, 100),
                     value: item.id,
                     ...(item.emoji ? { emoji: item.emoji } : {}),
                 }))),
@@ -130,9 +139,9 @@ export function storeHelpEmbed() {
     });
 }
 
-/** `مخزني`: what the member owns (real and demo item names are both known). */
+/** `مخزني`: what the member owns. */
 export function inventoryEmbed(user, inventory = {}) {
-    const known = [...ccStoreItems, ...ccStoreDemoItems];
+    const known = ccStoreItems;
     const lines = Object.entries(inventory)
         .filter(([, count]) => Number(count) > 0)
         .map(([id, count]) => {
@@ -152,16 +161,17 @@ export function confirmPurchasePayload(item, quantity, userId, balance, mode = s
         `${itemLabel(item)}${quantity > 1 ? ` × ${quantity}` : ''}`,
         `> ${item.description || '—'}`,
         '',
-        `💵 السعر: ${formatCC(cost)}`,
+        `💵 السعر: ${formatCC(cost)}${item.type === 'custom_role' ? ` (كل ${customRoleSettings.days} يوم، بيتجدد من رصيدك)` : ''}`,
         `💰 رصيدك: ${formatCC(balance)}`,
         after >= 0 ? `📉 بعد الشراء: ${formatCC(after)}` : `❌ ناقصك ${formatCC(-after)}`,
         ...(mode === 'trial' ? ['', TRIAL_LINE] : []),
     ].join('\n'));
+    const isRole = item.type === 'custom_role';
     const row = new ActionRowBuilder().addComponents(
         new ButtonBuilder()
             .setCustomId(`${STORE_BUTTON_PREFIX}:confirm:${item.id}:${quantity}:${userId}`)
-            .setLabel(mode === 'trial' ? 'تجربة الشراء' : 'تأكيد')
-            .setEmoji('✅')
+            .setLabel(isRole ? 'اختار الاسم واللون والأيقونة' : mode === 'trial' ? 'تجربة الشراء' : 'تأكيد')
+            .setEmoji(isRole ? '🎨' : '✅')
             .setStyle(ButtonStyle.Success)
             .setDisabled(after < 0),
         new ButtonBuilder().setCustomId(`${STORE_BUTTON_PREFIX}:cancel:${userId}`).setLabel('إلغاء').setEmoji('✖️').setStyle(ButtonStyle.Secondary),
@@ -172,10 +182,21 @@ export function confirmPurchasePayload(item, quantity, userId, balance, mode = s
 const FAILURE_TEXT = {
     closed: CLOSED_LINE,
     not_found: '❌ المنتج ده مش موجود. اكتب `متجر` وشوف الأرقام.',
-    bad_quantity: `❌ العدد لازم يكون من 1 لـ ${ccStoreSettings.maxQuantity} (والرتب قطعة واحدة بس).`,
+    bad_quantity: `❌ العدد لازم يكون من 1 لـ ${ccStoreSettings.maxQuantity} (والرتب والصندوق والتنبؤ قطعة واحدة بس).`,
     owned: '❌ الرتبة دي معاك أصلاً.',
     max_owned: '❌ وصلت لأقصى عدد تقدر تملكه من المنتج ده.',
     role_failed: '❌ معرفتش أديك الرتبة، ورجعتلك الـ CC بتاعتك. كلم الإدارة.',
+    role_missing: '❌ الرتبة دي مش موجودة في السيرفر دلوقتي. كلم الإدارة.',
+    deliver_failed: '❌ حصلت مشكلة ومعرفتش أسلمك المنتج، ورجعتلك الـ CC بتاعتك.',
+    use_form: '🎨 الرول دي بتتشرى من زرار المتجر عشان تختار اسمها ولونها.',
+    has_role: '❌ معاك رول من النوع ده أصلاً. اكتب `رولي` تشوفها.',
+    bad_color: '❌ اللون مش مفهوم. اكتب لون زي `#ff0000` أو `احمر`.',
+    empty: '❌ لازم تكتب اسم للرول.',
+    too_long: `❌ اسم الرول لازم يكون ${customRoleSettings.maxNameLength} حرف أو أقل.`,
+    link: '❌ اسم الرول مينفعش يكون فيه منشن أو لينك.',
+    staff_name: '❌ الاسم ده شبه رتب الإدارة، اختار اسم تاني.',
+    taken: '❌ فيه رتبة بالاسم ده أصلاً، اختار اسم تاني.',
+    create_failed: '❌ معرفتش أعمل الرول، ورجعتلك الـ CC بتاعتك. كلم الإدارة.',
 };
 
 export function purchaseFailureText(result) {
@@ -183,10 +204,29 @@ export function purchaseFailureText(result) {
     return FAILURE_TEXT[result.reason] || '❌ حصلت مشكلة، جرب تاني.';
 }
 
+const timestamp = (ms) => `<t:${Math.floor(ms / 1000)}:R>`;
+
+/** What the purchase gave, as lines under the receipt (luck box prize, boost end, forecast). */
+function deliveryLines(result) {
+    const lines = [];
+    if (result.prize?.cc) lines.push(`🎉 الصندوق طلعلك **${formatCC(result.prize.cc)}**!`);
+    if (result.prize?.boost) lines.push('🎉 الصندوق طلعلك **بوست XP ×2** لمدة ساعة!');
+    const { chat = 0, voice = 0 } = result.boostUntil || {};
+    if (chat && voice && chat === voice) lines.push(`⚡ XP الشات والفويس ×2 لحد ما يخلص ${timestamp(chat)}`);
+    else {
+        if (chat) lines.push(`⚡ XP الشات ×2 لحد ما يخلص ${timestamp(chat)}`);
+        if (voice) lines.push(`🎙️ XP الفويس ×2 لحد ما يخلص ${timestamp(voice)}`);
+    }
+    if (result.forecast) lines.push('🔮 التنبؤ اتبعتلك في رسالة ليك إنت بس.');
+    return lines;
+}
+
 /** The receipt after a (real or trial) purchase: what was bought on top, then the numbers as cards. */
 export function purchaseReceiptEmbed(user, result) {
     const bought = `${itemLabel(result.item)}${result.quantity > 1 ? ` × ${result.quantity}` : ''}`;
     const description = [`${user} ${result.trial ? 'جرب يشتري' : 'اشترى'} **${bought}**`];
+    const delivered = deliveryLines(result);
+    if (delivered.length) description.push('', ...delivered);
     if (result.trial) description.push('', '🧪 ده شراء تجريبي، مفيش CC اتخصم ولا حاجة اتسلمت.');
     return ccEmbed(result.trial ? '🧪 شراء تجريبي تم' : '✅ تم الشراء', description.join('\n'), {
         color: 'success',
@@ -197,9 +237,14 @@ export function purchaseReceiptEmbed(user, result) {
     });
 }
 
-/** Buys and returns the reply payload (receipt or the reason it failed). */
+/**
+ * Buys and returns the reply payload (receipt or the reason it failed). A forecast also returns
+ * `privatePayload`, to be shown only to the buyer.
+ */
 export async function purchase(client, member, itemId, quantity) {
     const result = await buyItem(client, member, itemId, quantity);
     if (!result.ok) return { ok: false, payload: { content: purchaseFailureText(result), embeds: [], components: [], allowedMentions: { parse: [] } } };
-    return { ok: true, payload: { content: '', embeds: [purchaseReceiptEmbed(member.user || member, result)], components: [], allowedMentions: { parse: [] } } };
+    const payload = { content: '', embeds: [purchaseReceiptEmbed(member.user || member, result)], components: [], allowedMentions: { parse: [] } };
+    const privatePayload = result.forecast ? { embeds: [forecastEmbed(result.forecast)], allowedMentions: { parse: [] } } : null;
+    return { ok: true, payload, privatePayload };
 }
