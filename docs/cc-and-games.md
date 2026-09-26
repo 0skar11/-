@@ -197,15 +197,15 @@ attachments, links, reactions and threads, and has a 3 second slowmode.
   away after 4 seconds. Other slash commands get a private "store only" reply. The server
   owners and this bot are left alone.
 - The store panel is pinned: a card with the items and their prices, a small grey card with the
-  main commands (`متجر`, `شراء 1`, `مخزني`), and a menu to pick an item plus
+  main commands (`متجر`, `متجر 1`, `مخزني`), and a menu to pick an item plus
   buttons (💰 رصيدي, 🎒 مخزني, 🏆 توب CC, ❓ المساعدة) that answer privately.
 - Every **5** member messages under the panel, the old panel is deleted and it is sent and
   pinned again, so it is always near the bottom. Discord's "pinned a message" notice is deleted.
 
 | Chat word | Slash | What it does |
 |---|---|---|
-| `متجر` / `shop` | `/store list` | The items and their prices |
-| `شراء 1` / `شراء 1 3` / `buy` | `/store buy item [quantity]` | Buy item 1 (or 3 of it); a ✅ button confirms, only for the buyer |
+| `متجر` / `shop` | `/store list` | The store panel: items, buy menu and buttons |
+| `متجر 1` / `متجر رتبة vip` / `متجر 1 3` / `buy` | `/store buy item [quantity]` | Buy item 1 (by number or name, or 3 of it); a ✅ button confirms, only for the buyer |
 | `مخزني` / `inventory` | `/store inventory` | What the member bought |
 | `رصيد`, `توب cc` | `/cc`, `/cctop` | Also allowed in the store room |
 
@@ -249,7 +249,7 @@ hour (5:00, 6:00, 7:00...). The commands work in any channel (the store and game
 | Chat word | Slash | What it does |
 |---|---|---|
 | `اسعار` / `بورصة` | `/bourse prices` | A card per asset with its price and move since last hour (🟢 ▲ / 🔴 ▼, nothing when it didn't move; 🔥 when in demand); the rules in the footer |
-| `استثمار عربية` / `استثمار 3 2` | `/bourse invest asset [quantity]` | Buy by name or number (2 of it) |
+| `شراء عربية` / `استثمار عربية` / `شراء 3 2` | `/bourse invest asset [quantity]` | Buy by name or number (2 of it) |
 | `بيع عربية` / `بيع 3 2` | `/bourse sell asset [quantity]` | Sell at the price of the hour |
 | `ممتلكاتي` | `/bourse holdings` | What the member owns, what they paid and what they'd get selling now |
 

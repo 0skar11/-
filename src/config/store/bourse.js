@@ -43,7 +43,7 @@ export const bourseSettings = {
     maxCatchUpHours: 168,
 };
 
-function normalizeName(text) {
+export function normalizeName(text) {
     return String(text || '')
         .trim()
         .toLowerCase()

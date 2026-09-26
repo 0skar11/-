@@ -8,7 +8,7 @@ import { findAsset, getMarket, getHoldings } from '../../services/cc/bourseServi
 import { pricesEmbed, holdingsEmbed, confirmInvestPayload, confirmSellPayload, bourseFailureText } from '../../services/cc/bourseUi.js';
 import { InteractionHelper } from '../../utils/interactionHelper.js';
 
-// The CC bourse: `اسعار` (prices of the hour), `استثمار عربية` / `استثمار 3 2` (buy), `بيع عربية` /
+// The CC bourse: `اسعار` (prices of the hour), `شراء عربية` / `استثمار عربية` / `شراء 3 2` (buy), `بيع عربية` /
 // `بيع 3 2` (sell) and `ممتلكاتي` (holdings). Buying and selling are confirmed with a button
 // (src/interactions/buttons/store/bourse.js). The rules are src/config/store/bourse.js.
 const assetOption = (option) => option.setName('asset').setDescription('Asset number or name (see /bourse prices)').setRequired(true);

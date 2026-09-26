@@ -42,7 +42,7 @@ export function pricesEmbed({ quotes, nextChangeAt }) {
     const embed = ccEmbed('📈 البورصة', `⏰ الأسعار الجاية <t:${next}:R>`, {
         fields: [
             ...cards,
-            { name: '🛒 ازاي تشتري', value: '`استثمار عربية`\n`بيع عربية`\n`ممتلكاتي`', inline: true },
+            { name: '🛒 ازاي تشتري', value: '`شراء عربية`\n`بيع عربية`\n`ممتلكاتي`', inline: true },
         ],
     });
     embed.footer = {
