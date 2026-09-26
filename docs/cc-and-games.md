@@ -186,6 +186,10 @@ from 0 CC. Every change goes through `src/services/cc/ccService.js`, which locks
 
 ## The store
 
+The items below are for our server only (`1155236281706627173`, `src/config/homeGuild.js`); other
+servers keep the old sample store, always as a preview, and get no `رولي`, custom roles, trader role
+or boosts (see `CLAUDE.md`).
+
 The store is **in trial mode** for now: it shows the real items below, and buying one checks the
 balance and shows a receipt but takes no CC and gives nothing (a custom role shows its form and a
 preview of the role). `ccStoreSettings.open = true` opens it.

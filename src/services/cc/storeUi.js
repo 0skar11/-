@@ -4,7 +4,8 @@
 
 import { ActionRowBuilder, ButtonBuilder, ButtonStyle, StringSelectMenuBuilder } from 'discord.js';
 import { CC, ccEmbed, formatCC } from '../../config/cc.js';
-import { ccStoreItems, ccStoreSettings, storeRoomSettings, customRoleSettings } from '../../config/store/ccStoreItems.js';
+import { ccStoreItems, ccStoreDemoItems, ccStoreSettings, storeRoomSettings, customRoleSettings } from '../../config/store/ccStoreItems.js';
+import { isHomeGuild } from '../../config/homeGuild.js';
 import { storeMode, storeCatalog, buyItem } from './ccStoreService.js';
 import { forecastEmbed } from './bourseUi.js';
 
@@ -29,6 +30,10 @@ export const STORE_COMMANDS = [
     ['📈 اسعار', 'أسعار البورصة'],
     ['💵 شراء عربية', 'تشتري من البورصة (أو استثمار)'],
     ['💼 ممتلكاتي', 'اللي معاك في البورصة'],
+];
+
+// Only in our server (src/config/homeGuild.js), where the custom roles are sold.
+const CUSTOM_ROLE_COMMANDS = [
     ['🎨 رولي', 'الرول المميزة بتاعتك'],
     ['📨 رولي انفايت @عضو', 'تضيف صاحبك لرولك'],
     ['🚪 رولي اخرج', 'تخرج من رول صحابك'],
@@ -46,10 +51,11 @@ export function isStorePanelFooter(text) {
 }
 
 /** The commands as a header field plus one card (inline field) per command. */
-export function commandFields(header = 'اكتب الأمر هنا في الروم 👇') {
+export function commandFields(header = 'اكتب الأمر هنا في الروم 👇', guildId = null) {
+    const commands = isHomeGuild(guildId) ? [...STORE_COMMANDS, ...CUSTOM_ROLE_COMMANDS] : STORE_COMMANDS;
     return [
         { name: '⌨️ الأوامر', value: header },
-        ...STORE_COMMANDS.map(([name, value]) => ({ name, value, inline: true })),
+        ...commands.map(([name, value]) => ({ name, value, inline: true })),
     ];
 }
 
@@ -87,7 +93,7 @@ function modeTag(mode) {
  */
 export function buildStorePanel(guild, { settings = ccStoreSettings } = {}) {
     const mode = storeMode(settings);
-    const items = storeCatalog(settings);
+    const items = storeCatalog(settings, { guildId: guild?.id });
     const itemsEmbed = ccEmbed(`🛒 متجر ${CC.name}`, modeTag(mode), { fields: itemFields(items) });
     const commandsEmbed = ccEmbed('⌨️ الأوامر', '', {
         color: PANEL_COMMANDS_COLOR,
@@ -127,13 +133,13 @@ function storePanelComponents(items, mode) {
     return rows;
 }
 
-export function storeHelpEmbed() {
+export function storeHelpEmbed(guildId = null) {
     return ccEmbed('❓ ازاي تستخدم المتجر', [
         '🛒 تقدر تشتري من القايمة اللي في الرسالة المثبتة، وبعدها تأكد بزرار ✅.',
         ...(modeLine() ? ['', modeLine()] : []),
     ].join('\n'), {
         fields: [
-            ...commandFields('ودي الأوامر اللي تقدر تكتبها 👇'),
+            ...commandFields('ودي الأوامر اللي تقدر تكتبها 👇', guildId),
             { name: `💡 ازاي تكسب ${CC.short}`, value: '🎮 تكسب في الألعاب\n📈 لما تعلى لفل\n🔁 لما حد يحوّلك' },
         ],
     });
@@ -141,7 +147,7 @@ export function storeHelpEmbed() {
 
 /** `مخزني`: what the member owns. */
 export function inventoryEmbed(user, inventory = {}) {
-    const known = ccStoreItems;
+    const known = [...ccStoreItems, ...ccStoreDemoItems];
     const lines = Object.entries(inventory)
         .filter(([, count]) => Number(count) > 0)
         .map(([id, count]) => {

@@ -16,6 +16,7 @@ import { startStoreChannel } from "../services/cc/storeChannel.js";
 import { startInviteRewards } from "../services/inviteRewardService.js";
 import { ensureTraderRole } from "../services/cc/traderRoleService.js";
 import { startCustomRoles } from "../services/cc/customRoleService.js";
+import { isHomeGuild } from "../config/homeGuild.js";
 
 export default {
   name: Events.ClientReady,
@@ -89,12 +90,14 @@ export default {
         } catch (error) {
           logger.error(`Failed to find level roles in ${guild.name}:`, error);
         }
-        // The CC store's trader role, made once above the Level 100 role (the owner asked for it).
-        try {
-          const trader = await ensureTraderRole(client, guild);
-          startupLog(`Trader role in ${guild.name}: ${trader.status}`);
-        } catch (error) {
-          logger.error(`Failed to set up the trader role in ${guild.name}:`, error);
+        // The CC store's trader role, made once above the Level 100 role (the owner asked for it), in our server only.
+        if (isHomeGuild(guild.id)) {
+          try {
+            const trader = await ensureTraderRole(client, guild);
+            startupLog(`Trader role in ${guild.name}: ${trader.status}`);
+          } catch (error) {
+            logger.error(`Failed to set up the trader role in ${guild.name}:`, error);
+          }
         }
       }
       const levelRoleSummary = await reconcileLevelRoles(client);

@@ -7,7 +7,7 @@ import { getProfile } from '../../../services/cc/ccService.js';
 // confirmation, whose buttons are handled by src/interactions/buttons/store/storePanel.js.
 async function execute(interaction, client, [action]) {
     if (!interaction.inGuild() || action !== 'buy') return;
-    const item = findStoreItem(interaction.values?.[0], storeCatalog());
+    const item = findStoreItem(interaction.values?.[0], storeCatalog(undefined, { guildId: interaction.guildId }));
     if (!item) {
         await interaction.reply({ content: purchaseFailureText({ reason: 'not_found' }), flags: MessageFlags.Ephemeral }).catch(() => {});
         return;

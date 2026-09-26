@@ -3,6 +3,7 @@ import { STORE_BUTTON_PREFIX, storeHelpEmbed, inventoryEmbed, purchase } from '.
 import { getProfile } from '../../../services/cc/ccService.js';
 import { getStoreItem, storeMode } from '../../../services/cc/ccStoreService.js';
 import { customRoleModal } from '../../../services/cc/customRoleUi.js';
+import { isHomeGuild } from '../../../config/homeGuild.js';
 import { ccProfileEmbed } from '../../../commands/Games/cc.js';
 import { ccTopEmbed } from '../../../commands/Games/cctop.js';
 
@@ -34,7 +35,7 @@ async function execute(interaction, client, [action, ...args]) {
         const [itemId, quantity] = args;
         // A custom role is bought through its form (name, colour, icon): src/interactions/modals/store/customRole.js.
         const item = getStoreItem(itemId);
-        if (item?.type === 'custom_role' && storeMode() !== 'closed') {
+        if (item?.type === 'custom_role' && storeMode() !== 'closed' && isHomeGuild(interaction.guildId)) {
             return interaction.showModal(customRoleModal(item, interaction.guild)).catch(() => {});
         }
         if (onCooldown(interaction.user.id)) return privately(interaction, { content: '⏳ استنى ثانية.' });
@@ -47,7 +48,7 @@ async function execute(interaction, client, [action, ...args]) {
         return;
     }
 
-    if (action === 'help') return privately(interaction, { embeds: [storeHelpEmbed()] });
+    if (action === 'help') return privately(interaction, { embeds: [storeHelpEmbed(interaction.guildId)] });
 
     await interaction.deferReply({ flags: MessageFlags.Ephemeral });
     let embed = null;

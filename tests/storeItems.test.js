@@ -13,8 +13,11 @@ import { customRoleModal, myRolesEmbed } from '../src/services/cc/customRoleUi.j
 import { applyWordAliases } from '../src/config/commands/commandAliases.js';
 import myrole from '../src/commands/Games/myrole.js';
 import { LEVEL_TIERS } from '../src/services/leveling/levelTierRoles.js';
+import { HOME_GUILD_ID, isHomeGuild } from '../src/config/homeGuild.js';
+import { ccStoreDemoItems } from '../src/config/store/ccStoreItems.js';
+import { storeCatalog } from '../src/services/cc/ccStoreService.js';
 
-const GUILD_ID = '100000000000000077';
+const GUILD_ID = HOME_GUILD_ID;
 const MEMBER = '200000000000000077';
 const OPEN = { open: true, trial: false, maxQuantity: 10 };
 const DAY = 24 * 60 * 60 * 1000;
@@ -56,6 +59,28 @@ describe('store catalog', () => {
         assert.equal(maxQuantityOf(byId('luck_box')), 1);
         assert.equal(maxQuantityOf(byId('bourse_forecast')), 1);
         assert.equal(maxQuantityOf(byId('xp_boost')), 10);
+    });
+});
+
+describe('our server only', () => {
+    const OTHER = '100000000000000099';
+
+    test('our only server is 1155236281706627173', () => {
+        assert.equal(HOME_GUILD_ID, '1155236281706627173');
+        assert.ok(isHomeGuild('1155236281706627173'));
+        assert.ok(!isHomeGuild(OTHER));
+    });
+
+    test('other servers keep the old sample store, and buying there is only ever a preview', async () => {
+        assert.deepEqual(storeCatalog(undefined, { guildId: OTHER }).map((item) => item.id), ccStoreDemoItems.map((item) => item.id));
+        assert.deepEqual(storeCatalog(undefined, { guildId: HOME_GUILD_ID }).map((item) => item.id), ccStoreItems.map((item) => item.id));
+        const client = fakeClient();
+        client.store.set(`guild:${OTHER}:economy:${MEMBER}`, { cc: 50_000 });
+        const member = { ...fakeMember(), guild: { id: OTHER, roles: { cache: new Map() } } };
+        assert.equal((await buyItem(client, member, 'luck_box', 1, { settings: OPEN })).reason, 'not_found');
+        const demo = await buyItem(client, member, 'demo_box', 1, { settings: OPEN });
+        assert.equal(demo.trial, true);
+        assert.equal((await getProfile(client, OTHER, MEMBER)).cc, 50_000);
     });
 });
 

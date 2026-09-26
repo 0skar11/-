@@ -49,7 +49,7 @@ export default {
         }
 
         if (storeMode() === 'closed') return reply({ content: purchaseFailureText({ reason: 'closed' }) });
-        const item = findStoreItem(interaction.options.getString('item'), storeCatalog());
+        const item = findStoreItem(interaction.options.getString('item'), storeCatalog(undefined, { guildId: interaction.guildId }));
         if (!item) return reply({ content: purchaseFailureText({ reason: 'not_found' }) });
         const quantity = interaction.options.getInteger('quantity') || 1;
         if (quantity < 1 || quantity > maxQuantityOf(item)) {

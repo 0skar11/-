@@ -3,8 +3,11 @@
 // (src/services/cc/storeChannel.js). While the store is in trial mode a purchase is only a preview:
 // the balance is checked but no CC is taken and nothing is given.
 // Custom roles (type 'custom_role') are bought through a form instead: customRoleService.js.
+// The items are for our server only (src/config/homeGuild.js); other servers keep the old samples
+// (ccStoreDemoItems), always as a preview.
 
-import { ccStoreItems, ccStoreSettings, luckBoxPrizes } from '../../config/store/ccStoreItems.js';
+import { ccStoreItems, ccStoreDemoItems, ccStoreSettings, luckBoxPrizes } from '../../config/store/ccStoreItems.js';
+import { isHomeGuild } from '../../config/homeGuild.js';
 import { getProfile, updateCCState } from './ccService.js';
 import { logger } from '../../utils/logger.js';
 import { normalizeName } from '../../config/store/bourse.js';
@@ -46,9 +49,13 @@ export function storeMode(settings = ccStoreSettings) {
     return settings.trial ? 'trial' : 'closed';
 }
 
-/** The items the store shows right now: the catalog (open or trial), or none when it is closed. */
-export function storeCatalog(settings = ccStoreSettings, { items = ccStoreItems } = {}) {
-    return storeMode(settings) === 'closed' ? [] : listStoreItems(items);
+/**
+ * The items the store shows right now in `guildId`: the catalog (open or trial), or none when it is
+ * closed. Other servers than ours see the old samples.
+ */
+export function storeCatalog(settings = ccStoreSettings, { items = ccStoreItems, demoItems = ccStoreDemoItems, guildId = null } = {}) {
+    if (storeMode(settings) === 'closed') return [];
+    return listStoreItems(guildId && !isHomeGuild(guildId) ? demoItems : items);
 }
 
 /** How many of `item` can be bought at once. */
@@ -98,9 +105,16 @@ export function findStoreItem(query, items) {
  * role_failed, role_missing, use_form (custom roles are bought through their form).
  * A luck box adds `prize` (and `boostUntil` for a boost prize), a boost `boostUntil`, a forecast `forecast`.
  */
-export async function buyItem(client, member, itemId, quantity = 1, { items = ccStoreItems, settings = ccStoreSettings, rng = Math.random } = {}) {
+export async function buyItem(client, member, itemId, quantity = 1, { items = ccStoreItems, demoItems = ccStoreDemoItems, settings = ccStoreSettings, rng = Math.random } = {}) {
     const mode = storeMode(settings);
     if (mode === 'closed') return { ok: false, reason: 'closed' };
+    // Other servers: the old samples, only ever previewed.
+    if (!isHomeGuild(member.guild.id)) {
+        const demo = getStoreItem(itemId, demoItems);
+        if (!demo) return { ok: false, reason: 'not_found' };
+        if (!Number.isSafeInteger(quantity) || quantity < 1 || quantity > settings.maxQuantity) return { ok: false, reason: 'bad_quantity' };
+        return previewPurchase(client, member, demo, quantity);
+    }
     const item = getStoreItem(itemId, items);
     if (!item) return { ok: false, reason: 'not_found' };
     if (!Number.isSafeInteger(quantity) || quantity < 1 || quantity > maxQuantityOf(item, settings)) return { ok: false, reason: 'bad_quantity' };

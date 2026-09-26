@@ -3,6 +3,7 @@
 // the first time only, created with no permissions just above the Level 100 role. Once it was made,
 // it is never made again: if the owner deletes it, it is only reported as missing (the bot doesn't
 // recreate roles the owner removed). Its ID is saved in the guild config as `traderRoleId`.
+// Our server only (src/config/homeGuild.js): src/events/ready.js calls it for that server alone.
 
 import { traderRoleSettings } from '../../config/store/ccStoreItems.js';
 import { getGuildConfig, updateGuildConfig } from '../config/guildConfig.js';

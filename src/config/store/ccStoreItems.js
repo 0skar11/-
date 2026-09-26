@@ -29,6 +29,15 @@ export const ccStoreItems = [
     { id: 'bourse_forecast', name: 'تنبؤ البورصة', emoji: '🔮', description: 'تعرف كل أصل في البورصة هيطلع ولا هينزل الساعة الجاية', price: 6500, type: 'forecast' },
 ];
 
+// Other servers (not HOME_GUILD_ID in src/config/homeGuild.js) keep the store as it was before these
+// items: these samples, in trial mode (buying only previews). They get no updates unless the owner asks.
+export const ccStoreDemoItems = [
+    { id: 'demo_vip', name: 'رتبة VIP', emoji: '💎', description: 'رتبة مميزة بلون خاص فوق الأعضاء', price: 5000, type: 'item', maxOwned: 1 },
+    { id: 'demo_color', name: 'لون مميز للاسم', emoji: '🎨', description: 'تختار لون اسمك في السيرفر', price: 1500, type: 'item', maxOwned: 1 },
+    { id: 'demo_xp_boost', name: 'بوست XP ×2', emoji: '⚡', description: 'ضعف الـ XP لمدة ساعة', price: 800, type: 'item', maxOwned: 5 },
+    { id: 'demo_box', name: 'صندوق حظ', emoji: '🎁', description: 'جواه جايزة عشوائية', price: 300, type: 'item', maxOwned: 10 },
+];
+
 // The luck box: one prize is drawn by `weight` (the chance is weight / total). On average it gives back
 // a little less than its price (about 1,235 CC, plus an XP boost 11% of the time, for 1,500), so buying
 // boxes doesn't create CC.

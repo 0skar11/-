@@ -10,6 +10,7 @@ import { buyItem, storeCatalog, storeMode, findStoreItem } from '../src/services
 import { ccStoreItems, storeRoomSettings } from '../src/config/store/ccStoreItems.js';
 import { typedCommandName } from '../src/services/games/gamesChannel.js';
 import { SERVER_OWNER_IDS } from '../src/config/serverOwners.js';
+import { HOME_GUILD_ID } from '../src/config/homeGuild.js';
 
 const GUILD_ID = '100000000000000001';
 const STORE_ID = '300000000000000001';
@@ -175,7 +176,7 @@ describe('trial buying', () => {
             get: async () => ({ cc: item.price * 2 }),
             set: async () => { saved += 1; return true; },
         };
-        const member = { id: MEMBER, guild: { id: GUILD_ID }, roles: { cache: new Map() } };
+        const member = { id: MEMBER, guild: { id: HOME_GUILD_ID }, roles: { cache: new Map() } };
         const result = await buyItem({ db }, member, item.id, 2);
         assert.equal(result.ok, true);
         assert.equal(result.trial, true);

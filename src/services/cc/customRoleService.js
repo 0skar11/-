@@ -23,6 +23,7 @@ import { Mutex } from '../../utils/mutex.js';
 import { logger } from '../../utils/logger.js';
 import { spendCC, grantCC, getProfile } from './ccService.js';
 import { getTraderRole } from './traderRoleService.js';
+import { isHomeGuild } from '../../config/homeGuild.js';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -366,6 +367,8 @@ async function leaderCanPay(client, guild, record) {
 
 export async function sweepCustomRoles(client, options = {}) {
     for (const guild of client.guilds.cache.values()) {
+        // Custom roles are sold in our server only.
+        if (!isHomeGuild(guild.id)) continue;
         const records = await listCustomRoles(client, guild.id).catch(() => []);
         if (!records.length) continue;
         const summary = await sweepGuildCustomRoles(client, guild, options).catch((error) => {
