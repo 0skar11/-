@@ -7,7 +7,12 @@ import { ModerationService } from '../src/services/moderation/moderationService.
 const guild = { id: 'g', name: 'Chaos', iconURL: () => null, vanityURLCode: 'chaos' };
 
 describe('ban / kick DM (report #133)', () => {
-  test('says what happened and why, without naming the moderator', () => {
+  test('says what happened and why, and who to talk to if it was unfair', () => {
+    const member = { id: '200000000000000001', toString: () => '<@200000000000000001>' };
+    const moderator = { id: '200000000000000002', user: { tag: 'mod#1' } };
+    const withStaff = buildPunishmentDm(guild, 'ban', 'سبام', null, { user: member, moderator });
+    assert.match(withStaff.embeds[0].description, /^<@200000000000000001> اتعملك/u);
+    assert.match(withStaff.embeds[0].description, /لو حاسس إنك مظلوم، اتفاهم مع الإداري <@200000000000000002> \(mod#1\)/u);
     const ban = buildPunishmentDm(guild, 'ban', 'سبام');
     assert.match(ban.embeds[0].description, /بان[\s\S]*Chaos[\s\S]*السبب:\*\* سبام/u);
     assert.equal(ban.components.length, 0);
@@ -22,9 +27,10 @@ describe('ban / kick DM (report #133)', () => {
     assert.equal(await sendPunishmentDm(guild, { id: 'u', send: async () => {} }, 'warn', 'x'), false);
   });
 
-  test('the DM is sent before the ban and the kick', async () => {
+  test('the DM is sent before the ban and the kick, with the member mentioned', async () => {
     const order = [];
-    const user = { id: '200000000000000001', tag: 'u', send: async () => order.push('dm') };
+    const sent = [];
+    const user = { id: '200000000000000001', tag: 'u', toString: () => '<@200000000000000001>', send: async (payload) => { sent.push(payload); order.push('dm'); } };
     const moderator = { id: '200000000000000002', user: { tag: 'mod' }, permissions: new PermissionsBitField(PermissionsBitField.All) };
     const g = {
       ...guild,
@@ -35,6 +41,8 @@ describe('ban / kick DM (report #133)', () => {
     };
     await ModerationService.banUser({ guild: g, user, moderator, reason: 'r' }).catch(() => {});
     assert.deepEqual(order.slice(0, 2), ['dm', 'ban']);
+    assert.equal(sent[0].content, '<@200000000000000001>');
+    assert.match(sent[0].embeds[0].description, /اتفاهم مع الإداري <@200000000000000002> \(mod\)/u);
 
     order.length = 0;
     const member = { id: user.id, user, kickable: true, kick: async () => order.push('kick'), roles: { highest: { position: 0 } }, guild: g };

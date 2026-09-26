@@ -110,7 +110,7 @@ export default {
                         continue;
                     }
 
-                    await sendPunishmentDm(interaction.guild, member.user, 'kick', reason);
+                    await sendPunishmentDm(interaction.guild, member.user, 'kick', reason, interaction.user);
                     await member.kick(reason);
 
                     results.successful.push({

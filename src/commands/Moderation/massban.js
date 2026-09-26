@@ -122,7 +122,7 @@ export default {
                     }
 
                     // Only members still in the server can be told (the bot must share a server to DM).
-                    if (member) await sendPunishmentDm(interaction.guild, user, 'ban', reason);
+                    if (member) await sendPunishmentDm(interaction.guild, user, 'ban', reason, interaction.user);
                     await interaction.guild.members.ban(userId, {
                         reason: reason,
                         deleteMessageSeconds: deleteDays * 24 * 60 * 60
