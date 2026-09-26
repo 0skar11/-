@@ -92,20 +92,28 @@ export function demandMove(flow = {}, demand = bourseSettings.demand) {
 }
 
 /**
- * One hour of an asset: a new price drawn at random anywhere between `min` and the ceiling (`max`,
- * lifted by buying demand), whatever the last price was. Demand nudges the draw: each net buyer moves
- * it up by `demand.perBuyerPercent` of the range, each net seller down.
+ * One hour of an asset: a random move of at most `maxMovePercent` (10%) up or down from the last
+ * price. Near the top of its range the move leans down, near the bottom up, so it doesn't stick to a
+ * limit; demand pushes it (each net buyer up by `demand.perBuyerPercent`, each net seller down). The
+ * whole move, demand included, never goes past `maxMovePercent` in one hour.
  */
 export function tickAsset(asset, entry, { settings = bourseSettings, rng = Math.random } = {}) {
     const { min } = asset;
+    const maxMove = settings.maxMovePercent / 100;
     const demand = demandMove(entry.flow, settings.demand);
     const raise = demand > 0
         ? Math.min(settings.demand.maxRaisePercent, entry.raise + demand * 100)
         : Math.max(0, entry.raise - settings.demand.raiseDecayPercent);
     const ceiling = assetCeiling(asset, raise);
+    const position = (entry.price - min) / (ceiling - min);
 
-    const draw = clamp(rng() + demand, 0, 1);
-    const price = keepInside(Math.round(min + draw * (ceiling - min)), min, ceiling, rng);
+    let lean = 0;
+    if (demand <= 0 && entry.price > ceiling) lean = -maxMove;
+    else if (demand <= 0 && position > 0.85) lean = -maxMove / 2;
+    else if (position < 0.15) lean = maxMove / 2;
+
+    const move = clamp((rng() * 2 - 1) * maxMove + lean + demand, -maxMove, maxMove);
+    const price = keepInside(Math.round(entry.price * (1 + move)), min, ceiling, rng);
     return { price, previous: entry.price, raise: Math.round(raise * 100) / 100, flow: {} };
 }
 

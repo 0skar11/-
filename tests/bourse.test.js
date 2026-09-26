@@ -82,37 +82,30 @@ describe('bourse prices', () => {
         }
     });
 
-    test('random prices stay between min and max without demand', () => {
+    test('random moves stay between min and max and never move more than 10% an hour', () => {
         const rng = seeded(7);
         for (const asset of bourseAssets) {
             let entry = normalizeMarket(null, { rng }).assets[asset.id];
             for (let hour = 0; hour < 2000; hour += 1) {
-                entry = tickAsset(asset, entry, { rng });
-                assert.ok(entry.price > asset.min && entry.price < asset.max, `${asset.id} ${entry.price}`);
+                const next = tickAsset(asset, entry, { rng });
+                assert.ok(next.price > asset.min && next.price < asset.max, `${asset.id} ${next.price}`);
+                assert.ok(Math.abs(next.price - entry.price) <= Math.ceil(entry.price * 0.1) + 1, `${asset.id} ${entry.price} -> ${next.price}`);
+                entry = next;
             }
         }
     });
 
-    test('each hour the price is fully random between min and max, whatever it was (report #130)', () => {
+    test('an hour moves by at most 10%, whatever the demand (the owner\'s rule)', () => {
+        assert.equal(bourseSettings.maxMovePercent, 10);
         const car = byId('car');
-        const middle = Math.round(car.min + 0.5 * (car.max - car.min));
-        for (const price of [850, 1300, 1990]) {
-            const entry = { price, previous: price, raise: 0, flow: {} };
-            assert.equal(tickAsset(car, entry, { rng: () => 0.5 }).price, middle);
-            assert.ok(tickAsset(car, entry, { rng: () => 0 }).price <= car.min + Math.round((car.max - car.min) * 0.02) + 1);
-            assert.ok(tickAsset(car, entry, { rng: () => 0.9999 }).price >= car.max - Math.round((car.max - car.min) * 0.02) - 1);
-        }
-        // Over many hours the price visits the whole range, not just near the last price.
-        const rng = seeded(11);
-        let entry = { price: 1300, previous: 1300, raise: 0, flow: {} };
-        let low = Infinity;
-        let high = 0;
-        for (let hour = 0; hour < 200; hour += 1) {
-            entry = tickAsset(car, entry, { rng });
-            low = Math.min(low, entry.price);
-            high = Math.max(high, entry.price);
-        }
-        assert.ok(low < car.min + 150 && high > car.max - 150, `${low} ${high}`);
+        const entry = { price: 1300, previous: 1300, raise: 0, flow: {} };
+        assert.equal(tickAsset(car, entry, { rng: () => 1 }).price, Math.round(1300 * 1.1));
+        assert.equal(tickAsset(car, entry, { rng: () => 0 }).price, Math.round(1300 * 0.9));
+        const rush = { ...entry, flow: Object.fromEntries(Array.from({ length: 30 }, (_, i) => [`u${i}`, 1])) };
+        assert.equal(tickAsset(car, rush, { rng: () => 1 }).price, Math.round(1300 * 1.1));
+        // At the top the move leans down, at the bottom up.
+        assert.ok(tickAsset(car, { ...entry, price: 1990 }, { rng: () => 0.5 }).price < 1990);
+        assert.ok(tickAsset(car, { ...entry, price: 810 }, { rng: () => 0.5 }).price > 810);
     });
 
     test('demand pushes the price up and lifts the ceiling, which comes back down after', () => {
@@ -135,7 +128,7 @@ describe('bourse prices', () => {
     test('selling pressure pushes the price down', () => {
         const car = byId('car');
         const entry = { price: 1300, previous: 1300, raise: 0, flow: { a: -1, b: -1, c: -1 } };
-        assert.equal(tickAsset(car, entry, { rng: () => 0.5 }).price, Math.round(car.min + 0.47 * (car.max - car.min)));
+        assert.equal(tickAsset(car, entry, { rng: () => 0.5 }).price, Math.round(1300 * 0.97));
     });
 
     test('missed hours are played when the market is read later, up to the cap', () => {
@@ -217,14 +210,11 @@ describe('bourse trading', () => {
         const later = { now: NOW + HOUR_MS, rng: () => 0.5 };
         const { quotes } = await getMarket(client, GUILD, later);
         const car = quotes.find((entry) => entry.asset.id === 'car');
-        // A middle random draw, nudged up by the 2 buyers (1% of the range each), whose buying also
-        // lifted the ceiling by 2%.
-        const carAsset = byId('car');
-        assert.equal(car.price, Math.round(carAsset.min + 0.52 * (assetCeiling(carAsset, 2) - carAsset.min)));
-        assert.ok(car.changePercent > 0);
+        // A middle random draw: only the 2 buyers moved it (1% each).
+        assert.equal(car.price, Math.round(byId('car').start * 1.02));
+        assert.equal(car.changePercent, 2);
         const gold = quotes.find((entry) => entry.asset.id === 'gold');
-        const goldAsset = byId('gold');
-        assert.equal(gold.price, Math.round(goldAsset.min + 0.5 * (goldAsset.max - goldAsset.min)));
+        assert.equal(gold.price, byId('gold').start);
 
         // Buying a piece they already had at the old price: the old price is refused.
         assert.equal((await invest(client, GUILD, A, 'car', 1, { ...later, expectedPrice: byId('car').start })).reason, 'price_changed');
