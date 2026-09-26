@@ -101,7 +101,7 @@ describe('bourse prices', () => {
         const entry = { price: 1300, previous: 1300, raise: 0, flow: {} };
         assert.equal(tickAsset(car, entry, { rng: () => 1 }).price, Math.round(1300 * 1.1));
         assert.equal(tickAsset(car, entry, { rng: () => 0 }).price, Math.round(1300 * 0.9));
-        const rush = { ...entry, flow: Object.fromEntries(Array.from({ length: 30 }, (_, i) => [`u${i}`, 1])) };
+        const rush = { ...entry, flow: Object.fromEntries(Array.from({ length: 60 }, (_, i) => [`u${i}`, 1])) };
         assert.equal(tickAsset(car, rush, { rng: () => 1 }).price, Math.round(1300 * 1.1));
         // At the top the move leans down, at the bottom up.
         assert.ok(tickAsset(car, { ...entry, price: 1990 }, { rng: () => 0.5 }).price < 1990);
@@ -123,6 +123,24 @@ describe('bourse prices', () => {
         for (let hour = 0; hour < 10; hour += 1) entry = tickAsset(car, entry, { rng: () => 1 });
         assert.equal(entry.raise, 0);
         assert.ok(entry.price <= car.max);
+    });
+
+    test('20+ pieces bought in the hour: the price is sure to rise, by the number of pieces', () => {
+        const car = byId('car');
+        const bought = (pieces) => ({ price: 1300, previous: 1300, raise: 0, flow: { a: pieces - 5, b: 5 } });
+        // Below 20 pieces, a low random draw can still bring the price down.
+        assert.ok(tickAsset(car, bought(19), { rng: () => 0 }).price < 1300);
+        // 20 pieces: +5% whatever the random draw; 30: +7.5%; 40 or more: +10% (the hourly cap).
+        for (const rng of [() => 0, () => 0.5, () => 0.99]) {
+            assert.equal(tickAsset(car, bought(20), { rng }).price, Math.round(1300 * 1.05));
+        }
+        assert.equal(tickAsset(car, bought(30), { rng: () => 0 }).price, Math.round(1300 * 1.075));
+        assert.equal(tickAsset(car, bought(80), { rng: () => 0 }).price, Math.round(1300 * 1.1));
+        // Sales count against the purchases.
+        assert.ok(tickAsset(car, { ...bought(20), flow: { a: 25, b: -6 } }, { rng: () => 0 }).price < 1300);
+        // Near the top the ceiling rises with it, so the sure rise isn't cut off.
+        const top = tickAsset(car, { ...bought(20), price: 1990 }, { rng: () => 0 });
+        assert.ok(top.price > 1990 && top.raise > 0, `${top.price}`);
     });
 
     test('selling pressure pushes the price down', () => {
