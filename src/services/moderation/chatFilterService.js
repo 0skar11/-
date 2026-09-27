@@ -45,7 +45,7 @@ export const BANNED_WORDS = [/(?<!\p{L})ال\s?حفره(?!\p{L})/u, /(?<![a-z])[
 
 const RULES = {
     // The owner's own reply for this one, instead of the usual notice.
-    kosomak: { label: 'شتيمة (كسمك)', timeoutMs: HOUR, reply: (userId) => `<@${userId}> كسمك انت، خد تايم يبن المتناكة` },
+    kosomak: { label: 'شتيمة (كسمك)', timeoutMs: HOUR, reply: (userId) => `<@${userId}> كسمين امك خد تايم يبنالمتناكه` },
     ibnAl: { label: 'شتيمة (ابن ال...)', warn: true },
     insult: { label: 'شتيمة', warn: true },
     banned: { label: 'كلمة ممنوعة' },
