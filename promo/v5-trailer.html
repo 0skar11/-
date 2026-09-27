@@ -55,8 +55,8 @@
   .rate-f { font-size: 30px; font-weight: 700; color: #aaa; margin-top: 18px; }
   /* the hook is on screen from the very first frame, with a zoom punch */
   #proof { animation-name: hookVis; }
-  @keyframes hookVis { 0% { opacity: 1; transform: scale(1.12); } 6% { transform: scale(1); } 95% { opacity: 1; transform: scale(1); }
-    100% { opacity: 0; transform: scale(.96); filter: blur(6px); } }
+  @keyframes hookVis { 0% { opacity: 1; transform: scale(1.12); filter: blur(0); } 6% { transform: scale(1); filter: blur(0); }
+    95% { opacity: 1; transform: scale(1); filter: blur(0); } 100% { opacity: 0; transform: scale(.96); filter: blur(6px); } }
   .soon { font-size: 44px; font-weight: 900; color: #e8dcc0; }
   /* real screenshots */
   .badge { font-size: 36px; font-weight: 900; color: #111; background: #ffd66e; padding: 8px 26px; border-radius: 999px; }
@@ -76,7 +76,7 @@
   .safe { font-size: 50px; font-weight: 900; color: #f9a8d4; }
 </style>
 </head>
-<body data-duration="29.7" data-cover="2.4">
+<body data-duration="34.02" data-cover="2.4">
 <div id="stage" class="bars">
   <div class="glow"></div>
   <canvas id="sparks" width="1080" height="1920"></canvas>
@@ -132,7 +132,7 @@
     <div class="title gold slam" data-at="0.1" style="font-size:120px">أول يوم افتتاح</div>
     <div class="among up" data-at="0.4">بالليل بنلعب <span class="num" style="color:#ff5a6e">AMONG US</span> <span class="emoji">🔪</span></div>
     <div class="shot fromR" data-at="0.5" id="voiceshot"><img src="vo/v5/voice.png" style="height:650px"></div>
-    <div class="sub fade" data-at="0.3" style="bottom:250px">سيرفر جديد… ورغم كده من أول ليلة الفويس مليان 🔥</div>
+    <div class="sub fade" data-at="0.3" style="bottom:250px">بص يا معلم… سيرفر لسه فاتح من يوم، والفويس مليان على الآخر! 🔥</div>
   </section>
 
   <section class="scene" id="economy">

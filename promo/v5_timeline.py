@@ -24,18 +24,20 @@ TRIM = ('silenceremove=start_periods=1:start_threshold=-45dB:start_silence=0.02,
 
 # The short cut: the real voice-channel screenshot is the hook, then logo, montage, the message to
 # girls and the call to action. (scene, narrator line or None, lead-in, tail or fixed length)
+# Narrator: Mostafa (young, energetic) in young Egyptian slang — y_*.mp3. The older, slower take by
+# Gamal is still in vo/v5/01.mp3 … 11.mp3.
 SEQ = [
-    ('proof', 11, 0.15, 0.8),      # hook: opening night, Among Us, the voice channel is full
+    ('proof', 'y_hook', 0.15, 0.8),    # hook: opening night, Among Us, the voice channel is full
     ('logo', None, 0, 2.1),
-    ('games', 5, 0.1, 0.25),
-    ('bourse', 7, 0.1, 1.5),       # the real bourse board needs a moment to be read
-    ('mafia', 8, 0.1, 0.35),
-    ('girls', 12, 0.3, 0.7),       # Nadia: girl-to-girl verification
-    ('finale', 10, 0.35, 1.8),
+    ('games', 'y_games', 0.1, 0.25),
+    ('bourse', 'y_bourse', 0.1, 1.5),  # the real bourse board needs a moment to be read
+    ('mafia', 'y_mafia', 0.1, 0.35),
+    ('girls', 12, 0.3, 0.7),           # Nadia: girl-to-girl verification
+    ('finale', 'y_finale', 0.35, 1.8),
 ]
-# Speed per line (the trailer voice is slow by nature; a touch faster keeps the cut snappy).
+# Speed per line.
 TEMPO = {12: 1.05}
-DEFAULT_TEMPO = 1.08
+DEFAULT_TEMPO = 1.0
 
 
 def length(mp3, tempo):
@@ -53,8 +55,9 @@ def main():
             t += tail
         else:
             tempo = TEMPO.get(line, DEFAULT_TEMPO)
-            d = length(vo / f'{line:02d}.mp3', tempo)
-            lines.append({'file': f'vo/v5/{line:02d}.mp3', 'at': round(start + lead, 2), 'tempo': tempo})
+            clip = line if isinstance(line, str) else f'{line:02d}'
+            d = length(vo / f'{clip}.mp3', tempo)
+            lines.append({'file': f'vo/v5/{clip}.mp3', 'at': round(start + lead, 2), 'tempo': tempo})
             t = start + lead + d + tail
         scenes[name] = [round(start, 2), round(t, 2)]
     end = round(t, 2)
