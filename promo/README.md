@@ -16,6 +16,12 @@
 
 وجنب كل فيديو صورة غلاف (`out/*-cover.png`).
 
+**`out/v4-story-vo.mp4`** (43 ث): قصة شات. محادثة ديسكورد بين صاحبين: زيزو زهقان إن السيرفر بتاعهم مات، وكيمو
+بيقنعه يدخل CHAOS (الألعاب، الـ CC، صفقة في البورصة بمكسب +267 CC، مكافأة الانفايت 1000 CC)، وفي الآخر بيبعتله
+لينك الدعوة. كل رسالة بتتقري بصوت صاحبها من ElevenLabs: زيزو = *Ziad*، كيمو = *Karim*، والراوي في الآخر
+= *Mostafa*. فيه كمان مؤثرات ElevenLabs (صوت وصول الرسالة وصوت الكاشير) وموسيقى lo-fi من ElevenLabs Music، وبعدين
+drop الـ phonk مع اللوجو. الدايرة الخضرا حوالين الأفاتار بتنوّر وصاحبها بيتكلم، زي ديسكورد بالظبط.
+
 **`out/v1-main-vo.mp4`**: الفيديو الرئيسي بتعليق صوتي مصري (ElevenLabs، صوت *Mostafa – Bold and Spirited*،
 موديل `eleven_v3`) وموسيقى Phonk متعملة بـ ElevenLabs Music. ده أقوى نسخة للنشر كإعلان.
 
@@ -57,7 +63,15 @@ node render.mjs --invite discord.gg/XXXX
 
 ```bash
 python3 mixvo.py vo/v1/plan.json    # -> out/v1-main-vo.mp4
+
+# قصة الشات: التوقيت كله محسوب من طول الجمل الصوتية
+python3 v4_timeline.py              # -> v4-story.timeline.js + vo/v4/plan.json
+node render.mjs v4-story            # الصورة
+python3 mixvo.py vo/v4/plan.json    # -> out/v4-story-vo.mp4
 ```
+
+لو غيرت جملة في ElevenLabs: نزّلها مكان الملف القديم في `vo/v4/`، وشغّل الأوامر التلاتة من الأول، والرسايل
+هتتظبط على الطول الجديد لوحدها.
 
 ملفات الصوت (`vo/`) مش في الريبو؛ هي في الـ flow بتاع ElevenLabs "CHAOS promo — voiceover + music".
 النص:

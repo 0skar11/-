@@ -1,0 +1,179 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<title>CHAOS — قصة شات</title>
+<link rel="stylesheet" href="shared.css">
+<style>
+  .scene.chat { justify-content: flex-start; padding: 70px 40px 0; gap: 26px; }
+  .hook { font-family: 'Lalezar', 'Cairo'; font-size: 66px; line-height: 1.25; text-shadow: 0 6px 24px rgba(0,0,0,.7); }
+  .hook .hl { padding: 0 18px; }
+  .dm { width: 1000px; height: 1420px; background: #313338; border-radius: 44px; overflow: hidden; border: 2px solid #1e1f22;
+    box-shadow: 0 40px 120px rgba(0,0,0,.65), 0 0 0 10px rgba(255,255,255,.04); display: flex; flex-direction: column; text-align: right; }
+  .dm-h { height: 116px; flex: none; background: #2b2d31; border-bottom: 2px solid #1e1f22; display: flex; align-items: center; gap: 22px; padding: 0 36px; }
+  .dm-h .at { font-size: 54px; color: #80848e; font-weight: 700; }
+  .dm-h .nm { font-size: 46px; font-weight: 900; color: #f2f3f5; }
+  .dm-h .on { width: 22px; height: 22px; border-radius: 50%; background: #23a55a; }
+  .dm-h .ic { margin-right: auto; font-family: 'Noto Color Emoji'; font-size: 44px; letter-spacing: 26px; opacity: .8; }
+  .dm-b { position: relative; flex: 1; overflow: hidden; }
+  .dm-list { position: absolute; left: 0; right: 0; top: 0; padding: 26px 30px 90px; }
+  .m { display: flex; gap: 24px; padding: 14px 10px; border-radius: 18px; }
+  .m.g { padding-top: 2px; }
+  .m.live { background: rgba(255,255,255,.035); }
+  .av { flex: none; width: 96px; height: 96px; border-radius: 50%; display: grid; place-items: center; font-family: 'Noto Color Emoji'; font-size: 56px;
+    transition: none; }
+  .m.g .av { visibility: hidden; height: 0; }
+  .av.speaking { box-shadow: 0 0 0 6px #313338, 0 0 0 11px #23a55a, 0 0 30px 8px rgba(35,165,90,.6); }
+  .mc { flex: 1; min-width: 0; }
+  .mh { display: flex; align-items: baseline; gap: 18px; margin-bottom: 4px; }
+  .mh .nm { font-size: 42px; font-weight: 900; }
+  .mh .ts { font-size: 28px; color: #949ba4; font-weight: 700; }
+  .tx { font-size: 46px; line-height: 1.45; color: #dbdee1; font-weight: 700; }
+  .tx b { color: #fff; }
+  .emb { margin-top: 12px; background: #2b2d31; border-radius: 16px; border-right: 10px solid var(--gold); padding: 26px 30px; max-width: 800px; }
+  .emb .et { font-size: 34px; font-weight: 900; color: #b5bac1; margin-bottom: 14px; }
+  .emb .er { display: flex; justify-content: space-between; font-size: 40px; font-weight: 700; color: #dbdee1; padding: 6px 0; }
+  .emb .er .v { font-family: 'Anton'; direction: ltr; }
+  .emb .big { font-family: 'Anton'; font-size: 96px; direction: ltr; text-align: right; line-height: 1.1; margin-top: 10px; }
+  .emb.inv { border-right-color: #5865f2; }
+  .inv-row { display: flex; align-items: center; gap: 26px; }
+  .srv { width: 120px; height: 120px; border-radius: 34px; display: grid; place-items: center; font-family: 'Anton'; font-size: 70px; color: #fff;
+    background: linear-gradient(135deg, var(--red), var(--vio)); box-shadow: 0 0 40px rgba(255,46,77,.5); flex: none; }
+  .srv-n { font-family: 'Anton'; font-size: 60px; letter-spacing: 6px; color: #fff; direction: ltr; }
+  .srv-d { font-size: 32px; color: #b5bac1; font-weight: 700; }
+  .join { margin-right: auto; background: #248046; color: #fff; font-size: 44px; font-weight: 900; padding: 18px 44px; border-radius: 14px; }
+  .typing { position: absolute; right: 36px; bottom: 16px; font-size: 32px; font-weight: 700; color: #dbdee1; opacity: 0; display: flex; gap: 14px; align-items: center; }
+  .typing i { display: inline-block; width: 14px; height: 14px; border-radius: 50%; background: #dbdee1; }
+  .dm-f { flex: none; padding: 18px 30px 34px; }
+  .inp { background: #383a40; border-radius: 22px; padding: 26px 34px; font-size: 38px; color: #6d6f78; font-weight: 700; display: flex; gap: 20px; align-items: center; }
+  .inp .plus { width: 54px; height: 54px; border-radius: 50%; background: #b5bac1; color: #383a40; display: grid; place-items: center; font-size: 44px; font-weight: 900; }
+  .tap { position: absolute; font-family: 'Noto Color Emoji'; font-size: 120px; opacity: 0; pointer-events: none; }
+</style>
+</head>
+<body data-duration="43.5" data-cover="19.2" data-hits="39.31">
+<div id="stage">
+  <div class="bg"><div class="blob a"></div><div class="blob b"></div><div class="blob c"></div><div class="noise"></div><div class="scan"></div><div class="vignette"></div></div>
+
+  <!-- 1. The DM -->
+  <section class="scene chat" data-start="0" data-end="39.56">
+    <div class="hook glin" data-at="0">لما صاحبك يقولك <span class="hl">السيرفر مات</span> <span class="emoji">💀</span></div>
+    <div class="dm fromR" data-at="0.15">
+      <div class="dm-h"><span class="at">@</span><span class="av" id="hav" style="width:74px;height:74px;font-size:42px"></span><span class="nm" id="hname"></span><span class="on"></span><span class="ic">📞🎥</span></div>
+      <div class="dm-b" id="body">
+        <div class="dm-list" id="list"></div>
+        <div class="typing" id="typing"><span><i></i> <i></i> <i></i></span><span id="typname"></span></div>
+      </div>
+      <div class="dm-f"><div class="inp"><span class="plus">+</span><span id="ph"></span></div></div>
+    </div>
+    <div class="tap" id="tap">👆</div>
+  </section>
+
+  <!-- 2. CTA -->
+  <section class="scene" data-start="39.31" data-end="43.5">
+    <div class="logo slam" data-t="CHAOS" data-at="0" style="font-size:250px">CHAOS</div>
+    <div class="h2 up" data-at="0.35">الفوضى <span class="red">مستنياك</span> <span class="emoji">🔥</span></div>
+    <div class="pop" data-at="0.8"><div class="btn pulse">ادخل السيرفر</div></div>
+    <div class="cta-foot up" data-at="1.2" data-invite>
+      <div class="bio">اللينك في البايو <span class="bounce">👇</span></div>
+      <div class="link">discord.gg/…</div>
+    </div>
+  </section>
+
+  <div id="flash"></div>
+</div>
+<script src="v4-story.timeline.js"></script>
+<script>
+  // Build the chat from the timeline before shared.js starts the clock.
+  (function () {
+    const P = { A: TL.A, B: TL.B };
+    const $ = id => document.getElementById(id);
+    const avBg = who => who === 'A' ? 'linear-gradient(135deg,#0e7490,#22d3ee)' : 'linear-gradient(135deg,#9f1239,#ff5a6e)';
+    $('hav').textContent = P.B.avatar; $('hav').style.background = avBg('B');
+    $('hname').textContent = P.B.name;
+    $('ph').textContent = `ابعت رسالة لـ @${P.B.name}`;
+    const cards = {
+      trade: `<div class="emb"><div class="et">📈 البورصة · صفقة كيمو</div>
+        <div class="er"><span>🚗 عربية · شراء</span><span class="v">1,180 CC</span></div>
+        <div class="er"><span>بيع بعد 4 ساعات</span><span class="v">1,470 CC</span></div>
+        <div class="er"><span>ضريبة البيع 1.5%</span><span class="v">-23 CC</span></div>
+        <div class="big green">+267 CC</div></div>`,
+      invite: `<div class="emb"><div class="et">📨 مكافأة انفايت</div>
+        <div class="er"><span>صاحبك وصل لفل 5 ✅</span><span></span></div>
+        <div class="big gold">+1,000 CC</div></div>`,
+      link: `<div class="tx">اتفضل يا باشا 👇</div><div class="emb inv"><div class="et">اتبعتلك دعوة تنضم لسيرفر</div>
+        <div class="inv-row"><div class="srv">C</div><div><div class="srv-n">CHAOS</div><div class="srv-d">ألعاب · بورصة · CC</div></div><div class="join" id="join">انضم</div></div></div>`,
+    };
+    let last = null, minute = 40;
+    const list = $('list');
+    TL.items.forEach((it, i) => {
+      if (it.kind === 'typing') return;
+      const who = it.kind === 'msg' ? it.who : 'B';
+      const grouped = last === who;
+      last = who;
+      if (!grouped) minute++;
+      const el = document.createElement('div');
+      el.className = 'm' + (grouped ? ' g' : '');
+      el.id = 'it' + i;
+      el.innerHTML = `<div class="av" style="background:${avBg(who)}">${P[who].avatar}</div><div class="mc">`
+        + (grouped ? '' : `<div class="mh"><span class="nm" style="color:${P[who].color}">${P[who].name}</span><span class="ts">اليوم الساعة 11:${minute} م</span></div>`)
+        + (it.kind === 'msg' ? `<div class="tx">${it.text}</div>` : cards[it.id]) + '</div>';
+      list.appendChild(el);
+    });
+  })();
+</script>
+<script src="shared.js"></script>
+<script>
+  const { hook, ease, clamp } = CHAOS;
+  const $ = id => document.getElementById(id);
+  const body = $('body'), list = $('list');
+  const shown = TL.items.map((it, i) => ({ ...it, el: $('it' + i) })).filter(x => x.el);
+  let targets = null;
+  function measure() {  // how far the list must scroll so item k is fully visible
+    const viewH = body.clientHeight;
+    targets = shown.map(x => Math.max(0, x.el.offsetTop + x.el.offsetHeight + 90 - viewH));
+  }
+  hook(t => {
+    if (!targets) measure();
+    let k = -1;
+    shown.forEach((x, i) => {
+      const p = ease.out((t - x.at) / 0.28);
+      x.el.style.opacity = t < x.at ? 0 : clamp(p).toFixed(3);
+      x.el.style.transform = `translateY(${((1 - clamp(p)) * 40).toFixed(1)}px) scale(${(0.96 + 0.04 * clamp(p)).toFixed(3)})`;
+      if (t >= x.at) k = i;
+      const live = x.speak && t >= x.speak[0] && t <= x.speak[1];
+      x.el.classList.toggle('live', !!live);
+    });
+    // The speaking ring sits on the avatar that heads the group of the message being read.
+    shown.forEach((x, i) => {
+      let speaking = false;
+      for (let n = i; n < shown.length; n++) {
+        const y = shown[n];
+        if (n > i && !y.el.classList.contains('g')) break;
+        if (y.speak && t >= y.speak[0] && t <= y.speak[1]) speaking = true;
+      }
+      x.el.querySelector('.av').classList.toggle('speaking', speaking && !x.el.classList.contains('g'));
+    });
+    const prev = k > 0 ? targets[k - 1] : 0, cur = k >= 0 ? targets[k] : 0;
+    const off = prev + (cur - prev) * ease.out(k >= 0 ? (t - shown[k].at) / 0.4 : 0);
+    list.style.transform = `translateY(${(-off).toFixed(1)}px)`;
+    // "كيمو بيكتب…"
+    const typ = TL.items.find(x => x.kind === 'typing' && t >= x.at && t < x.at + x.len + 0.1);
+    $('typing').style.opacity = typ ? 1 : 0;
+    $('typname').textContent = `${TL.B.name} بيكتب…`;
+    document.querySelectorAll('#typing i').forEach((d, n) => { d.style.transform = `translateY(${(Math.sin(t * 12 - n * 1.2) * 6).toFixed(1)}px)`; });
+    // Tap on "انضم" before the CTA.
+    const link = TL.items.find(x => x.id === 'link');
+    const join = $('join'), tap = $('tap');
+    if (join && link) {
+      const tt = t - (link.at + 0.7);
+      const r = join.getBoundingClientRect(), s = document.getElementById('stage').getBoundingClientRect();
+      tap.style.left = (r.left - s.left + r.width / 2 - 40) + 'px';
+      tap.style.top = (r.top - s.top + r.height / 2 - 10 + Math.max(0, 1 - tt / 0.35) * 160) + 'px';
+      tap.style.opacity = tt > 0 ? clamp(tt / 0.2) : 0;
+      join.style.transform = tt > 0.35 && tt < 0.55 ? 'scale(.9)' : '';
+      join.style.filter = tt > 0.35 ? 'brightness(1.25)' : '';
+    }
+  });
+</script>
+</body>
+</html>
