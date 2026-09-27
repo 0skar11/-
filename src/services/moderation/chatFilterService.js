@@ -7,10 +7,12 @@
 //                 + 15 minute timeout. A few friendly phrases are left alone (IBN_AL_ALLOWED).
 //   • insult    — strong insults (INSULTS below): message deleted + a warning (3 warnings = timeout).
 //   • banned    — words that are only deleted, with no punishment ("الحفره").
-// Owners, bots and the report channel (reports quote insults) are never checked. Edit the lists
+// Owners, trusted staff (the Anti-Nuke trusted list, members or roles), bots and the report channel
+// (reports quote insults) are never checked. Edit the lists
 // below to add or remove words.
 
 import { isServerOwner } from '../../config/serverOwners.js';
+import { canLiftHardBan } from './hardBanService.js';
 import { REPORT_CHANNEL_ID } from '../reportChannelService.js';
 import { issueWarning } from './warnEscalation.js';
 import { sendModerationActionLog } from './moderationActionLogService.js';
@@ -132,6 +134,8 @@ export async function handleChatFilter(message) {
     if (message.channelId === REPORT_CHANNEL_ID) return false;
     const ruleName = checkText(message.content);
     if (!ruleName) return false;
+    // Trusted staff (the Anti-Nuke trusted list: members or roles) may swear.
+    if (await canLiftHardBan(message.guild, message.author.id).catch(() => false)) return false;
     const rule = RULES[ruleName];
 
     await message.delete().catch(() => {});

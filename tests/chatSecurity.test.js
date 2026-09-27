@@ -34,7 +34,7 @@ describe('chat filter (reports #146, #147, #151)', () => {
       calls,
       message: {
         content,
-        guild: { id: 'g', members: { me: null, fetch: async () => member }, channels: { cache: new Map(), fetch: async () => null } },
+        guild: { id: 'g', ownerId: '1', client: { db: { get: async (key, fallback) => (key.includes('config') ? { antiNukeTrustedUsers: ['200000000000000077'] } : fallback), set: async () => true } }, members: { me: null, fetch: async () => member }, channels: { cache: new Map(), fetch: async () => null } },
         member,
         author: { id: authorId, bot: false },
         client: { user: { id: 'bot' } },
@@ -59,6 +59,11 @@ describe('chat filter (reports #146, #147, #151)', () => {
     assert.ok(!calls.some(([kind]) => kind === 'timeout'));
 
     ({ calls, message } = filterMessage('كسمك', { authorId: '1159601661392715906' }));
+    assert.equal(await handleChatFilter(message), false);
+    assert.equal(calls.length, 0);
+
+    // Trusted staff may swear.
+    ({ calls, message } = filterMessage('كسمك', { authorId: '200000000000000077' }));
     assert.equal(await handleChatFilter(message), false);
     assert.equal(calls.length, 0);
 
