@@ -44,14 +44,17 @@ describe('chat filter (reports #146, #147, #151)', () => {
     };
   }
 
-  test('kosomak: deleted + 1 hour timeout; ibn al: deleted + 15 minutes; owners are skipped', async () => {
+  test('kosomak: deleted + 1 hour timeout; ibn al: deleted + warning; owners are skipped', async () => {
     let { calls, message } = filterMessage('يا ك س م ك');
     assert.equal(await handleChatFilter(message), true);
     assert.deepEqual(calls.slice(0, 2), [['delete'], ['timeout', 60 * 60_000]]);
+    assert.deepEqual(calls.find(([kind]) => kind === 'notice'), ['notice', '<@200000000000000001> كسمين امك خد تايم يبنالمتناكه']);
 
+    // ابن ال...: deleted + a warning, no direct timeout.
     ({ calls, message } = filterMessage('ابن الكلب'));
-    await handleChatFilter(message);
-    assert.deepEqual(calls.slice(0, 2), [['delete'], ['timeout', 15 * 60_000]]);
+    assert.equal(await handleChatFilter(message), true);
+    assert.deepEqual(calls[0], ['delete']);
+    assert.ok(!calls.some(([kind]) => kind === 'timeout'));
 
     ({ calls, message } = filterMessage('الحفره'));
     await handleChatFilter(message);

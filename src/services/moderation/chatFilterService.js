@@ -4,7 +4,8 @@
 //   • kosomak   — "كسمك" and anything with the same meaning, even hidden ("ك س م ك", "كـسـمـك",
 //                 "kosomak", "k$mk"): message deleted + 1 hour timeout.
 //   • ibnAl     — "ابن ال..." with any word ("ابن الكلب", "يا ابن ال...", "ebn el ..."): message deleted
-//                 + 15 minute timeout. A few friendly phrases are left alone (IBN_AL_ALLOWED).
+//                 + a warning (the owner changed it from a 15 minute timeout). A few friendly phrases
+//                 are left alone (IBN_AL_ALLOWED).
 //   • insult    — strong insults (INSULTS below): message deleted + a warning (3 warnings = timeout).
 //   • banned    — words that are only deleted, with no punishment ("الحفره").
 // Owners, trusted staff (the Anti-Nuke trusted list, members or roles), bots and the report channel
@@ -43,8 +44,9 @@ const INSULTS_LATIN = ['sharmot', 'sharmota', 'metnak', 'mitnak', 'metnaka', 'ma
 export const BANNED_WORDS = [/(?<!\p{L})ال\s?حفره(?!\p{L})/u, /(?<![a-z])[ae]l\s?7ofr?a(?![a-z])/u];
 
 const RULES = {
-    kosomak: { label: 'شتيمة (كسمك)', timeoutMs: HOUR },
-    ibnAl: { label: 'شتيمة (ابن ال...)', timeoutMs: 15 * 60_000 },
+    // The owner's own reply for this one, instead of the usual notice.
+    kosomak: { label: 'شتيمة (كسمك)', timeoutMs: HOUR, reply: (userId) => `<@${userId}> كسمين امك خد تايم يبنالمتناكه` },
+    ibnAl: { label: 'شتيمة (ابن ال...)', warn: true },
     insult: { label: 'شتيمة', warn: true },
     banned: { label: 'كلمة ممنوعة' },
 };
@@ -158,6 +160,6 @@ export async function handleChatFilter(message) {
         logger.warn(`Chat filter could not punish ${message.author.id}: ${error.message}`);
     }
 
-    await notice(message, `🚫 <@${message.author.id}> ${rule.label} ممنوعة هنا ・ ${punishment}`);
+    await notice(message, rule.reply ? rule.reply(message.author.id) : `🚫 <@${message.author.id}> ${rule.label} ممنوعة هنا ・ ${punishment}`);
     return true;
 }
