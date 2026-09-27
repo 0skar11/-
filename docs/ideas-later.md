@@ -112,3 +112,17 @@ before the role is made, so nobody buys a rude name or a role that looks like st
   task (done / can't do it), a per-member score (done on time, late, handed back), and a summary
   board in the channel. Reports from the report channel (`src/services/reportChannelService.js`)
   could become tasks automatically.
+
+## Fully automatic moderation (no staff)
+
+The owner's long-term goal: everything the staff does today is done by the bot on its own, so the
+server no longer needs a staff team.
+
+- Already automatic: the insult filter, anti-spam, owner-mention guard, media and invite-link guards,
+  anti-nuke / anti-raid, hard bans, warn escalation and the reports saved as issues.
+- Still done by people, to move to the bot one by one: reading reports and acting on them, tickets,
+  verification, giving and removing roles, unbans and appeals, and deciding punishments that need
+  judgement (the staff task system above is the step in between).
+- The owner keeps the last word: the bot logs every action, and big decisions (bans, role changes,
+  anything it isn't sure about) go to the owner to confirm instead of a staff member.
+
