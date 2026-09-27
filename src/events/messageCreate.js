@@ -17,6 +17,7 @@ import { handlePurgeMessage } from '../services/moderation/channelPurgeService.j
 import { handleReportChannelMessage } from '../services/reportChannelService.js';
 import { handleProtectedChannelMessage } from '../services/protectedChannelsService.js';
 import { handleEveryoneMention } from '../services/everyoneMentionGuardService.js';
+import { handleProofMessage, handleProofPinNotice } from '../services/moderation/proofMergeService.js';
 import { handleChatFilter } from '../services/moderation/chatFilterService.js';
 import { handleSpam, handleOwnerMentionSpam } from '../services/moderation/antiSpamService.js';
 import { handleForeignInviteLink } from '../services/inviteLinkGuardService.js';
@@ -43,12 +44,15 @@ export default {
       if (await handleStoreChannelMessage(message, client)) return;
       // Games bots (Clover) only play in their channel; elsewhere their messages are deleted.
       if (await handleGamesBotOutsideChannel(message)) return;
+      if (await handleProofPinNotice(message)) return;
       // Wins announced by the games bot (Clover) pay CC here.
       if (await handleGamesBotWin(message, client)) return;
       if (message.author.bot || !message.guild) return;
       logger.debug(`Message received from ${message.author.tag}: ${message.content}`);
 
       if (await handleEveryoneMention(message)) return;
+      // A moderator's proof in the moderation log channel is merged into their log message.
+      if (await handleProofMessage(message)) return;
       // Insults and banned words (chatFilterService), then spam and repeated owner mentions (antiSpamService).
       if (await handleChatFilter(message)) return;
       if (await handleSpam(message)) return;

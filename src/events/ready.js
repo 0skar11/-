@@ -10,6 +10,7 @@ import { ensureAuditLogChannels } from "../services/auditLogChannelsService.js";
 import { publishArabicModerationCommands } from "../services/moderationCommandsBoardService.js";
 import { publishTrustedBoard } from "../services/trustedBoardService.js";
 import { publishSavedIdeasBoard } from "../services/savedIdeasBoardService.js";
+import { publishProofGuide } from "../services/moderation/proofMergeService.js";
 import { startCCTopBoard } from "../services/games/ccTopBoard.js";
 import { startStoreChannel } from "../services/cc/storeChannel.js";
 import { startInviteRewards } from "../services/inviteRewardService.js";
@@ -37,6 +38,12 @@ export default {
         startupLog(`Trusted board: ${result.status} (channel ${result.channelId})`);
       } catch (error) {
         logger.error("Failed to publish trusted board:", error);
+      }
+      try {
+        const result = await publishProofGuide(client);
+        startupLog(`Proof guide: ${result.status}`);
+      } catch (error) {
+        logger.error("Failed to publish the proof guide:", error);
       }
       try {
         const result = await publishSavedIdeasBoard(client);

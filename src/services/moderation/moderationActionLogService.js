@@ -87,7 +87,14 @@ export async function sendModerationActionLog(guild, details) {
       logger.warn(`Moderation action log channel ${MODERATION_ACTION_LOG_CHANNEL_ID} was not found in guild ${guild.id}.`);
       return false;
     }
-    await channel.send({ embeds: [buildModerationActionLogEmbed(details)], allowedMentions: NO_PINGS });
+    const embed = buildModerationActionLogEmbed(details);
+    const posted = await channel.send({ embeds: [embed], allowedMentions: NO_PINGS });
+    // The moderator's proof sent next in this channel is merged into this log (proofMergeService.js).
+    const moderatorId = details.moderatorUser?.id || details.moderatorId;
+    if (moderatorId && moderatorId !== guild.client?.user?.id) {
+      const { rememberLogMessage } = await import('./proofMergeService.js');
+      rememberLogMessage(guild.id, moderatorId, posted, embed);
+    }
     return true;
   } catch (error) {
     logger.error('Failed to send moderation action log:', error);
