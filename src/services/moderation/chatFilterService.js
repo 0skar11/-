@@ -44,7 +44,8 @@ const INSULTS_LATIN = ['sharmot', 'sharmota', 'metnak', 'mitnak', 'metnaka', 'ma
 export const BANNED_WORDS = [/(?<!\p{L})ال\s?حفره(?!\p{L})/u, /(?<![a-z])[ae]l\s?7ofr?a(?![a-z])/u];
 
 const RULES = {
-    kosomak: { label: 'شتيمة (كسمك)', timeoutMs: HOUR },
+    // The owner's own reply for this one, instead of the usual notice.
+    kosomak: { label: 'شتيمة (كسمك)', timeoutMs: HOUR, reply: (userId) => `<@${userId}> كسمك انت، خد تايم يبن المتناكة` },
     ibnAl: { label: 'شتيمة (ابن ال...)', warn: true },
     insult: { label: 'شتيمة', warn: true },
     banned: { label: 'كلمة ممنوعة' },
@@ -159,6 +160,6 @@ export async function handleChatFilter(message) {
         logger.warn(`Chat filter could not punish ${message.author.id}: ${error.message}`);
     }
 
-    await notice(message, `🚫 <@${message.author.id}> ${rule.label} ممنوعة هنا ・ ${punishment}`);
+    await notice(message, rule.reply ? rule.reply(message.author.id) : `🚫 <@${message.author.id}> ${rule.label} ممنوعة هنا ・ ${punishment}`);
     return true;
 }
