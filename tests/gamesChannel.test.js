@@ -145,7 +145,7 @@ describe('who controls a game', () => {
         assert.equal(await canControlGame(guild, MEMBER, session), true, 'host');
         assert.equal(await canControlGame(guild, TRUSTED_USER, session), true, 'trusted user');
         assert.equal(await canControlGame(guild, ROLE_HOLDER, session), true, 'trusted role');
-        assert.equal(await canControlGame(guild, SERVER_OWNER_IDS[1], session), true, 'server owner');
+        assert.equal(await canControlGame(guild, SERVER_OWNER_IDS[0], session), true, 'server owner');
         assert.equal(await canControlGame(guild, guild.ownerId, session), true, 'guild owner');
         assert.equal(await canControlGame(guild, STAFF, session), false, 'other staff');
     });
