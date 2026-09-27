@@ -22,7 +22,7 @@
   function init() {
     document.querySelectorAll('.scene').forEach(sc => {
       const s = +sc.dataset.start, e = +sc.dataset.end;
-      cuts.push(s);
+      if (!('noflash' in sc.dataset)) cuts.push(s);  // data-noflash: a quiet cut, no flash/shake
       sc.style.setProperty('--len', (e - s) + 's');
       sc.style.animationDelay = s + 's';
       sc.querySelectorAll('[data-at]').forEach(el => {

@@ -1,0 +1,243 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<title>CHAOS — التريلر</title>
+<link rel="stylesheet" href="shared.css">
+<style>
+  #stage { background: #030304; }
+  .bars::before, .bars::after { content: ''; position: absolute; left: 0; right: 0; height: 150px; background: #000; z-index: 46; }
+  .bars::before { top: 0; } .bars::after { bottom: 0; }
+  .grain { position: absolute; inset: -80px; z-index: 44; opacity: .16; mix-blend-mode: overlay; pointer-events: none;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='260' height='260'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='1.1' numOctaves='2' stitchTiles='stitch'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>"); }
+  .glow { position: absolute; inset: 0; background: radial-gradient(ellipse 70% 45% at 50% 50%, rgba(255,120,40,.18), transparent 70%); z-index: 1; }
+  #sparks { position: absolute; inset: 0; z-index: 30; pointer-events: none; }
+  .vig { position: absolute; inset: 0; z-index: 43; background: radial-gradient(ellipse at center, transparent 40%, rgba(0,0,0,.85) 100%); pointer-events: none; }
+
+  .scene { padding: 200px 70px 260px; }
+  .gold { background: linear-gradient(110deg, transparent 38%, rgba(255,255,255,.95) 50%, transparent 62%) no-repeat,
+            linear-gradient(180deg, #fff7da 0%, #ffd66e 42%, #a8740a 58%, #ffe7a3 100%);
+    background-size: 250% 100%, 100% 100%; background-position: 200% 0, 0 0;
+    -webkit-background-clip: text; background-clip: text; color: transparent; animation: sweep 2.6s ease-in-out infinite; }
+  @keyframes sweep { 0% { background-position: 200% 0, 0 0; } 60%, 100% { background-position: -120% 0, 0 0; } }
+  .title { font-family: 'Lalezar', 'Cairo'; font-size: 140px; line-height: 1.15; filter: drop-shadow(0 8px 30px rgba(0,0,0,.8)); }
+  .title.red { background: linear-gradient(180deg, #ffd0d0, #ff2e4d 55%, #7a0010); -webkit-background-clip: text; background-clip: text; color: transparent; }
+  .kicker { font-size: 46px; font-weight: 900; color: #cfc6b0; letter-spacing: 1px; }
+  .sub { position: absolute; left: 60px; right: 60px; bottom: 330px; font-size: 50px; font-weight: 900; color: #fff; text-align: center;
+    text-shadow: 0 4px 18px #000, 0 0 2px #000; z-index: 41; }
+  .big { font-family: 'Noto Color Emoji'; font-size: 230px; line-height: 1; filter: drop-shadow(0 20px 50px rgba(255,140,40,.35)); }
+  .logo5 { font-family: 'Anton'; font-size: 290px; letter-spacing: 16px; direction: ltr; line-height: 1; }
+  .ring { position: absolute; left: 50%; top: 50%; width: 200px; height: 200px; margin: -100px 0 0 -100px; border-radius: 50%;
+    border: 6px solid rgba(255,214,110,.8); z-index: 5; }
+
+  /* dead servers */
+  .srvgrid { display: grid; grid-template-columns: repeat(3, 230px); gap: 44px; }
+  .srv { width: 230px; height: 230px; border-radius: 60px; display: grid; place-items: center; position: relative;
+    background: linear-gradient(135deg, #5865f2, #9b59b6); font-family: 'Noto Color Emoji'; font-size: 110px; }
+  .srv .x { position: absolute; inset: 0; display: grid; place-items: center; font-family: 'Anton'; font-size: 160px; color: #ff2e4d; opacity: 0; }
+  .srv .cnt { position: absolute; bottom: -40px; left: 0; right: 0; text-align: center; font-size: 28px; font-weight: 900; color: #8e8ea0; opacity: 0; }
+  /* empty channels */
+  .side { width: 860px; background: #2b2d31; border-radius: 30px; padding: 34px 40px; text-align: right; box-shadow: 0 30px 90px rgba(0,0,0,.7); }
+  .side .cat { font-size: 30px; font-weight: 900; color: #80848e; margin: 10px 0 14px; }
+  .side .ch { display: flex; justify-content: space-between; font-size: 44px; font-weight: 700; color: #6d6f78; padding: 14px 16px; border-radius: 12px; }
+  .side .ch b { font-family: 'Anton'; font-weight: 400; color: #5c5e66; }
+  .side .last { margin-top: 20px; font-size: 34px; color: #ff5a6e; font-weight: 900; }
+  .leaf { position: absolute; font-family: 'Noto Color Emoji'; font-size: 90px; z-index: 12; }
+  /* ember */
+  .ember { width: 60px; height: 60px; border-radius: 50%;
+    background: radial-gradient(circle, #fff6d0 0%, #ffb347 30%, rgba(255,80,20,.55) 55%, transparent 72%); }
+  /* rating */
+  .rate { display: flex; border: 6px solid #fff; background: #000; width: 900px; text-align: right; }
+  .rate .c { width: 250px; display: grid; place-items: center; font-family: 'Anton'; font-size: 240px; color: #000; background: #fff; }
+  .rate .t { flex: 1; padding: 30px 38px; }
+  .rate .t h4 { font-family: 'Lalezar'; font-weight: 400; font-size: 84px; color: #fff; line-height: 1.1; }
+  .rate .t p { font-size: 36px; font-weight: 900; color: #fff; line-height: 1.5; border-top: 4px solid #fff; margin-top: 12px; padding-top: 12px; }
+  .rate-f { font-size: 30px; font-weight: 700; color: #aaa; margin-top: 18px; }
+  .soon { font-size: 44px; font-weight: 900; color: #e8dcc0; }
+</style>
+</head>
+<body data-duration="39.67" data-cover="18.6">
+<div id="stage" class="bars">
+  <div class="glow"></div>
+  <canvas id="sparks" width="1080" height="1920"></canvas>
+
+  <section class="scene" id="studio" data-noflash>
+    <div class="kicker fade" data-at="0.1">كيوس للإنتاج السينمائي</div>
+    <div class="logo5 gold fade" data-at="0.2" style="font-size:150px">CHAOS</div>
+    <div class="kicker fade" data-at="0.7">تقدم</div>
+  </section>
+
+  <section class="scene" id="dead" data-noflash>
+    <div class="srvgrid" id="grid"></div>
+    <div class="sub fade" data-at="0.3">في عالم… السيرفرات فيه بتموت… واحد ورا التاني.</div>
+  </section>
+
+  <section class="scene" id="empty" data-noflash>
+    <div class="side fade" data-at="0">
+      <div class="cat">⌄ الشات</div>
+      <div class="ch"><span># الشات-العام</span><b>0</b></div>
+      <div class="ch"><span># الميمز</span><b>0</b></div>
+      <div class="cat">⌄ الفويس</div>
+      <div class="ch"><span>🔊 الفويس العام</span><b>0</b></div>
+      <div class="ch"><span>🔊 جيمنج</span><b>0</b></div>
+      <div class="last">آخر رسالة: من 47 يوم</div>
+    </div>
+    <div class="leaf" id="leaf">🍂</div>
+    <div class="sub fade" data-at="0.25">الشات بقى فاضي… والفويس بقى صامت.</div>
+  </section>
+
+  <section class="scene" id="ember" data-noflash>
+    <div class="ember" id="emb"></div>
+    <div class="sub fade" data-at="0.3">لكن… في سيرفر واحد…</div>
+  </section>
+
+  <section class="scene" id="refuse">
+    <div class="title red slam" data-at="0.15" style="font-size:190px">رفض يموت.</div>
+  </section>
+
+  <section class="scene" id="logo">
+    <div class="ring" id="ring"></div>
+    <div class="logo5 gold slam" data-at="0">CHAOS</div>
+    <div class="kicker up" data-at="0.6">كيوس · السيرفر اللي عمره ما بينام</div>
+  </section>
+
+  <section class="scene" id="games">
+    <div class="big pop" data-at="0">🎮</div>
+    <div class="title gold slam" data-at="0.1">ألعاب<br>كل ليلة</div>
+    <div class="kicker up" data-at="0.5">مافيا · روليت · كراسي · أسئلة</div>
+  </section>
+
+  <section class="scene" id="economy">
+    <div class="big pop" data-at="0">💰</div>
+    <div class="title gold slam" data-at="0.1">اقتصاد بعملة خاصة</div>
+    <div class="kicker up" data-at="0.5"><span class="num">CHAOS CREDITS — CC</span></div>
+  </section>
+
+  <section class="scene" id="bourse">
+    <div class="big pop" data-at="0">📈</div>
+    <div class="title gold slam" data-at="0.1">بورصة مابتنامش</div>
+    <div class="kicker up" data-at="0.5">الأسعار بتتحرك كل ساعة</div>
+  </section>
+
+  <section class="scene" id="mafia">
+    <div class="big pop" data-at="0">🎭</div>
+    <div class="title red slam" data-at="0.1">ومافيا<br>مابترحمش</div>
+    <div class="kicker up" data-at="0.6">مين المافيا؟ 👀</div>
+  </section>
+
+  <section class="scene" id="rating">
+    <div class="rate pop" data-at="0">
+      <div class="c">C</div>
+      <div class="t"><h4>مصنف C</h4><p>فوضى شديدة · تفاعل مفرط<br>احتمال إدمان عالي</p></div>
+    </div>
+    <div class="rate-f fade" data-at="0.4">غير مناسب لأصحاب السيرفرات الميتة</div>
+  </section>
+
+  <section class="scene" id="ready" data-noflash>
+    <div class="title gold fade" data-at="0.2" style="font-size:120px">استعد</div>
+  </section>
+
+  <section class="scene" id="finale">
+    <div class="logo5 gold slam" data-at="0">CHAOS</div>
+    <div class="h2 up" data-at="0.5">الفوضى <span class="red">بدأت</span></div>
+    <div class="soon fade" data-at="0.9">متاح دلوقتي على ديسكورد</div>
+    <div class="pop" data-at="1.3"><div class="btn pulse">ادخل السيرفر</div></div>
+    <div class="cta-foot up" data-at="1.7" data-invite>
+      <div class="bio">اللينك في البايو <span class="bounce">👇</span></div>
+      <div class="link">discord.gg/…</div>
+    </div>
+  </section>
+
+  <div class="grain" id="grain"></div>
+  <div class="vig"></div>
+  <div id="flash"></div>
+</div>
+<script src="v5-trailer.timeline.js"></script>
+<script>
+  // Scene times come from the narrator lengths (v5_timeline.py).
+  for (const [id, [a, b]] of Object.entries(TL.scenes)) {
+    const el = document.getElementById(id);
+    el.dataset.start = a; el.dataset.end = b;
+  }
+  document.body.dataset.duration = TL.end;
+  const icons = ['🎮', '🎧', '⚽', '🎨', '🐉', '🍕', '🎵', '💬', '🌙'];
+  document.getElementById('grid').innerHTML = icons.map(e => `<div class="srv">${e}<div class="x">✕</div><div class="cnt">0 أونلاين</div></div>`).join('');
+</script>
+<script src="shared.js"></script>
+<script>
+  const { hook, ease, clamp } = CHAOS;
+  const S = TL.scenes, $ = id => document.getElementById(id);
+  const inScene = (t, n) => t >= S[n][0] && t < S[n][1];
+  // Dead servers: one after another they go grey, get an ✕ and sink.
+  const srvs = [...document.querySelectorAll('.srv')];
+  hook(t => {
+    const [a, b] = S.dead;
+    srvs.forEach((el, i) => {
+      const die = a + 0.7 + i * ((b - a - 1.6) / srvs.length);
+      const p = clamp((t - die) / 0.5);
+      el.style.filter = `grayscale(${p}) brightness(${1 - 0.55 * p})`;
+      el.style.transform = `translateY(${(p * 26).toFixed(1)}px) rotate(${((i % 2 ? 1 : -1) * p * 6).toFixed(1)}deg)`;
+      el.querySelector('.x').style.opacity = (p * 0.9).toFixed(2);
+      el.querySelector('.cnt').style.opacity = p.toFixed(2);
+    });
+  });
+  // A leaf drifts across the empty channels.
+  hook(t => {
+    const [a, b] = S.empty, p = clamp((t - a) / (b - a));
+    const leaf = $('leaf');
+    leaf.style.left = (1100 - p * 1300) + 'px';
+    leaf.style.top = (1250 + Math.sin(p * 9) * 40) + 'px';
+    leaf.style.transform = `rotate(${(p * 540).toFixed(0)}deg)`;
+  });
+  // The ember grows; the ring blasts out on the logo.
+  hook(t => {
+    const [a, b] = S.ember, p = clamp((t - a) / (b - a));
+    $('emb').style.transform = `scale(${(1 + 5 * p * p).toFixed(2)})`;
+    $('emb').style.opacity = (0.4 + 0.6 * p).toFixed(2);
+    const r = clamp((t - S.logo[0]) / 1.2);
+    $('ring').style.transform = `scale(${(0.2 + r * 9).toFixed(2)})`;
+    $('ring').style.opacity = (r > 0 ? 1 - r : 0).toFixed(2);
+  });
+  // Montage cards push in slowly.
+  hook(t => {
+    for (const n of ['games', 'economy', 'bourse', 'mafia', 'logo', 'finale', 'refuse']) {
+      if (!inScene(t, n)) continue;
+      const p = (t - S[n][0]) / (S[n][1] - S[n][0]);
+      $(n).style.scale = (1.08 - 0.08 * p).toFixed(4);
+    }
+  });
+  // Sparks: how many depend on the moment (none while the servers are dead).
+  const cv = $('sparks'), cx = cv.getContext('2d');
+  let seed = 7; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+  const P = Array.from({ length: 140 }, () => ({ x: rnd() * 1080, y: rnd() * 1920, v: 60 + rnd() * 260, s: 1.5 + rnd() * 4, w: rnd() * 6.28, k: rnd() }));
+  function level(t) {
+    if (t < S.ember[0]) return 0;
+    if (t < S.logo[0]) return 0.25 * clamp((t - S.ember[0]) / 3);
+    if (t < S.rating[0]) return t < S.logo[1] ? 1 : 0.55;
+    if (t < S.finale[0]) return 0.2;
+    return 1;
+  }
+  hook(t => {
+    cx.clearRect(0, 0, 1080, 1920);
+    const L = level(t);
+    if (L <= 0) return;
+    for (const p of P) {
+      if (p.k > L) continue;
+      const y = ((p.y - t * p.v) % 1920 + 1920) % 1920;
+      const x = p.x + Math.sin(t * 1.3 + p.w) * 30;
+      const a = 0.35 + 0.65 * Math.abs(Math.sin(t * 3 + p.w));
+      cx.fillStyle = `rgba(255,${150 + Math.round(80 * p.k)},60,${(a * 0.25).toFixed(3)})`;
+      cx.beginPath(); cx.arc(x, y, p.s * 3, 0, 6.283); cx.fill();
+      cx.fillStyle = `rgba(255,236,190,${a.toFixed(3)})`;
+      cx.beginPath(); cx.arc(x, y, p.s, 0, 6.283); cx.fill();
+    }
+  });
+  // Film grain moves every frame; a light flicker on the picture.
+  hook(t => {
+    const f = Math.floor(t * 24);
+    $('grain').style.transform = `translate(${(f * 37) % 80 - 40}px, ${(f * 53) % 80 - 40}px)`;
+    $('stage').style.filter = `brightness(${(1 + Math.sin(f * 12.9898) * 0.025).toFixed(3)})`;
+  });
+</script>
+</body>
+</html>

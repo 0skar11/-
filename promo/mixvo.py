@@ -11,6 +11,8 @@ plan.json:
       "music2": "…", "music2_offset": 3.5, "music2_at": 39.3,   # ...and start a second piece here
       "lines": [{"file": "vo/v1/1.mp3", "at": 0.3, "tempo": 1.0}, ...],
       "sfx": [{"file": "vo/v4/pop.mp3", "at": 1.1, "gain": 0.5}, ...],   # optional, not ducked
+      "music_mute": [32.0, 34.0],           # optional: near-silent music here (the pause before a drop)
+      "no_synth_sfx": true,                 # optional: skip music.py's whooshes/impacts
       "out": "out/v1-main-vo.mp4"
     }
 
@@ -78,8 +80,11 @@ def main():
         fx[a:a + len(x)] += x[:len(fx) - a]
     write(tmp / 'fx.wav', fx[:int(SR * dur)])
 
-    subprocess.run(['python3', here / 'music.py', here / plan['html'], tmp / 'sfx.wav', '--sfx-only'],
-                   check=True, stdout=subprocess.DEVNULL)
+    if plan.get('no_synth_sfx'):
+        write(tmp / 'sfx.wav', np.zeros(int(SR * dur), np.float32))
+    else:
+        subprocess.run(['python3', here / 'music.py', here / plan['html'], tmp / 'sfx.wav', '--sfx-only'],
+                       check=True, stdout=subprocess.DEVNULL)
 
     off = plan.get('music_offset', 0)
     until = plan.get('music_until', dur)
@@ -99,6 +104,9 @@ def main():
         )
     else:
         graph += "[mus1]anull[mus];"
+    if 'music_mute' in plan:
+        a, b = plan['music_mute']
+        graph = graph[:-len('[mus];')] + f"[musraw];[musraw]volume=0.06:enable='between(t,{a},{b})'[mus];"
     graph += (
         f"[2:a]{fmt},volume=0.45[sfx];"
         f"[3:a]aresample={SR},loudnorm=I=-14,highpass=f=80,"
