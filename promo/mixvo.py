@@ -12,6 +12,7 @@ plan.json:
       "lines": [{"file": "vo/v1/1.mp3", "at": 0.3, "tempo": 1.0}, ...],
       "sfx": [{"file": "vo/v4/pop.mp3", "at": 1.1, "gain": 0.5}, ...],   # optional, not ducked
       "music_mute": [32.0, 34.0],           # optional: near-silent music here (the pause before a drop)
+      "music_soft": [37.6, 48.6],           # optional: music steps back here (a quiet, personal moment)
       "no_synth_sfx": true,                 # optional: skip music.py's whooshes/impacts
       "out": "out/v1-main-vo.mp4"
     }
@@ -104,9 +105,10 @@ def main():
         )
     else:
         graph += "[mus1]anull[mus];"
-    if 'music_mute' in plan:
-        a, b = plan['music_mute']
-        graph = graph[:-len('[mus];')] + f"[musraw];[musraw]volume=0.06:enable='between(t,{a},{b})'[mus];"
+    for key, vol in (('music_mute', 0.06), ('music_soft', 0.3)):
+        if key in plan:
+            a, b = plan[key]
+            graph = graph[:-len('[mus];')] + f"[m{key}];[m{key}]volume={vol}:enable='between(t,{a},{b})'[mus];"
     graph += (
         f"[2:a]{fmt},volume=0.45[sfx];"
         f"[3:a]aresample={SR},loudnorm=I=-14,highpass=f=80,"

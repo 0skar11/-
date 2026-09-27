@@ -54,9 +54,25 @@
   .rate .t p { font-size: 36px; font-weight: 900; color: #fff; line-height: 1.5; border-top: 4px solid #fff; margin-top: 12px; padding-top: 12px; }
   .rate-f { font-size: 30px; font-weight: 700; color: #aaa; margin-top: 18px; }
   .soon { font-size: 44px; font-weight: 900; color: #e8dcc0; }
+  /* real screenshots */
+  .badge { font-size: 36px; font-weight: 900; color: #111; background: #ffd66e; padding: 8px 26px; border-radius: 999px; }
+  .shot { position: relative; border-radius: 26px; overflow: hidden; border: 4px solid rgba(255,214,110,.9);
+    box-shadow: 0 0 0 10px rgba(255,214,110,.12), 0 30px 90px rgba(0,0,0,.8), 0 0 80px rgba(255,160,60,.25); }
+  .shot img { display: block; }
+  .ribbon { position: absolute; bottom: 30px; left: -62px; transform: rotate(35deg); background: var(--red); color: #fff;
+    font-size: 30px; font-weight: 900; padding: 8px 80px; box-shadow: 0 6px 20px rgba(0,0,0,.5); }
+  .among { font-family: 'Lalezar', 'Cairo'; font-size: 66px; color: #fff; text-shadow: 0 6px 24px #000; }
+  /* girls */
+  .pinkglow { position: absolute; inset: 0; background: radial-gradient(ellipse 80% 55% at 50% 45%, rgba(236,72,153,.28), rgba(139,92,246,.12) 45%, transparent 75%); }
+  .title.pink { background: linear-gradient(180deg, #ffe4f1, #f472b6 55%, #a855f7); -webkit-background-clip: text; background-clip: text; color: transparent; }
+  .steps5 { display: flex; flex-direction: column; gap: 22px; width: 900px; }
+  .st { display: flex; align-items: center; gap: 26px; background: rgba(30,16,40,.85); border: 2px solid rgba(244,114,182,.45);
+    border-radius: 26px; padding: 26px 34px; text-align: right; font-size: 46px; font-weight: 900; color: #fff; }
+  .st .e { font-family: 'Noto Color Emoji'; font-size: 64px; }
+  .safe { font-size: 50px; font-weight: 900; color: #f9a8d4; }
 </style>
 </head>
-<body data-duration="39.67" data-cover="18.6">
+<body data-duration="58.4" data-cover="18.6">
 <div id="stage" class="bars">
   <div class="glow"></div>
   <canvas id="sparks" width="1080" height="1920"></canvas>
@@ -107,6 +123,14 @@
     <div class="kicker up" data-at="0.5">مافيا · روليت · كراسي · أسئلة</div>
   </section>
 
+  <section class="scene" id="proof">
+    <div class="badge pop" data-at="0">📸 صورة حقيقية · 🆕 سيرفر جديد</div>
+    <div class="title gold slam" data-at="0.1" style="font-size:120px">أول يوم افتتاح</div>
+    <div class="among up" data-at="0.4">بالليل بنلعب <span class="num" style="color:#ff5a6e">AMONG US</span> <span class="emoji">🔪</span></div>
+    <div class="shot fromR" data-at="0.5" id="voiceshot"><img src="vo/v5/voice.png" style="height:650px"></div>
+    <div class="sub fade" data-at="0.3" style="bottom:250px">سيرفر جديد… ورغم كده من أول ليلة الفويس مليان 🔥</div>
+  </section>
+
   <section class="scene" id="economy">
     <div class="big pop" data-at="0">💰</div>
     <div class="title gold slam" data-at="0.1">اقتصاد بعملة خاصة</div>
@@ -114,15 +138,27 @@
   </section>
 
   <section class="scene" id="bourse">
-    <div class="big pop" data-at="0">📈</div>
-    <div class="title gold slam" data-at="0.1">بورصة مابتنامش</div>
-    <div class="kicker up" data-at="0.5">الأسعار بتتحرك كل ساعة</div>
+    <div class="title gold slam" data-at="0" style="font-size:120px">بورصة مابتنامش</div>
+    <div class="shot pop" data-at="0.2"><img src="vo/v5/bourse.png" style="width:820px"></div>
+    <div class="kicker up" data-at="0.6">الأسعار بتتحرك كل ساعة · اشتري واستثمر وبيع</div>
   </section>
 
   <section class="scene" id="mafia">
     <div class="big pop" data-at="0">🎭</div>
     <div class="title red slam" data-at="0.1">ومافيا<br>مابترحمش</div>
     <div class="kicker up" data-at="0.6">مين المافيا؟ 👀</div>
+  </section>
+
+  <section class="scene" id="girls">
+    <div class="pinkglow"></div>
+    <div class="big pop" data-at="0" style="font-size:190px">🛡️</div>
+    <div class="title pink slam" data-at="0.2" style="font-size:112px">لو إنتي بنت<br>متقلقيش <span class="emoji">💜</span></div>
+    <div class="steps5">
+      <div class="st fromR" data-at="2.2"><span class="e">👭</span>عندنا توثيق: بتدخلي مع بنت زيك</div>
+      <div class="st fromR" data-at="4.0"><span class="e">✅</span>تتأكد إنك بنت فعلًا</div>
+      <div class="st fromR" data-at="6.0"><span class="e">🚫</span>عشان نمنع انتحال الشخصية</div>
+    </div>
+    <div class="safe up" data-at="8.2">ولسلامتك وراحتك <span class="emoji">💜</span></div>
   </section>
 
   <section class="scene" id="rating">
@@ -198,9 +234,16 @@
     $('ring').style.transform = `scale(${(0.2 + r * 9).toFixed(2)})`;
     $('ring').style.opacity = (r > 0 ? 1 - r : 0).toFixed(2);
   });
+  // The voice screenshot drifts slowly, like a camera move over a photo.
+  hook(t => {
+    const [a, b] = S.proof, p = clamp((t - a) / (b - a));
+    const img = document.querySelector('#voiceshot img');
+    img.style.transformOrigin = '50% 0';  // keep the channel name and timer at the top in view
+    img.style.transform = `scale(${(1 + 0.05 * p).toFixed(3)})`;
+  });
   // Montage cards push in slowly.
   hook(t => {
-    for (const n of ['games', 'economy', 'bourse', 'mafia', 'logo', 'finale', 'refuse']) {
+    for (const n of ['games', 'proof', 'economy', 'bourse', 'mafia', 'girls', 'logo', 'finale', 'refuse']) {
       if (!inScene(t, n)) continue;
       const p = (t - S[n][0]) / (S[n][1] - S[n][0]);
       $(n).style.scale = (1.08 - 0.08 * p).toFixed(4);
@@ -213,6 +256,8 @@
   function level(t) {
     if (t < S.ember[0]) return 0;
     if (t < S.logo[0]) return 0.25 * clamp((t - S.ember[0]) / 3);
+    if (t >= S.girls[0] && t < S.girls[1]) return 0.12;
+    if (t >= S.proof[0] && t < S.proof[1] || t >= S.bourse[0] && t < S.bourse[1]) return 0.3;
     if (t < S.rating[0]) return t < S.logo[1] ? 1 : 0.55;
     if (t < S.finale[0]) return 0.2;
     return 1;

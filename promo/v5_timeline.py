@@ -4,7 +4,8 @@
 
 Every scene lasts as long as its narrator line (silence trimmed) plus a lead-in and a tail, so the
 picture follows the voice. Files in vo/v5/ come from the ElevenLabs flow "CHAOS promo — movie trailer (v5)":
-01.mp3 … 10.mp3 (narrator: Gamal), braam.mp3, hit.mp3, riser.mp3, musicA.mp3 (dark intro),
+01.mp3 … 11.mp3 (narrator: Gamal), 12.mp3 (Nadia, the message to girls), voice.png and bourse.png
+(real screenshots from the server, upscaled 3x), braam.mp3, hit.mp3, riser.mp3, musicA.mp3 (dark intro),
 musicB.mp3 (epic, from the logo on).
 """
 import json
@@ -30,9 +31,11 @@ SEQ = [
     ('refuse', 4, 0.2, 0.45),
     ('logo', None, 0, 2.7),
     ('games', 5, 0.15, 0.3),
+    ('proof', 11, 0.3, 1.3),       # the real voice-channel screenshot: opening night, Among Us
     ('economy', 6, 0.15, 0.3),
-    ('bourse', 7, 0.15, 0.3),
+    ('bourse', 7, 0.15, 2.0),      # the real bourse screenshot needs time to be read
     ('mafia', 8, 0.15, 0.45),
+    ('girls', 12, 0.4, 0.9),       # Nadia: girl-to-girl verification
     ('rating', None, 0, 2.1),
     ('ready', 9, 0.25, 0.9),
     ('finale', 10, 0.5, 2.2),
@@ -62,7 +65,7 @@ def main():
     sfx = [{'file': 'vo/v5/hit.mp3', 'at': 0.1, 'gain': 0.6},
            {'file': 'vo/v5/hit.mp3', 'at': s['refuse'][0] + 0.2, 'gain': 0.9},
            {'file': 'vo/v5/braam.mp3', 'at': s['logo'][0], 'gain': 1.0}]
-    sfx += [{'file': 'vo/v5/hit.mp3', 'at': s[n][0], 'gain': 0.85} for n in ('games', 'economy', 'bourse', 'mafia')]
+    sfx += [{'file': 'vo/v5/hit.mp3', 'at': s[n][0], 'gain': 0.85} for n in ('games', 'proof', 'economy', 'bourse', 'mafia')]
     sfx += [{'file': 'vo/v5/hit.mp3', 'at': s['rating'][0], 'gain': 0.6},
             {'file': 'vo/v5/riser.mp3', 'at': round(s['finale'][0] - 3.0, 2), 'gain': 0.9},
             {'file': 'vo/v5/braam.mp3', 'at': s['finale'][0], 'gain': 1.0}]
@@ -78,6 +81,7 @@ def main():
         'music': 'vo/v5/musicA.mp3', 'music_offset': 0, 'music_until': s['logo'][0] + 0.3,
         'music2': 'vo/v5/musicB.mp3', 'music2_offset': 0, 'music2_at': s['logo'][0],
         'music_mute': [s['ready'][0], s['finale'][0]],
+        'music_soft': [s['girls'][0], s['girls'][1]],   # the epic music steps back for Nadia
         'lines': lines, 'sfx': sfx, 'no_synth_sfx': True,
         'out': 'out/v5-trailer-vo.mp4',
     }
