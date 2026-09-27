@@ -53,6 +53,10 @@
   .rate .t h4 { font-family: 'Lalezar'; font-weight: 400; font-size: 84px; color: #fff; line-height: 1.1; }
   .rate .t p { font-size: 36px; font-weight: 900; color: #fff; line-height: 1.5; border-top: 4px solid #fff; margin-top: 12px; padding-top: 12px; }
   .rate-f { font-size: 30px; font-weight: 700; color: #aaa; margin-top: 18px; }
+  /* the hook is on screen from the very first frame, with a zoom punch */
+  #proof { animation-name: hookVis; }
+  @keyframes hookVis { 0% { opacity: 1; transform: scale(1.12); } 6% { transform: scale(1); } 95% { opacity: 1; transform: scale(1); }
+    100% { opacity: 0; transform: scale(.96); filter: blur(6px); } }
   .soon { font-size: 44px; font-weight: 900; color: #e8dcc0; }
   /* real screenshots */
   .badge { font-size: 36px; font-weight: 900; color: #111; background: #ffd66e; padding: 8px 26px; border-radius: 999px; }
@@ -72,7 +76,7 @@
   .safe { font-size: 50px; font-weight: 900; color: #f9a8d4; }
 </style>
 </head>
-<body data-duration="58.4" data-cover="18.6">
+<body data-duration="29.7" data-cover="2.4">
 <div id="stage" class="bars">
   <div class="glow"></div>
   <canvas id="sparks" width="1080" height="1920"></canvas>
@@ -154,11 +158,11 @@
     <div class="big pop" data-at="0" style="font-size:190px">🛡️</div>
     <div class="title pink slam" data-at="0.2" style="font-size:112px">لو إنتي بنت<br>متقلقيش <span class="emoji">💜</span></div>
     <div class="steps5">
-      <div class="st fromR" data-at="2.2"><span class="e">👭</span>عندنا توثيق: بتدخلي مع بنت زيك</div>
-      <div class="st fromR" data-at="4.0"><span class="e">✅</span>تتأكد إنك بنت فعلًا</div>
-      <div class="st fromR" data-at="6.0"><span class="e">🚫</span>عشان نمنع انتحال الشخصية</div>
+      <div class="st fromR" data-at="2.1"><span class="e">👭</span>عندنا توثيق: بتدخلي مع بنت زيك</div>
+      <div class="st fromR" data-at="3.8"><span class="e">✅</span>تتأكد إنك بنت فعلًا</div>
+      <div class="st fromR" data-at="5.7"><span class="e">🚫</span>عشان نمنع انتحال الشخصية</div>
     </div>
-    <div class="safe up" data-at="8.2">ولسلامتك وراحتك <span class="emoji">💜</span></div>
+    <div class="safe up" data-at="7.8">ولسلامتك وراحتك <span class="emoji">💜</span></div>
   </section>
 
   <section class="scene" id="rating">
@@ -190,14 +194,16 @@
 </div>
 <script src="v5-trailer.timeline.js"></script>
 <script>
-  // Scene times come from the narrator lengths (v5_timeline.py).
+  // Scene times come from the narrator lengths (v5_timeline.py); scenes left out of the cut are dropped.
+  document.querySelectorAll('.scene').forEach(sc => { if (!TL.scenes[sc.id]) sc.remove(); });
   for (const [id, [a, b]] of Object.entries(TL.scenes)) {
     const el = document.getElementById(id);
     el.dataset.start = a; el.dataset.end = b;
   }
   document.body.dataset.duration = TL.end;
   const icons = ['🎮', '🎧', '⚽', '🎨', '🐉', '🍕', '🎵', '💬', '🌙'];
-  document.getElementById('grid').innerHTML = icons.map(e => `<div class="srv">${e}<div class="x">✕</div><div class="cnt">0 أونلاين</div></div>`).join('');
+  const grid = document.getElementById('grid');
+  if (grid) grid.innerHTML = icons.map(e => `<div class="srv">${e}<div class="x">✕</div><div class="cnt">0 أونلاين</div></div>`).join('');
 </script>
 <script src="shared.js"></script>
 <script>
@@ -206,7 +212,7 @@
   const inScene = (t, n) => t >= S[n][0] && t < S[n][1];
   // Dead servers: one after another they go grey, get an ✕ and sink.
   const srvs = [...document.querySelectorAll('.srv')];
-  hook(t => {
+  if (S.dead) hook(t => {
     const [a, b] = S.dead;
     srvs.forEach((el, i) => {
       const die = a + 0.7 + i * ((b - a - 1.6) / srvs.length);
@@ -218,7 +224,7 @@
     });
   });
   // A leaf drifts across the empty channels.
-  hook(t => {
+  if (S.empty) hook(t => {
     const [a, b] = S.empty, p = clamp((t - a) / (b - a));
     const leaf = $('leaf');
     leaf.style.left = (1100 - p * 1300) + 'px';
@@ -227,9 +233,11 @@
   });
   // The ember grows; the ring blasts out on the logo.
   hook(t => {
-    const [a, b] = S.ember, p = clamp((t - a) / (b - a));
-    $('emb').style.transform = `scale(${(1 + 5 * p * p).toFixed(2)})`;
-    $('emb').style.opacity = (0.4 + 0.6 * p).toFixed(2);
+    if (S.ember) {
+      const [a, b] = S.ember, p = clamp((t - a) / (b - a));
+      $('emb').style.transform = `scale(${(1 + 5 * p * p).toFixed(2)})`;
+      $('emb').style.opacity = (0.4 + 0.6 * p).toFixed(2);
+    }
     const r = clamp((t - S.logo[0]) / 1.2);
     $('ring').style.transform = `scale(${(0.2 + r * 9).toFixed(2)})`;
     $('ring').style.opacity = (r > 0 ? 1 - r : 0).toFixed(2);
@@ -244,7 +252,7 @@
   // Montage cards push in slowly.
   hook(t => {
     for (const n of ['games', 'proof', 'economy', 'bourse', 'mafia', 'girls', 'logo', 'finale', 'refuse']) {
-      if (!inScene(t, n)) continue;
+      if (!S[n] || !inScene(t, n)) continue;
       const p = (t - S[n][0]) / (S[n][1] - S[n][0]);
       $(n).style.scale = (1.08 - 0.08 * p).toFixed(4);
     }
@@ -254,13 +262,13 @@
   let seed = 7; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
   const P = Array.from({ length: 140 }, () => ({ x: rnd() * 1080, y: rnd() * 1920, v: 60 + rnd() * 260, s: 1.5 + rnd() * 4, w: rnd() * 6.28, k: rnd() }));
   function level(t) {
-    if (t < S.ember[0]) return 0;
-    if (t < S.logo[0]) return 0.25 * clamp((t - S.ember[0]) / 3);
-    if (t >= S.girls[0] && t < S.girls[1]) return 0.12;
-    if (t >= S.proof[0] && t < S.proof[1] || t >= S.bourse[0] && t < S.bourse[1]) return 0.3;
-    if (t < S.rating[0]) return t < S.logo[1] ? 1 : 0.55;
-    if (t < S.finale[0]) return 0.2;
-    return 1;
+    const at = n => S[n] && inScene(t, n);
+    if (at('girls')) return 0.12;
+    if (at('proof') || at('bourse')) return 0.3;
+    if (at('ember')) return 0.25 * clamp((t - S.ember[0]) / 3);
+    if (at('dead') || at('empty') || at('studio')) return 0;
+    if (at('rating') || at('ready')) return 0.2;
+    return at('logo') || at('finale') ? 1 : 0.55;
   }
   hook(t => {
     cx.clearRect(0, 0, 1080, 1920);
