@@ -8,6 +8,7 @@ import { sanitizeMarkdown } from '../../utils/validation.js';
 import { InteractionHelper } from '../../utils/interactionHelper.js';
 import { replyUserError, ErrorTypes } from '../../utils/errorHandler.js';
 import { isUserArg } from '../../utils/prefixArgs.js';
+import { MAIN_INVITE_CODE, MAIN_INVITE_URL } from '../../config/security.js';
 
 /**
  * A permanent link to the server: the vanity URL when there is one, otherwise a never-expiring invite
@@ -16,6 +17,9 @@ import { isUserArg } from '../../utils/prefixArgs.js';
  */
 export async function getServerInviteUrl(guild) {
     if (guild.vanityURLCode) return `https://discord.gg/${guild.vanityURLCode}`;
+    // The server keeps one invite link (config/security.js); use it while it exists.
+    const main = await guild.client?.fetchInvite?.(MAIN_INVITE_CODE).catch(() => null);
+    if (main?.guild?.id === guild.id) return MAIN_INVITE_URL;
 
     const me = guild.members.me;
     const canInvite = (channel) => channel

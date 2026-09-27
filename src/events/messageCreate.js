@@ -17,6 +17,8 @@ import { handlePurgeMessage } from '../services/moderation/channelPurgeService.j
 import { handleReportChannelMessage } from '../services/reportChannelService.js';
 import { handleProtectedChannelMessage } from '../services/protectedChannelsService.js';
 import { handleEveryoneMention } from '../services/everyoneMentionGuardService.js';
+import { handleChatFilter } from '../services/moderation/chatFilterService.js';
+import { handleSpam, handleOwnerMentionSpam } from '../services/moderation/antiSpamService.js';
 import { handleForeignInviteLink } from '../services/inviteLinkGuardService.js';
 import { handleMediaMessage } from '../services/mediaRoleService.js';
 import { handleImageOnlyChannelMessage } from '../services/imageOnlyChannelService.js';
@@ -47,6 +49,10 @@ export default {
       logger.debug(`Message received from ${message.author.tag}: ${message.content}`);
 
       if (await handleEveryoneMention(message)) return;
+      // Insults and banned words (chatFilterService), then spam and repeated owner mentions (antiSpamService).
+      if (await handleChatFilter(message)) return;
+      if (await handleSpam(message)) return;
+      if (await handleOwnerMentionSpam(message)) return;
       if (await handleForeignInviteLink(message)) return;
       if (await handleImageOnlyChannelMessage(message)) return;
       if (await handleMediaMessage(message)) return;

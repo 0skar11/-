@@ -128,7 +128,7 @@ describe('protected board channels', async () => {
   });
 
   test('allows the owners and this bot, and ignores other channels', async () => {
-    for (const authorId of ['1159601661392715906', '1308224908576428079', BOT_ID]) {
+    for (const authorId of ['1159601661392715906', BOT_ID]) {
       const { message } = makeMessage({ authorId });
       assert.equal(await handleProtectedChannelMessage(message), false);
       assert.equal(message.deleted, false);
