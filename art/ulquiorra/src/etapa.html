@@ -1,0 +1,324 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Ulquiorra Segunda Etapa</title>
+<style>
+  @font-face { font-family: 'Cinzel'; src: url(fonts/Cinzel.woff2) format('woff2'); font-weight: 400 900; }
+  html, body { margin: 0; background: #111; }
+  body { display: flex; flex-wrap: wrap; gap: 24px; padding: 24px; }
+  svg { display: block; }
+</style>
+</head>
+<body>
+<script>
+// Segunda Etapa set: dark, desaturated, gritty. render.mjs saves each <svg id> into ../segunda-etapa/.
+function rng(seed) { return () => ((seed = (seed * 1664525 + 1013904223) >>> 0) / 4294967296); }
+const f1 = n => n.toFixed(1);
+
+function defs(k, o = {}) {
+  return `
+  <filter id="${k}grade" x="0" y="0" width="100%" height="100%" color-interpolation-filters="sRGB">
+    <feGaussianBlur stdDeviation="${o.blur ?? .8}"/>
+    <feColorMatrix type="matrix" values=".26 .5 .1 0 .02  .26 .52 .1 0 .04  .27 .52 .12 0 .05  0 0 0 1 0"/>
+  </filter>
+  <filter id="${k}glow" x="-100%" y="-100%" width="300%" height="300%">
+    <feGaussianBlur stdDeviation="5" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+  </filter>
+  <filter id="${k}blur" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="${o.lightBlur ?? 14}"/></filter>
+  <filter id="${k}bigblur" x="-100%" y="-100%" width="300%" height="300%"><feGaussianBlur stdDeviation="40"/></filter>
+  <filter id="${k}grain" x="0" y="0" width="100%" height="100%">
+    <feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="2" seed="${o.seed ?? 4}" stitchTiles="stitch"/>
+    <feColorMatrix type="matrix" values="0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 1 -0.4"/>
+  </filter>
+  <filter id="${k}smoke" x="-20%" y="-20%" width="140%" height="140%">
+    <feTurbulence type="fractalNoise" baseFrequency="0.008 0.015" numOctaves="4" seed="9" result="n"/>
+    <feDisplacementMap in="SourceGraphic" in2="n" scale="140" xChannelSelector="R" yChannelSelector="G" result="d"/>
+    <feGaussianBlur in="d" stdDeviation="12"/>
+  </filter>
+  <radialGradient id="${k}vig" cx="50%" cy="45%" r="70%">
+    <stop offset=".45" stop-color="#000" stop-opacity="0"/><stop offset="1" stop-color="#000" stop-opacity=".92"/>
+  </radialGradient>
+  <linearGradient id="${k}bodyFade" x1="0" y1="0" x2="0" y2="1">
+    <stop offset=".55" stop-color="#000" stop-opacity="0"/><stop offset="1" stop-color="#000" stop-opacity=".85"/>
+  </linearGradient>
+  <linearGradient id="${k}sideShade" x1="0" y1="0" x2="1" y2="0">
+    <stop offset="0" stop-color="#000" stop-opacity=".55"/><stop offset=".45" stop-color="#000" stop-opacity=".05"/><stop offset="1" stop-color="#000" stop-opacity=".3"/>
+  </linearGradient>
+  <radialGradient id="${k}eye" cx="50%" cy="50%" r="50%">
+    <stop offset="0" stop-color="#fff3c4"/><stop offset=".4" stop-color="${o.eye ?? '#ffb02e'}"/><stop offset="1" stop-color="${o.eyeDeep ?? '#a8320a'}"/>
+  </radialGradient>`;
+}
+
+// Ragged, hair-like wing: many tapered strokes fanning out from a root.
+// side: -1 left, 1 right. θ is measured from straight up, towards the outside.
+function wing(seed, x, y, side, scale, o = {}) {
+  const r = rng(seed);
+  const n = o.n ?? 120, t0 = o.t0 ?? 4, t1 = o.t1 ?? 118;
+  const stroke = (color, opacity, widthMul, lenMul) => {
+    const th = (t0 + (t1 - t0) * Math.pow(r(), .85)) * Math.PI / 180;
+    const dx = side * Math.sin(th), dy = -Math.cos(th);
+    const mid = Math.sin(th * 1.1);                    // strokes around the diagonal are the longest
+    const L = (230 + r() * 330 + mid * 180) * scale * lenMul;
+    const w = (6 + r() * 22) * scale * widthMul;
+    const start = (20 + r() * 70) * scale;
+    const bx = x + dx * start, by = y + dy * start;
+    const px = -dy, py = dx;                           // perpendicular
+    const bend = (r() - .3) * .25 * L * side;
+    const tx = bx + dx * L + px * bend * .2, ty = by + dy * L + py * bend * .2 + L * .06;
+    const cx = bx + dx * L * .55 + px * bend, cy = by + dy * L * .55 + py * bend;
+    return `<path d="M ${f1(bx + px * w)} ${f1(by + py * w)} Q ${f1(cx + px * w * .5)} ${f1(cy + py * w * .5)} ${f1(tx)} ${f1(ty)} Q ${f1(cx - px * w * .5)} ${f1(cy - py * w * .5)} ${f1(bx - px * w)} ${f1(by - py * w)} Z" fill="${color}" opacity="${opacity.toFixed(2)}"/>`;
+  };
+  let light = '', dark = '';
+  for (let i = 0; i < (o.lightN ?? 26); i++) light += stroke(o.light ?? '#a9b6b4', .25 + r() * .45, .8, .95);
+  for (let i = 0; i < n; i++) dark += stroke(r() < .12 ? '#1b2222' : '#030404', .82 + r() * .18, 1, 1);
+  for (let i = 0; i < n; i++) dark += stroke(r() < .2 ? '#2a3332' : '#050606', .7 + r() * .3, .3, 1.08);
+  return { light, dark };
+}
+
+function wings(k, seed, x, y, scale, o = {}) {
+  const L = wing(seed, x - 40 * scale, y, -1, scale, o), R = wing(seed + 101, x + 40 * scale, y, 1, scale, o);
+  return `<g filter="url(#${k}blur)">${L.light}${R.light}</g>${L.dark}${R.dark}`;
+}
+
+// Tapered hair strand from (x, y) along a curve to (x + dx, y + dy).
+function strand(x, y, dx, dy, w, bend, color, op = 1) {
+  const px = -dy, py = dx, len = Math.hypot(dx, dy) || 1;
+  const nx = px / len, ny = py / len;
+  const cx = x + dx * .5 + nx * bend, cy = y + dy * .5 + ny * bend;
+  return `<path d="M ${f1(x + nx * w)} ${f1(y + ny * w)} Q ${f1(cx + nx * w * .5)} ${f1(cy + ny * w * .5)} ${f1(x + dx)} ${f1(y + dy)} Q ${f1(cx - nx * w * .5)} ${f1(cy - ny * w * .5)} ${f1(x - nx * w)} ${f1(y - ny * w)} Z" fill="${color}" opacity="${op}"/>`;
+}
+
+function hair(seed) {
+  const r = rng(seed);
+  let back = '', bangs = '';
+  // Long hair hanging past the shoulders.
+  for (let i = 0; i < 90; i++) {
+    const a = Math.PI * (1.08 + r() * .84);            // around the top of the head
+    const x = 512 + Math.cos(a) * 92, y = 280 + Math.sin(a) * 96;
+    const out = Math.cos(a) * (40 + r() * 70);
+    const dy = 170 + r() * 300 - Math.abs(Math.cos(a)) * 20;
+    back += strand(x, y, out, dy, 7 + r() * 14, (r() - .5) * 60, r() < .12 ? '#1e2626' : '#040505');
+  }
+  // Bangs over the face: long ones are thin so the eyes still show.
+  for (let i = 0; i < 34; i++) {
+    const x = 448 + r() * 128, y = 222 + r() * 16;
+    const long = r() < .45;
+    const dy = long ? 140 + r() * 60 : 70 + r() * 60;
+    bangs += strand(x, y, (x - 512) * .12 + (r() - .5) * 26, dy, long ? 3 + r() * 5 : 8 + r() * 10, (r() - .5) * 24, r() < .15 ? '#222b2a' : '#040505');
+  }
+  return { back, bangs };
+}
+
+// The figure, drawn around a 1024 box: head ~ (512, 330), torso down to the bottom edge.
+function figure(k, o = {}) {
+  const eyes = o.eyes !== false;
+  const h = hair(o.hairSeed ?? 5);
+  return `
+  <linearGradient id="${k}skinG" x1="380" y1="0" x2="650" y2="0" gradientUnits="userSpaceOnUse">
+    <stop offset="0" stop-color="#6f7775"/><stop offset=".4" stop-color="#c9cfcc"/><stop offset=".62" stop-color="#eef2f0"/><stop offset="1" stop-color="#a9b0ad"/>
+  </linearGradient>
+  <path d="M 470 216 C 452 150 432 86 404 6 C 440 70 468 132 494 206 Z" fill="#c9d0cd"/>
+  <path d="M 554 216 C 572 150 592 86 620 6 C 584 70 556 132 530 206 Z" fill="#c9d0cd"/>
+  <path d="M 470 216 C 452 150 432 86 404 6 L 420 60 C 440 120 458 170 478 214 Z M 554 216 C 572 150 592 86 620 6 L 604 60 C 584 120 566 170 546 214 Z" fill="#000" opacity=".3"/>
+  <path d="M 488 416 L 488 486 L 536 486 L 536 416 Z" fill="url(#${k}skinG)"/>
+  <path d="M 488 430 C 500 450 524 450 536 430 L 536 460 C 520 470 504 470 488 460 Z" fill="#000" opacity=".3"/>
+  <g stroke="#000" stroke-opacity=".55" stroke-width="3">
+    <path d="M 418 508 C 396 520 384 560 382 620 C 380 700 378 780 374 860 C 372 900 374 930 380 962 L 400 962 C 402 920 402 880 404 840 C 408 760 412 690 416 630 C 418 590 422 560 428 540 Z" fill="url(#${k}skinG)"/>
+    <path d="M 606 508 C 628 520 640 560 642 620 C 644 700 646 780 650 860 C 652 900 650 930 644 962 L 624 962 C 622 920 622 880 620 840 C 616 760 612 690 608 630 C 606 590 602 560 596 540 Z" fill="url(#${k}skinG)"/>
+    <path d="M 490 472 C 470 488 440 498 420 512 C 406 540 406 600 414 660 C 422 720 440 780 446 840 L 440 1030 L 584 1030 L 578 840 C 584 780 602 720 610 660 C 618 600 618 540 604 512 C 584 498 554 488 534 472 Z" fill="url(#${k}skinG)"/>
+  </g>
+  <path d="M 378 760 C 378 820 372 880 376 962 L 400 962 C 402 900 404 830 406 760 Z M 646 760 C 646 820 652 880 648 962 L 624 962 C 622 900 620 830 618 760 Z" fill="#070909" opacity=".9"/>
+  <g stroke="#59615f" stroke-width="2.5" fill="none" stroke-linecap="round" opacity=".85">
+    <path d="M 436 520 C 462 510 486 510 500 516 M 588 520 C 562 510 538 510 524 516"/>
+    <path d="M 440 560 C 462 572 480 574 494 572 M 584 560 C 562 572 544 574 530 572"/>
+    <path d="M 440 640 C 462 650 482 652 494 650 M 584 640 C 562 650 542 652 530 650"/>
+    <path d="M 444 676 C 464 686 482 688 494 686 M 580 676 C 560 686 542 688 530 686"/>
+    <path d="M 448 712 C 466 722 482 724 494 722 M 576 712 C 558 722 542 724 530 722"/>
+    <path d="M 452 748 C 468 756 482 758 494 756 M 572 748 C 556 756 542 758 530 756"/>
+  </g>
+  <path d="M 500 494 L 524 494 L 538 1030 L 486 1030 Z" fill="#050606"/>
+  <ellipse cx="512" cy="492" rx="17" ry="15" fill="#000"/>
+  ${h.back}
+  <path d="M 440 300 C 440 382 470 424 512 442 C 554 424 584 382 584 300 C 584 236 440 236 440 300 Z" fill="url(#${k}skinG)"/>
+  <path d="M 440 300 C 440 382 470 424 512 442 C 554 424 584 382 584 300 C 584 236 440 236 440 300 Z" fill="#fff" opacity=".25"/>
+  <path d="M 452 344 L 500 340 M 572 344 L 524 340" stroke="#0a0a0a" stroke-width="4" stroke-linecap="round"/>
+  ${eyes ? `
+  <path d="M 458 346 C 470 336 490 336 500 342 C 490 350 470 352 458 346 Z" fill="url(#${k}eye)"/>
+  <path d="M 566 346 C 554 336 534 336 524 342 C 534 350 554 352 566 346 Z" fill="url(#${k}eye)"/>
+  <circle cx="480" cy="344" r="2.6" fill="#200"/><circle cx="544" cy="344" r="2.6" fill="#200"/>` : ''}
+  <path d="M 474 352 L 482 352 L 486 440 L 480 470 L 472 440 Z M 542 352 L 550 352 L 552 440 L 546 470 L 540 440 Z" fill="#0b1413" opacity=".92"/>
+  <path d="M 500 404 Q 512 400 524 404" stroke="#111" stroke-width="3.5" fill="none" stroke-linecap="round"/>
+  <path d="M 430 300 C 418 204 468 176 512 176 C 556 176 606 204 594 300 C 570 248 454 248 430 300 Z" fill="#040505"/>
+  ${h.bangs}`;
+}
+
+function eyesGlow(k, s = 1) {
+  return `<g filter="url(#${k}glow)">
+    <path d="M 458 346 C 470 336 490 336 500 342 C 490 350 470 352 458 346 Z" fill="url(#${k}eye)"/>
+    <path d="M 566 346 C 554 336 534 336 524 342 C 534 350 554 352 566 346 Z" fill="url(#${k}eye)"/></g>
+    <circle cx="480" cy="344" r="2.6" fill="#200"/><circle cx="544" cy="344" r="2.6" fill="#200"/>
+    <circle cx="512" cy="344" r="${60 * s}" fill="#ff9a2e" opacity=".22" filter="url(#${k}bigblur)"/>`;
+}
+
+function dust(seed, W, H, n, color, rMax = 2.2) {
+  const r = rng(seed);
+  let s = '';
+  for (let i = 0; i < n; i++) s += `<circle cx="${f1(r() * W)}" cy="${f1(r() * H)}" r="${(r() * rMax + .4).toFixed(2)}" fill="${color}" opacity="${(r() * .6 + .15).toFixed(2)}"/>`;
+  return s;
+}
+
+function lance(k, x0, y0, x1, y1) {
+  return `<path d="M ${x0} ${y0} L ${x1} ${y1}" stroke="#35e08a" stroke-width="26" stroke-linecap="round" opacity=".55" filter="url(#${k}blur)"/>
+    <path d="M ${x0} ${y0} L ${x1} ${y1}" stroke="#d9ffe9" stroke-width="7" stroke-linecap="round" filter="url(#${k}glow)"/>`;
+}
+
+// Finishing layers shared by every piece.
+function finish(k, W, H, grain = .2, vig = 1) {
+  return `<rect width="${W}" height="${H}" fill="url(#${k}vig)" opacity="${vig}"/>
+    <rect width="${W}" height="${H}" filter="url(#${k}grain)" opacity="${grain}"/>`;
+}
+
+function svg(id, W, H, body) {
+  return `<svg id="${id}" xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">${body}</svg>`;
+}
+
+const out = [];
+const bgLight = (k, cx, cy, r, c = '#8e9c9a', op = .9) =>
+  `<circle cx="${cx}" cy="${cy}" r="${r}" fill="${c}" opacity="${op}" filter="url(#${k}bigblur)"/>`;
+
+// ── PFP 1 — Segunda Etapa (like the reference: centred, wings spread, light behind) ──
+out.push(svg('pfp-1-segunda-etapa', 1024, 1024, `<defs>${defs('a')}</defs>
+  <rect width="1024" height="1024" fill="#020303"/>
+  <g filter="url(#agrade)">
+    ${bgLight('a', 512, 170, 330)}
+    ${wings('a', 3, 512, 520, 1.1)}
+    ${figure('a')}
+    <rect width="1024" height="1024" fill="url(#abodyFade)"/>
+  </g>
+  ${eyesGlow('a')}
+  ${finish('a', 1024, 1024)}`));
+
+// ── PFP 2 — close-up, amber eyes through the hair ──
+out.push(svg('pfp-2-gaze', 1024, 1024, `<defs>${defs('b')}</defs>
+  <rect width="1024" height="1024" fill="#020303"/>
+  <g filter="url(#bgrade)">
+    ${bgLight('b', 512, 120, 420, '#7f8d8b', .7)}
+    <g transform="translate(512 470) scale(2.35) translate(-512 -330)">${wings('b', 5, 512, 520, 1)}${figure('b')}</g>
+  </g>
+  <g transform="translate(512 470) scale(2.35) translate(-512 -330)">${eyesGlow('b', .8)}</g>
+  ${finish('b', 1024, 1024, .22)}`));
+
+// ── PFP 3 — Lanza del Relámpago, green light from below ──
+out.push(svg('pfp-3-lanza', 1024, 1024, `<defs>${defs('c', { eye: '#7dffb8', eyeDeep: '#0b8f4d' })}
+  <radialGradient id="cgl" cx="85%" cy="95%" r="70%"><stop offset="0" stop-color="#35e08a" stop-opacity=".5"/><stop offset=".7" stop-color="#35e08a" stop-opacity="0"/></radialGradient></defs>
+  <rect width="1024" height="1024" fill="#020303"/>
+  <g filter="url(#cgrade)">
+    ${bgLight('c', 512, 200, 300, '#6d7b79', .7)}
+    ${wings('c', 11, 512, 520, 1.1, { t0: 0, t1: 100 })}
+    ${figure('c')}
+    <rect width="1024" height="1024" fill="url(#cbodyFade)"/>
+  </g>
+  <rect width="1024" height="1024" fill="url(#cgl)" style="mix-blend-mode:screen"/>
+  ${lance('c', 690, 1060, 1010, 470)}
+  ${eyesGlow('c')}
+  ${dust(13, 1024, 1024, 60, '#9dffc8')}
+  ${finish('c', 1024, 1024)}`));
+
+// ── PFP 4 — cold moonlight, wings closing in ──
+out.push(svg('pfp-4-luna', 1024, 1024, `<defs>${defs('d')}</defs>
+  <rect width="1024" height="1024" fill="#020303"/>
+  <g filter="url(#dgrade)">
+    <circle cx="512" cy="300" r="300" fill="#d9e1de" opacity=".55" filter="url(#dbigblur)"/>
+    <circle cx="512" cy="300" r="250" fill="#cfd8d5"/>
+    ${wings('d', 21, 512, 540, 1.15, { t0: 20, t1: 160, n: 150 })}
+    ${figure('d')}
+    <rect width="1024" height="1024" fill="url(#dbodyFade)"/>
+  </g>
+  ${eyesGlow('d')}
+  ${dust(17, 1024, 1024, 40, '#fff', 1.6)}
+  ${finish('d', 1024, 1024, .2, .9)}`));
+
+// ── PFP 5 — the darkest: only the eyes and the edges of the wings ──
+out.push(svg('pfp-5-abismo', 1024, 1024, `<defs>${defs('e', { eye: '#ff7a1a', eyeDeep: '#7a1204' })}</defs>
+  <rect width="1024" height="1024" fill="#000"/>
+  <g filter="url(#egrade)" opacity=".55">
+    ${bgLight('e', 512, 150, 260, '#46514f', .8)}
+    ${wings('e', 31, 512, 520, 1.1, { light: '#5d6866', lightN: 18 })}
+    ${figure('e')}
+  </g>
+  <rect width="1024" height="1024" fill="url(#ebodyFade)"/>
+  <rect width="1024" height="1024" fill="#000" opacity=".6"/>
+  <g filter="url(#esmoke)" opacity=".5"><ellipse cx="300" cy="880" rx="360" ry="120" fill="#161b1a"/><ellipse cx="780" cy="820" rx="300" ry="110" fill="#111615"/></g>
+  ${eyesGlow('e', 1.2)}
+  ${dust(41, 1024, 1024, 30, '#ff9a4a', 1.8)}
+  ${finish('e', 1024, 1024, .26)}`));
+
+// ── BANNER 1 — Segunda Etapa, full wingspan ──
+out.push(svg('banner-1-segunda-etapa', 1500, 500, `<defs>${defs('f')}</defs>
+  <rect width="1500" height="500" fill="#020303"/>
+  <g filter="url(#fgrade)">
+    ${bgLight('f', 750, 60, 380)}
+    <g transform="translate(750 170) scale(.6) translate(-512 -330)">${wings('f', 7, 512, 520, 1.9, { n: 180 })}${figure('f')}</g>
+    <rect width="1500" height="500" fill="url(#fbodyFade)"/>
+  </g>
+  <g transform="translate(750 170) scale(.6) translate(-512 -330)">${eyesGlow('f')}</g>
+  ${finish('f', 1500, 500)}`));
+
+// ── BANNER 2 — the gaze: eyes band across the banner ──
+out.push(svg('banner-2-gaze', 1500, 500, `<defs>${defs('g')}</defs>
+  <rect width="1500" height="500" fill="#020303"/>
+  <g filter="url(#ggrade)">
+    ${bgLight('g', 750, 0, 520, '#7f8d8b', .7)}
+    <g transform="translate(1050 250) scale(2.2) translate(-512 -340)">${wings('g', 15, 512, 520, 1.2)}${figure('g')}</g>
+  </g>
+  <g transform="translate(1050 250) scale(2.2) translate(-512 -340)">${eyesGlow('g', .8)}</g>
+  <text x="80" y="265" font-family="Cinzel" font-weight="700" font-size="46" letter-spacing="16" fill="#cfd6d4" opacity=".9">ULQUIORRA</text>
+  <text x="84" y="305" font-family="Cinzel" font-size="18" letter-spacing="12" fill="#7d8886">CUARTA ESPADA</text>
+  ${finish('g', 1500, 500)}`));
+
+// ── BANNER 3 — Lanza del Relámpago ──
+out.push(svg('banner-3-lanza', 1500, 500, `<defs>${defs('h', { eye: '#7dffb8', eyeDeep: '#0b8f4d' })}</defs>
+  <rect width="1500" height="500" fill="#020303"/>
+  <g filter="url(#hgrade)">
+    ${bgLight('h', 420, 80, 320, '#6d7b79', .7)}
+    <g transform="translate(420 190) scale(.62) translate(-512 -330)">${wings('h', 23, 512, 520, 1.7, { n: 170 })}${figure('h')}</g>
+    <rect width="1500" height="500" fill="url(#hbodyFade)"/>
+  </g>
+  <g transform="translate(420 190) scale(.62) translate(-512 -330)">${eyesGlow('h')}</g>
+  ${lance('h', 760, 250, 1460, 250)}
+  <path d="M 1460 250 L 1420 232 L 1420 268 Z" fill="#fff" filter="url(#hglow)"/>
+  ${dust(29, 1500, 500, 120, '#9dffc8')}
+  ${finish('h', 1500, 500)}`));
+
+// ── BANNER 4 — moonlit wings over the void ──
+out.push(svg('banner-4-luna', 1500, 500, `<defs>${defs('i')}</defs>
+  <rect width="1500" height="500" fill="#020303"/>
+  <g filter="url(#igrade)">
+    <circle cx="1120" cy="180" r="200" fill="#d9e1de" opacity=".5" filter="url(#ibigblur)"/>
+    <circle cx="1120" cy="180" r="150" fill="#cfd8d5"/>
+    <g transform="translate(1120 200) scale(.58) translate(-512 -330)">${wings('i', 37, 512, 520, 1.6, { n: 170 })}${figure('i')}</g>
+    <rect width="1500" height="500" fill="url(#ibodyFade)"/>
+  </g>
+  <g transform="translate(1120 200) scale(.58) translate(-512 -330)">${eyesGlow('i')}</g>
+  ${dust(43, 1500, 500, 70, '#fff', 1.5)}
+  <text x="80" y="440" font-family="Cinzel" font-size="20" letter-spacing="14" fill="#6f7b79">NOTHING EXISTS HERE</text>
+  ${finish('i', 1500, 500)}`));
+
+// ── BANNER 5 — the darkest ──
+out.push(svg('banner-5-abismo', 1500, 500, `<defs>${defs('j', { eye: '#ff7a1a', eyeDeep: '#7a1204' })}</defs>
+  <rect width="1500" height="500" fill="#000"/>
+  <g filter="url(#jgrade)" opacity=".5">
+    ${bgLight('j', 750, 40, 300, '#3f4948', .8)}
+    <g transform="translate(750 240) scale(1.1) translate(-512 -340)">${wings('j', 47, 512, 520, 1.5, { light: '#5d6866', lightN: 20, n: 180 })}${figure('j')}</g>
+  </g>
+  <rect width="1500" height="500" fill="#000" opacity=".5"/>
+  <g filter="url(#jsmoke)" opacity=".55"><ellipse cx="300" cy="430" rx="420" ry="90" fill="#151a19"/><ellipse cx="1200" cy="440" rx="400" ry="90" fill="#111615"/></g>
+  <g transform="translate(750 240) scale(1.1) translate(-512 -340)">${eyesGlow('j', 1.3)}</g>
+  ${dust(53, 1500, 500, 40, '#ff9a4a', 1.6)}
+  ${finish('j', 1500, 500, .26)}`));
+
+document.body.insertAdjacentHTML('beforeend', out.join(''));
+</script>
+</body>
+</html>
