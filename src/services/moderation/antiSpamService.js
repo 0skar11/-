@@ -4,7 +4,8 @@
 // DUPLICATE_MESSAGES times within DUPLICATE_WINDOW_MS, gets a SPAM_TIMEOUT_MS timeout and those
 // messages are deleted. Owners, bots and staff (Manage Messages) are left alone.
 //
-// Owner mentions: mentioning the owner (OWNER_PING_ID) in OWNER_MENTION_LIMIT messages in a row
+// Owner mentions: mentioning the owner (OWNER_PING_ID, typed in the message; replies to the owner don't
+// count) in OWNER_MENTION_LIMIT messages in a row
 // (each within OWNER_MENTION_WINDOW_MS of the last) deletes the last one and gives a warning.
 // A message without the mention starts the count again. Only the owners may do it freely.
 
@@ -23,6 +24,7 @@ export const SPAM_TIMEOUT_MS = 10 * 60_000;
 export const OWNER_PING_ID = '1159601661392715906';
 export const OWNER_MENTION_LIMIT = 3;
 export const OWNER_MENTION_WINDOW_MS = 10 * 60_000;
+const OWNER_MENTION = new RegExp(`<@!?${OWNER_PING_ID}>`);
 
 const NOTICE_DELETE_MS = 5_000;
 const recent = new Map(); // guildId:userId -> [{ at, text, channelId, id }]
@@ -92,7 +94,8 @@ export async function handleSpam(message, { now = Date.now() } = {}) {
 export async function handleOwnerMentionSpam(message, { now = Date.now() } = {}) {
     if (!message.guild || message.author?.bot || isServerOwner(message.author?.id)) return false;
     const key = `${message.guild.id}:${message.author.id}`;
-    const mentionsOwner = Boolean(message.mentions?.users?.has?.(OWNER_PING_ID)) || String(message.content || '').includes(`<@${OWNER_PING_ID}>`) || String(message.content || '').includes(`<@!${OWNER_PING_ID}>`);
+    // Only a mention typed in the message counts: a reply to the owner (even with its ping on) is not one.
+    const mentionsOwner = OWNER_MENTION.test(String(message.content || ''));
     if (!mentionsOwner) {
         ownerMentions.delete(key);
         return false;
