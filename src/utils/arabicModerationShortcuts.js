@@ -9,6 +9,7 @@ import { handlePurgeMessage } from '../services/moderation/channelPurgeService.j
 import { refreshTrustedBoard } from '../services/trustedBoardService.js';
 import { issueWarning, warningCard } from '../services/moderation/warnEscalation.js';
 import { moderationCard, cardReason, formatDurationMs, NO_REASON } from './moderationCard.js';
+import { unbanDmLine } from '../services/moderation/punishmentDm.js';
 
 const COMMANDS = new Set([
   'وارن', 'وارنات', 'تايم', 'انتايم', 'بان', 'انبان', 'كلير', 'ان', 'شيل', 'ر', 'رول', 'ب', 'رتبة', 'ازالةرتبة', 'purge', 'تراست', 'انتراست', 'trusted', 'trustedlist', 'warn', 'warnings', 'timeout', 'untimeout', 'ban', 'unban', 'clear', 'remove', 'role', 'roll', 'lock', 'unlock',
@@ -288,8 +289,8 @@ export async function handleArabicModerationShortcut(message) {
     if (command === 'انبان' || command === 'unban') {
       if (!hasPermission(message.member, PermissionFlagsBits.BanMembers)) return reply(message, '🚫 No Permission');
       if (!targetUser) return true;
-      await ModerationService.unbanUser({ guild, user: targetUser, moderator: message.member, reason: tail || NO_REASON });
-      return sendCard(message, { emoji: '✅', title: 'BAN REMOVED', fields: [['User', `<@${targetId}>`], ['Reason', cardReason(tail)]], moderatorId: message.member.id });
+      const result = await ModerationService.unbanUser({ guild, user: targetUser, moderator: message.member, reason: tail || NO_REASON });
+      return sendCard(message, { emoji: '✅', title: 'BAN REMOVED', fields: [['User', `<@${targetId}>`], ['Reason', cardReason(tail)], ['DM', unbanDmLine(result.dmSent)]], moderatorId: message.member.id });
     }
 
     if (command === 'كلير' || command === 'clear') {

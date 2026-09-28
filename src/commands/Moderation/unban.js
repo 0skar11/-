@@ -4,6 +4,7 @@ import { ModerationService } from '../../services/moderation/moderationService.j
 import { replyUserError, ErrorTypes } from '../../utils/errorHandler.js';
 import { InteractionHelper } from '../../utils/interactionHelper.js';
 import { moderationCard, cardReason } from '../../utils/moderationCard.js';
+import { unbanDmLine } from '../../services/moderation/punishmentDm.js';
 
 export default {
     data: new SlashCommandBuilder()
@@ -64,7 +65,7 @@ export default {
         await InteractionHelper.safeEditReply(interaction, moderationCard({
             emoji: '✅',
             title: 'BAN REMOVED',
-            fields: [['User', `<@${targetUser.id}>`], ['Reason', reason]],
+            fields: [['User', `<@${targetUser.id}>`], ['Reason', reason], ['DM', unbanDmLine(result.dmSent)]],
             moderatorId: interaction.user.id,
         }));
     },
