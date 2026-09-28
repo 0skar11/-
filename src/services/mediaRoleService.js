@@ -4,7 +4,7 @@ import { canLiftHardBan } from './moderation/hardBanService.js';
 import { getGuildConfig, updateGuildConfig } from './config/guildConfig.js';
 import { logger } from '../utils/logger.js';
 
-// Images/files and links are for members of the `media` role only; GIFs are open to everyone.
+// Images/files, GIFs and links are for members of the `media` role (and admins) only.
 // The role and its permissions are the owner's to set: the bot never changes them. Discord permissions
 // can't stop a plain link from being sent, so the message guard below deletes those.
 const MEDIA_ROLE_NAME = 'media';
@@ -13,9 +13,6 @@ const BLOCKED_NOTICE_DELETE_MS = 5_000;
 const GRANTED_TO_ALL_KEY = 'mediaRoleGrantedToAll';
 
 const LINK = /(?:https?:\/\/|www\.)\S+|(?:discord(?:app)?\.com\/invite|discord\.gg)\/[\w-]+/iu;
-// GIFs anyone may send: GIF picker links (Tenor, Giphy) and .gif files on Discord's CDN. Anything else
-// left in the message (another site around them) is still caught as a link.
-const GIF_LINK = /(?:https?:\/\/)?(?:[\w-]+\.)*(?:tenor\.com|giphy\.com|gph\.is)\/\S*|(?:https?:\/\/)?(?:cdn\.discordapp\.com|media\.discordapp\.net)\/\S+?\.gif(?:[?#]\S*)?(?=\s|$)/giu;
 
 // The media role's ID per server, so a media role the owner renamed is still the media role.
 const MEDIA_ROLE_ID_KEY = 'mediaRoleId';
@@ -91,9 +88,9 @@ export async function grantMediaRoleToAllMembers(guild) {
   return { skipped: false, granted, failed };
 }
 
-/** A message counts as media when it has an attachment or a link. GIF links (the GIF picker's Tenor/Giphy links) don't count. */
+/** A message counts as media when it has an attachment or a link (GIF picker links included). */
 export function hasMediaContent(message) {
-  return Boolean(message.attachments?.size) || LINK.test((message.content || '').replace(GIF_LINK, ' '));
+  return Boolean(message.attachments?.size) || LINK.test(message.content || '');
 }
 
 // `شغل <link>` / `play <link>` (with or without a prefix) is a music request, not media, so it isn't blocked.
@@ -118,7 +115,7 @@ export async function handleMediaMessage(message) {
 
   await message.delete().catch(() => {});
   const notice = await message.channel.send({
-    content: `🚫 <@${message.author.id}> الصور واللينكات لرتبة ${MEDIA_ROLE_NAME} بس.`,
+    content: `🚫 <@${message.author.id}> الصور والـ GIF واللينكات لرتبة ${MEDIA_ROLE_NAME} بس.`,
     allowedMentions: { users: [message.author.id] },
   }).catch(() => null);
   if (notice) setTimeout(() => notice.delete().catch(() => {}), BLOCKED_NOTICE_DELETE_MS);

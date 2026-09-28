@@ -20,15 +20,11 @@ describe('media lock', () => {
     assert.equal(isPlayCommand(message('شغل https://example.com', 1)), false);
   });
 
-  test('GIFs are allowed for everyone, other links around them are not', () => {
-    assert.equal(hasMediaContent(message('https://tenor.com/view/cat-gif-123')), false);
-    assert.equal(hasMediaContent(message('ههه https://media.tenor.com/abc/x.gif')), false);
-    assert.equal(hasMediaContent(message('https://giphy.com/gifs/funny-abc')), false);
-    assert.equal(hasMediaContent(message('https://media.discordapp.net/attachments/1/2/a.gif?ex=1')), false);
-    assert.equal(hasMediaContent(message('https://tenor.com/view/a https://youtube.com/x')), true);
-    assert.equal(hasMediaContent(message('https://tenor.com.evil.com/x')), true);
-    assert.equal(hasMediaContent(message('https://evil.com/tenor.com/x')), true);
-    assert.equal(hasMediaContent(message('https://scam.com/?a.gif')), true);
+  test('GIFs count as media too', () => {
+    assert.equal(hasMediaContent(message('https://tenor.com/view/cat-gif-123')), true);
+    assert.equal(hasMediaContent(message('https://giphy.com/gifs/funny-abc')), true);
+    assert.equal(hasMediaContent(message('https://media.discordapp.net/attachments/1/2/a.gif?ex=1')), true);
+    assert.equal(hasMediaContent(message('', 1)), true);
   });
 
   test('plain text is not media', () => {
