@@ -3,8 +3,9 @@
 // The bot posts every ban / timeout / warn in the moderation log channel. When the moderator who
 // did it then sends the proof there (a screenshot, or what the member said), the bot deletes both
 // messages and posts one message instead: the log with the proof attached (text in a field, the
-// first image as the embed image, other files under it). More proof sent later is merged the same
-// way. Only the moderator's own proof within PROOF_WINDOW_MS of their latest log is merged.
+// first image as the embed image, other files under it). Only the moderator's FIRST message after
+// their log, within PROOF_WINDOW_MS, is taken as proof (report #164); anything after it stays a
+// normal message.
 
 import { MessageType } from 'discord.js';
 import { MODERATION_ACTION_LOG_CHANNEL_ID } from './moderationActionLogService.js';
@@ -39,9 +40,17 @@ export async function handleProofMessage(message, { now = Date.now() } = {}) {
     if (message.channelId !== MODERATION_ACTION_LOG_CHANNEL_ID || !message.guild || message.author?.bot) return false;
     const key = `${message.guild.id}:${message.author.id}`;
     const entry = pending.get(key);
-    if (!entry || now - entry.at > PROOF_WINDOW_MS) return false;
+    if (!entry) return false;
+    // The first message after the log decides: proof when it's in time, otherwise the log gets none.
+    if (now - entry.at > PROOF_WINDOW_MS) {
+        pending.delete(key);
+        return false;
+    }
     const attachments = [...(message.attachments?.values?.() || [])];
-    if (!message.content?.trim() && !attachments.length) return false;
+    if (!message.content?.trim() && !attachments.length) {
+        pending.delete(key);
+        return false;
+    }
 
     // Names are made unique so two "image.png" files don't clash in attachment:// links.
     const files = [
@@ -54,7 +63,8 @@ export async function handleProofMessage(message, { now = Date.now() } = {}) {
         const posted = await message.channel.send(buildMergedPayload(entry.embed, texts, files));
         await entry.message.delete().catch(() => {});
         await message.delete().catch(() => {});
-        pending.set(key, { message: posted, embed: entry.embed, texts, files, at: now });
+        // One proof per log: the moderator's next messages are normal messages.
+        pending.delete(key);
         return true;
     } catch (error) {
         logger.warn(`Could not merge the proof of ${message.author.id}: ${error.message}`);
@@ -78,7 +88,7 @@ export function buildProofGuideEmbed() {
             `**3️⃣** ابعت الدليل هنا في خلال ${PROOF_WINDOW_MS / 60_000} دقايق: صورة، أو اكتب العضو قال إيه، أو الاتنين.`,
             '**4️⃣** البوت هيمسح رسالتك ورسالة العقوبة ويبعتهم **رسالة واحدة** فيها العقوبة والدليل.',
             '',
-            '📎 تقدر تبعت أكتر من دليل ورا بعض، كله بيتضاف لنفس الرسالة.',
+            '📎 أول رسالة بس بعد العقوبة هي اللي بتتاخد دليل (صورة ومعاها كلام في نفس الرسالة لو عايز)، وأي رسالة بعدها بتفضل رسالة عادية.',
             '⚠️ الدليل بيتضاف لآخر عقوبة **انت** عملتها بس.',
         ].join('\n'),
     };

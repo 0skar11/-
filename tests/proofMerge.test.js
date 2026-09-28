@@ -36,10 +36,13 @@ describe('proof channel (report #156)', () => {
     assert.equal(merged.embeds[0].image.url, 'attachment://proof-1-shot.png');
     assert.equal(merged.files[0].attachment, 'https://cdn/x/shot.png');
 
-    // More proof later is added to the same merged message.
-    assert.equal(await handleProofMessage(proof('وكمان ده', ['two.png']), { now: 3000 }), true);
-    assert.equal(sent[1].files.length, 2);
-    assert.match(sent[1].embeds[0].fields[0].value, /قالي كسمك\nوكمان ده/u);
+    // Only the first message is proof (report #164): the next one stays a normal message.
+    assert.equal(await handleProofMessage(proof('وكمان ده', ['two.png']), { now: 3000 }), false);
+    assert.equal(sent.length, 1);
+    // A new log takes a new proof.
+    rememberLogMessage('g', MOD, log, embed, 4000);
+    assert.equal(await handleProofMessage(proof('دليل تاني'), { now: 5000 }), true);
+    assert.equal(sent.length, 2);
   });
 
   test('other people, other channels, empty messages and late proof are left alone', async () => {
