@@ -7,9 +7,13 @@ import { getServerInviteUrl } from '../../commands/Moderation/dm.js';
 // before the ban/kick, because afterwards
 // the bot no longer shares a server with them and Discord refuses the DM. A kicked member gets a
 // button back to the server; a banned one can't rejoin, so there is none.
+// Unban (report #160): the member is told the ban was lifted, with the button back to the server. After
+// the ban they share no server with the bot, so Discord often refuses this DM; the moderator is told
+// when it wasn't delivered so they can send the link themselves.
 const ACTIONS = {
     ban: { title: '🔨 اتعملك بان', line: (guild) => `اتعملك **بان** من سيرفر **${guild.name}**.`, color: 0xed4245 },
     kick: { title: '👢 اتعملك كيك', line: (guild) => `اتعملك **كيك** (طرد) من سيرفر **${guild.name}**.`, color: 0xfaa61a },
+    unban: { title: '✅ البان اتفك', line: (guild) => `البان بتاعك من سيرفر **${guild.name}** **اتفك**، تقدر ترجع تاني.`, color: 0x57f287, welcomeBack: true },
 };
 
 function moderatorLabel(moderator) {
@@ -19,8 +23,9 @@ function moderatorLabel(moderator) {
 }
 
 export function buildPunishmentDm(guild, action, reason, inviteUrl = null, { user = null, moderator = null } = {}) {
-    const { title, line, color } = ACTIONS[action];
-    const staff = moderatorLabel(moderator);
+    const { title, line, color, welcomeBack } = ACTIONS[action];
+    // An unban has nothing to appeal, so it doesn't name the moderator.
+    const staff = welcomeBack ? null : moderatorLabel(moderator);
     const lines = [
         `${user ? `${user} ` : ''}${line(guild)}`,
         '',
@@ -35,7 +40,7 @@ export function buildPunishmentDm(guild, action, reason, inviteUrl = null, { use
         footer: { text: 'الرسالة دي من إدارة السيرفر' },
         timestamp: new Date().toISOString(),
     };
-    const components = action === 'kick' && inviteUrl
+    const components = (action === 'kick' || action === 'unban') && inviteUrl
         ? [new ActionRowBuilder().addComponents(new ButtonBuilder().setStyle(ButtonStyle.Link).setURL(inviteUrl).setLabel('ارجع للسيرفر').setEmoji('🔗'))]
         : [];
     return { embeds: [embed], components };
@@ -45,7 +50,7 @@ export function buildPunishmentDm(guild, action, reason, inviteUrl = null, { use
 export async function sendPunishmentDm(guild, user, action, reason, moderator = null) {
     if (!user || user.bot || !ACTIONS[action]) return false;
     try {
-        const inviteUrl = action === 'kick' ? await getServerInviteUrl(guild).catch(() => null) : null;
+        const inviteUrl = action === 'kick' || action === 'unban' ? await getServerInviteUrl(guild).catch(() => null) : null;
         // The member's own mention on top, so the DM is clearly for them.
         await user.send({ content: `${user}`, ...buildPunishmentDm(guild, action, reason, inviteUrl, { user, moderator }) });
         return true;
@@ -53,4 +58,9 @@ export async function sendPunishmentDm(guild, user, action, reason, moderator = 
         logger.debug(`Could not DM ${user.tag || user.id} about the ${action}: ${error.message}`);
         return false;
     }
+}
+
+/** The unban card's DM line: sent, or a hint to send the server link by hand. */
+export function unbanDmLine(dmSent) {
+    return dmSent ? '✅ اتبعتله إنه اتفك' : '❌ الخاص مقفول، ابعتله لينك السيرفر بنفسك';
 }

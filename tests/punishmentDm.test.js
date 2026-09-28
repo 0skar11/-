@@ -1,7 +1,7 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import { PermissionsBitField } from 'discord.js';
-import { buildPunishmentDm, sendPunishmentDm } from '../src/services/moderation/punishmentDm.js';
+import { buildPunishmentDm, sendPunishmentDm, unbanDmLine } from '../src/services/moderation/punishmentDm.js';
 import { ModerationService } from '../src/services/moderation/moderationService.js';
 
 const guild = { id: 'g', name: 'Chaos', iconURL: () => null, vanityURLCode: 'chaos' };
@@ -54,5 +54,19 @@ describe('ban / kick DM (report #133)', () => {
       ModerationService.assertModerationHierarchy = orig;
     }
     assert.deepEqual(order.slice(0, 2), ['dm', 'kick']);
+  });
+
+  test('unban (report #160): tells the member the ban was lifted, with the way back, and no appeal line', async () => {
+    const member = { id: '200000000000000001', toString: () => '<@200000000000000001>' };
+    const moderator = { id: '200000000000000002', user: { tag: 'mod' } };
+    const dm = buildPunishmentDm(guild, 'unban', 'اتفك', 'https://discord.gg/chaos', { user: member, moderator });
+    assert.match(dm.embeds[0].description, /اتفك/u);
+    assert.doesNotMatch(dm.embeds[0].description, /مظلوم/u);
+    assert.equal(dm.components.length, 1);
+    const sent = [];
+    assert.equal(await sendPunishmentDm(guild, { id: 'u', toString: () => '<@u>', send: async (p) => sent.push(p) }, 'unban', 'x', moderator), true);
+    assert.equal(sent.length, 1);
+    assert.match(unbanDmLine(true), /اتبعت/u);
+    assert.match(unbanDmLine(false), /ابعتله لينك السيرفر/u);
   });
 });

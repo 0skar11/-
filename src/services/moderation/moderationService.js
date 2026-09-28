@@ -150,11 +150,13 @@ export class ModerationService {
     // Drop the hard ban first so the unban isn't reverted by the GuildBanRemove guard.
     if (hardBanned) await removeHardBan(guild.client, guild.id, user.id);
     await guild.members.unban(user.id, reason);
+    // Tell them the ban was lifted (often refused by Discord: they no longer share a server with the bot).
+    const dmSent = await sendPunishmentDm(guild, user, 'unban', reason, moderator);
     const caseId = await logModerationAction({ client: guild.client, guild, event: {
       action: 'Member Unbanned', target: `${user.tag} (${user.id})`, executor: `${moderator.user?.tag || moderator.id} (${moderator.id})`, reason,
       metadata: { userId: user.id, moderatorId: moderator.id },
     }});
     logger.info(`User unbanned: ${user.tag} by ${moderator.user?.tag || moderator.id} in ${guild.name}`);
-    return { caseId, user: user.tag, reason };
+    return { caseId, user: user.tag, reason, dmSent };
   }
 }
