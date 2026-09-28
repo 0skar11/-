@@ -109,6 +109,11 @@ describe('anti spam (#144) and owner mentions (#148)', () => {
     for (let i = 0; i < FLOOD_MESSAGES + 2; i += 1) assert.equal(await handleSpam(staff, { now: 3_000_000 + i }), false);
   });
 
+  test('replies to the owner (ping on) are not counted as mentions', async () => {
+    const reply = (now) => handleOwnerMentionSpam(message('تمام', { userId: 'h', mentions: [OWNER_PING_ID] }), { now });
+    for (let i = 1; i <= 5; i += 1) assert.equal(await reply(i), false);
+  });
+
   test('the 3rd owner mention in a row is deleted; a message without it starts over', async () => {
     const ping = (userId, now) => handleOwnerMentionSpam(message(`<@${OWNER_PING_ID}>`, { userId, mentions: [OWNER_PING_ID] }), { now });
     assert.equal(await ping('f', 1), false);
