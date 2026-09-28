@@ -45,7 +45,7 @@ export function buildGuideEmbeds({ boostLine = ccBoostLine() } = {}) {
             '',
             '🧠 **الفكرة:** اشتري والسعر واطي، وبيع لما يعلى.',
             `🔥 لو الناس اشتروا **${demand.guaranteedRiseUnits} قطعة أو أكتر** من حاجة في نفس الساعة، سعرها **لازم يزيد** الساعة الجاية.`,
-            `🧾 البيع عليه رسوم **${bourseSettings.sellFeePercent}%**، وأقصى حاجة **${bourseSettings.maxOwnedPerAsset} قطع** من كل حاجة.`,
+            `🧾 البيع عليه رسوم **${bourseSettings.sellFeePercent}%**، وأقصى حاجة **${bourseSettings.maxOwnedPerAsset} قطعة** من كل حاجة.`,
         ].join('\n'), { color: 'info' }),
         ccEmbed('🔁 التحويل', [
             '`تحويل @صاحبك 100` ← تبعتله 100',

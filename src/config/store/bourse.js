@@ -35,7 +35,7 @@ export const bourseSettings = {
     // Taken from what a member gets when selling (rounded up, at least 1 CC).
     sellFeePercent: 1.5,
     // Most pieces of one asset a member can own.
-    maxOwnedPerAsset: 10,
+    maxOwnedPerAsset: 25,
     // Most a price can go up or down in one hourly update, demand included.
     maxMovePercent: 20,
     demand: {

@@ -192,7 +192,7 @@ describe('bourse trading', () => {
 
         assert.equal((await invest(client, GUILD, A, 'nothing', 1, options)).reason, 'not_found');
         assert.equal((await invest(client, GUILD, A, 'car', 0, options)).reason, 'bad_quantity');
-        assert.equal((await invest(client, GUILD, A, 'car', 11, options)).reason, 'bad_quantity');
+        assert.equal((await invest(client, GUILD, A, 'car', 26, options)).reason, 'bad_quantity');
         assert.equal((await invest(client, GUILD, A, 'car', 1, { ...options, expectedPrice: 1 })).reason, 'price_changed');
         assert.equal((await invest(client, GUILD, A, 'plane', 1, options)).reason, 'no_cc');
 
@@ -239,13 +239,14 @@ describe('bourse trading', () => {
         assert.equal((await invest(client, GUILD, A, 'car', 1, { ...later, expectedPrice: byId('car').start })).reason, 'price_changed');
     });
 
-    test('never owns more than 10 of one asset', async () => {
+    test('never owns more than 25 of one asset (report #158)', async () => {
+        assert.equal(bourseSettings.maxOwnedPerAsset, 25);
         const client = fakeClient();
         const options = { now: NOW, rng: () => 0.5 };
         await adjustCC(client, GUILD, A, 100_000, 'staff');
-        assert.equal((await invest(client, GUILD, A, 'motorcycle', 10, options)).ok, true);
+        assert.equal((await invest(client, GUILD, A, 'motorcycle', 25, options)).ok, true);
         const refused = await invest(client, GUILD, A, 'motorcycle', 1, options);
-        assert.deepEqual([refused.reason, refused.owned], ['max_owned', 10]);
+        assert.deepEqual([refused.reason, refused.owned], ['max_owned', 25]);
     });
 });
 
