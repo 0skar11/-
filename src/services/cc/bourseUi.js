@@ -46,7 +46,7 @@ export function pricesEmbed({ quotes, nextChangeAt }) {
         ],
     });
     embed.footer = {
-        text: `رسوم البيع ${bourseSettings.sellFeePercent}% ・ أقصى ${bourseSettings.maxOwnedPerAsset} قطع من كل حاجة ・ 🔥 = عليها طلب`,
+        text: `رسوم البيع ${bourseSettings.sellFeePercent}% ・ أقصى ${bourseSettings.maxOwnedPerAsset} قطعة من كل حاجة ・ 🔥 = عليها طلب`,
     };
     return embed;
 }
@@ -168,7 +168,7 @@ const FAILURE_TEXT = {
 export function bourseFailureText(result) {
     if (result.reason === 'no_cc') return `❌ رصيدك ${formatCC(result.balance ?? 0)} مش كفاية.`;
     if (result.reason === 'max_owned') {
-        return `❌ أقصى حاجة ${bourseSettings.maxOwnedPerAsset} قطع من ${result.asset ? assetLabel(result.asset) : 'المنتج ده'}، ومعاك ${result.owned}.`;
+        return `❌ أقصى حاجة ${bourseSettings.maxOwnedPerAsset} قطعة من ${result.asset ? assetLabel(result.asset) : 'المنتج ده'}، ومعاك ${result.owned}.`;
     }
     if (result.reason === 'not_owned') {
         return result.owned
