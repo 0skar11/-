@@ -65,6 +65,7 @@
   .shot img { display: block; }
   .ribbon { position: absolute; bottom: 30px; left: -62px; transform: rotate(35deg); background: var(--red); color: #fff;
     font-size: 30px; font-weight: 900; padding: 8px 80px; box-shadow: 0 6px 20px rgba(0,0,0,.5); }
+  .tabs { display: flex; gap: 34px; justify-content: center; }
   .among { font-family: 'Lalezar', 'Cairo'; font-size: 66px; color: #fff; text-shadow: 0 6px 24px #000; }
   /* girls */
   .pinkglow { position: absolute; inset: 0; background: radial-gradient(ellipse 80% 55% at 50% 45%, rgba(236,72,153,.28), rgba(139,92,246,.12) 45%, transparent 75%); }
@@ -76,7 +77,7 @@
   .safe { font-size: 50px; font-weight: 900; color: #f9a8d4; }
 </style>
 </head>
-<body data-duration="34.02" data-cover="2.4">
+<body data-duration="41.41" data-cover="2.4">
 <div id="stage" class="bars">
   <div class="glow"></div>
   <canvas id="sparks" width="1080" height="1920"></canvas>
@@ -133,6 +134,23 @@
     <div class="among up" data-at="0.4">بالليل بنلعب <span class="num" style="color:#ff5a6e">AMONG US</span> <span class="emoji">🔪</span></div>
     <div class="shot fromR" data-at="0.5" id="voiceshot"><img src="vo/v5/voice.png" style="height:650px"></div>
     <div class="sub fade" data-at="0.3" style="bottom:250px">بص يا معلم… سيرفر لسه فاتح من يوم، والفويس مليان على الآخر! 🔥</div>
+  </section>
+
+  <section class="scene" id="crowd">
+    <div class="badge pop" data-at="0">👥 17 في فويس واحد</div>
+    <div class="title gold slam" data-at="0.05" style="font-size:112px">الفويس مابيفضاش</div>
+    <div class="shot fromL" data-at="0.2" id="crowdshot"><img src="vo/v5/crowd.png" style="width:980px"></div>
+    <div class="sub fade" data-at="0.2" style="bottom:250px">ومن ساعتها… الفويس مابيفضاش! 🔥</div>
+  </section>
+
+  <section class="scene" id="minecraft">
+    <div class="title gold slam" data-at="0" style="font-size:112px">وماينكرافت كمان</div>
+    <div class="shot pop" data-at="0.15"><img src="vo/v5/mc_house.png" style="width:960px"></div>
+    <div class="tabs up" data-at="0.6">
+      <div class="shot"><img src="vo/v5/mc_tab1.png" style="height:330px"></div>
+      <div class="shot"><img src="vo/v5/mc_tab2.png" style="height:330px"></div>
+    </div>
+    <div class="kicker up" data-at="0.9">🟢 لاعيبة أونلاين · بنبني ونلعب سوا</div>
   </section>
 
   <section class="scene" id="economy">
@@ -249,9 +267,16 @@
     img.style.transformOrigin = '50% 0';  // keep the channel name and timer at the top in view
     img.style.transform = `scale(${(1 + 0.05 * p).toFixed(3)})`;
   });
+  // The big voice call drifts slowly too.
+  hook(t => {
+    if (!S.crowd) return;
+    const [a, b] = S.crowd, p = clamp((t - a) / (b - a));
+    const img = document.querySelector('#crowdshot img');
+    img.style.transform = `scale(${(1 + 0.06 * p).toFixed(3)})`;
+  });
   // Montage cards push in slowly.
   hook(t => {
-    for (const n of ['games', 'proof', 'economy', 'bourse', 'mafia', 'girls', 'logo', 'finale', 'refuse']) {
+    for (const n of ['games', 'proof', 'crowd', 'minecraft', 'economy', 'bourse', 'mafia', 'girls', 'logo', 'finale', 'refuse']) {
       if (!S[n] || !inScene(t, n)) continue;
       const p = (t - S[n][0]) / (S[n][1] - S[n][0]);
       $(n).style.scale = (1.08 - 0.08 * p).toFixed(4);
@@ -264,7 +289,7 @@
   function level(t) {
     const at = n => S[n] && inScene(t, n);
     if (at('girls')) return 0.12;
-    if (at('proof') || at('bourse')) return 0.3;
+    if (at('proof') || at('bourse') || at('crowd') || at('minecraft')) return 0.3;
     if (at('ember')) return 0.25 * clamp((t - S.ember[0]) / 3);
     if (at('dead') || at('empty') || at('studio')) return 0;
     if (at('rating') || at('ready')) return 0.2;
