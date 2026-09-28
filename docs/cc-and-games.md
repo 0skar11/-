@@ -51,6 +51,7 @@ Game words typed without the prefix only start a game when the message is just t
 | `رصيد` / `cc` / `bal` | `/cc [user]` | CC balance, rank and game stats (reply to a message to see that member's) |
 | `top cc` / `توب cc` / `cctop` | `/cctop` | CC leaderboard |
 | `تحويل @member 100` / `cc give @member 100` / `give` | `/give user amount` | Send CC to a member, minus a tax (see below) |
+| `addcc 500` / `addcc @member 500` / (reply) `addcc 500` | `/addcc [user] amount` | Owner only (`SERVER_OWNER_IDS`): adds CC to yourself, or to the mentioned / replied-to member. No tax, nothing is taken from anyone |
 | `العاب` | `/game list` | The games panel (see below) |
 | `روليت` | `/game roulette` | Roulette (3–20 players, join with buttons) |
 | `كراسي` | `/game chairs` | Chairs (3–25 players): grey chairs flash 🔴 at random (pressing then knocks you out), then turn 🟢 at a random moment and everyone races to sit |
