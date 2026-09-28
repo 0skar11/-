@@ -1,0 +1,16 @@
+/* "Reasons to join" TikTok-trend cards: white page, plain black text line by line, bouncing emoji. */
+#stage { background: #fff; }
+.scene.rcard { justify-content: flex-start; padding: 330px 70px 0; gap: 56px; animation-name: cardVis; }
+@keyframes cardVis { 0%, 100% { opacity: 0; } 0.4%, 99.6% { opacity: 1; } }  /* hard cuts */
+.txt { display: flex; flex-direction: column; gap: 18px; }
+.txt .ln { font-family: 'Cairo'; font-weight: 700; font-size: 68px; line-height: 1.45; color: #111; }
+.txt .ln .lat { direction: ltr; unicode-bidi: isolate; }
+.emo { display: flex; gap: 10px; align-items: flex-end; justify-content: center; }
+.emo .e { font-family: 'Noto Color Emoji'; font-size: 230px; line-height: 1; display: inline-block; }
+.emo .e.b { font-size: 150px; margin-bottom: 10px; }
+.wob { animation: wob 1.1s ease-in-out infinite; transform-origin: 50% 85%; }
+.wav { animation: wav .7s ease-in-out infinite; transform-origin: 70% 90%; }
+@keyframes wob { 0%, 100% { transform: rotate(-6deg) translateY(0); } 50% { transform: rotate(6deg) translateY(-18px); } }
+@keyframes wav { 0%, 100% { transform: rotate(-14deg); } 50% { transform: rotate(14deg); } }
+.tag { position: absolute; bottom: 150px; left: 0; right: 0; text-align: center; font-family: 'Cairo'; font-weight: 700;
+  font-size: 34px; color: #b9b9c2; letter-spacing: 1px; }
