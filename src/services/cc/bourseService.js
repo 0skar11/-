@@ -10,6 +10,8 @@
 // `roll` is the random draw of the next hour's move, made in advance so the store's forecast
 // (`forecastMarket`) can tell which way each asset goes; buying and selling during the hour still push it.
 // Only in our server (src/config/homeGuild.js): other servers keep no `roll`, so their bourse works as before.
+// `locked` is the next hour's price once someone bought the forecast (report #172): from then on that
+// price is fixed, so later buying and selling can't make the forecast wrong. Only our server has it too.
 
 import { bourseAssets, bourseSettings, findAsset } from '../../config/store/bourse.js';
 
@@ -76,6 +78,7 @@ export function normalizeMarket(raw, { assets = bourseAssets, hour = hourOf(), r
         const price = keepInside(saved.price, asset.min, assetCeiling(asset, raise), rng);
         const roll = isRoll(saved.roll) ? saved.roll : rng();
         const entry = { price, previous: Number.isSafeInteger(saved.previous) ? saved.previous : price, raise, roll, flow: {} };
+        if (Number.isSafeInteger(saved.locked) && saved.locked > 0) entry.locked = saved.locked;
         if (saved.flow && typeof saved.flow === 'object') {
             for (const [userId, net] of Object.entries(saved.flow)) {
                 if (Number.isSafeInteger(net) && net !== 0) entry.flow[userId] = net;
@@ -137,6 +140,13 @@ export function tickAsset(asset, entry, { settings = bourseSettings, rng = Math.
     else if (demand <= 0 && position > 0.85) lean = -maxMove / 2;
     else if (position < 0.15) lean = maxMove / 2;
 
+    // A price fixed by a sold forecast wins (see `locked` at the top); the ceiling is kept above it so it
+    // isn't moved when the market is read again.
+    if (Number.isSafeInteger(entry.locked) && entry.locked > 0) {
+        const needed = Math.min(settings.demand.maxRaisePercent, Math.max(0, Math.ceil((entry.locked / asset.max - 1) * 100)));
+        return { price: entry.locked, previous: entry.price, raise: Math.max(Math.round(raise * 100) / 100, needed), roll: rng(), flow: {} };
+    }
+
     // The draw made in advance for this hour (see `roll` at the top), or a fresh one.
     const move = sureRise || clamp(((isRoll(entry.roll) ? entry.roll : rng()) * 2 - 1) * maxMove + lean + demand, -maxMove, maxMove);
     const price = keepInside(Math.round(entry.price * (1 + move)), min, ceiling, rng);
@@ -166,9 +176,12 @@ export function advanceMarket(market, hour, { assets = bourseAssets, settings = 
     return true;
 }
 
-/** Other servers than ours: no move drawn in advance (each hour draws its own, as before). */
+/** Other servers than ours: no move drawn in advance (each hour draws its own, as before) and no locked price. */
 function stripRolls(market) {
-    for (const entry of Object.values(market.assets)) delete entry.roll;
+    for (const entry of Object.values(market.assets)) {
+        delete entry.roll;
+        delete entry.locked;
+    }
 }
 
 /**
@@ -214,13 +227,21 @@ export async function getMarket(client, guildId, options = {}) {
     return { quotes, nextChangeAt: nextChangeAt(options.now) };
 }
 
-/** The store's forecast: `{ forecasts: [{ asset, current, next, changePercent }], nextChangeAt }`, one per asset. */
+/**
+ * The store's forecast: `{ forecasts: [{ asset, current, next, changePercent }], nextChangeAt }`, one per
+ * asset. The forecast price is locked in for the next hour (see `locked` at the top), so it is exactly
+ * what the price will be; a second forecast in the same hour shows the same locked prices.
+ */
 export async function forecastMarket(client, guildId, options = {}) {
     const assets = options.assets || bourseAssets;
+    const lock = isHomeGuild(guildId);
     const forecasts = await withMarket(client, guildId, (market) => assets.map((asset) => {
         const entry = market.assets[asset.id];
-        const { price, changePercent } = forecastAsset(asset, entry);
-        return { asset, current: entry.price, next: price, changePercent };
+        let next = Number.isSafeInteger(entry.locked) ? entry.locked : forecastAsset(asset, entry).price;
+        if (lock) entry.locked = next;
+        else next = forecastAsset(asset, entry).price;
+        const changePercent = entry.price ? Math.round(((next - entry.price) / entry.price) * 1000) / 10 : 0;
+        return { asset, current: entry.price, next, changePercent };
     }), options);
     return { forecasts, nextChangeAt: nextChangeAt(options.now) };
 }

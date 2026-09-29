@@ -180,24 +180,24 @@ export function bourseFailureText(result) {
 
 export const PRICE_CHANGED_NOTE = '⚠️ **السعر اتغير!** ده السعر الجديد، أكد تاني لو لسه عايز.';
 
-/** `⬆️ هيطلع حوالي 4%`, `⬇️ هينزل حوالي 3%` or `➖ تقريباً ثابت`. */
+/** `⬆️ هيطلع 4.2%`, `⬇️ هينزل 3%` or `➖ ثابت` (the forecast price is exact, see forecastMarket). */
 export function forecastLine(changePercent) {
-    const rounded = Math.round(Math.abs(changePercent));
-    if (changePercent > 0) return `⬆️ هيطلع${rounded ? ` حوالي ${rounded}%` : ' شوية'}`;
-    if (changePercent < 0) return `⬇️ هينزل${rounded ? ` حوالي ${rounded}%` : ' شوية'}`;
-    return '➖ تقريباً ثابت';
+    const amount = Math.round(Math.abs(changePercent) * 10) / 10;
+    if (changePercent > 0) return `⬆️ هيطلع **${amount}%**`;
+    if (changePercent < 0) return `⬇️ هينزل **${amount}%**`;
+    return '➖ ثابت';
 }
 
-/** The store's bourse forecast (shown only to the buyer): a card per asset with its price now and where it goes. */
+/** The store's bourse forecast (sent to the buyer in DM): a card per asset with its price now and its exact next price. */
 export function forecastEmbed({ forecasts, nextChangeAt }) {
     const next = Math.floor(nextChangeAt / 1000);
-    const embed = ccEmbed('🔮 تنبؤ البورصة', `الأسعار الجاية <t:${next}:R>، ودي الأصول هتروح فين:`, {
-        fields: forecasts.map(({ asset, current, changePercent }) => ({
+    const embed = ccEmbed('🔮 تنبؤ البورصة', `الأسعار الجاية <t:${next}:R>، ودي هتبقى بالظبط:`, {
+        fields: forecasts.map(({ asset, current, next: nextPrice, changePercent }) => ({
             name: assetLabel(asset),
-            value: `${forecastLine(changePercent)}\nدلوقتي **${number(current)}** ${CC.emoji}`,
+            value: `${forecastLine(changePercent)}\n${number(current)} ← **${number(nextPrice ?? current)}** ${CC.emoji}`,
             inline: true,
         })),
     });
-    embed.footer = { text: 'الشراء والبيع لحد آخر الساعة ممكن يغيّروا النتيجة شوية ・ التنبؤ ليك إنت بس' };
+    embed.footer = { text: 'الأسعار دي اتثبتت للساعة الجاية، الشراء والبيع مش هيغيّروها ・ التنبؤ ليك إنت بس' };
     return embed;
 }
