@@ -60,10 +60,18 @@ function fakeSetup() {
     guilds: { cache: new Map([[CHAOS_GUILD_ID, guild]]) },
   };
   const join = (member) => { members.set(member.id, member); return { ...member, guild, client }; };
-  const setLevel = (id, level) => store.set(getUserLevelKey(CHAOS_GUILD_ID, id), { xp: 0, level, totalXp: 1000, lastMessage: 0, rank: 0 });
+  // Chat messages of the member (the reward also needs INVITE_REWARDS.minMessages of them).
+  const setMessages = (id, count) => {
+    const key = `guild:${CHAOS_GUILD_ID}:chatcounts`;
+    store.set(key, { ...(store.get(key) || {}), [id]: count });
+  };
+  const setLevel = (id, level, messages = INVITE_REWARDS.minMessages) => {
+    store.set(getUserLevelKey(CHAOS_GUILD_ID, id), { xp: 0, level, totalXp: 1000, lastMessage: 0, rank: 0 });
+    setMessages(id, messages);
+  };
   const ccOf = (id) => store.get(getEconomyKey(CHAOS_GUILD_ID, id))?.cc || 0;
   members.set(INVITER, fakeMember(INVITER));
-  return { client, guild, store, sent, members, join, setLevel, ccOf };
+  return { client, guild, store, sent, members, join, setLevel, setMessages, ccOf };
 }
 
 describe('invite rewards rules', () => {
@@ -86,8 +94,11 @@ describe('invite rewards rules', () => {
 
   test('pays only a pending invite that reached the level after the stay days', () => {
     const record = { inviterId: INVITER, joinedAt: NOW - 3 * DAY, status: STATUS.PENDING };
-    assert.equal(isReadyToPay(record, 5, NOW), true);
-    assert.equal(isReadyToPay(record, 4, NOW), false);
+    const talked = INVITE_REWARDS.minMessages;
+    assert.equal(INVITE_REWARDS.minMessages, 50);
+    assert.equal(isReadyToPay(record, 5, NOW, talked), true);
+    assert.equal(isReadyToPay(record, 5, NOW, talked - 1), false, 'level 5 without really talking (report #167)');
+    assert.equal(isReadyToPay(record, 4, NOW, talked), false);
     assert.equal(isReadyToPay({ ...record, joinedAt: NOW - 2 * DAY }, 10, NOW), false);
     assert.equal(isReadyToPay({ ...record, status: STATUS.PAID }, 10, NOW), false);
     assert.equal(isReadyToPay({ ...record, status: STATUS.LEFT }, 10, NOW), false);
@@ -169,7 +180,12 @@ describe('invite rewards flow', () => {
     assert.equal(await sweepInviteRewards(setup.client, { now: NOW + 3 * DAY }), 0);
     assert.equal(setup.ccOf(INVITER), 0);
 
-    setup.setLevel(NEWBIE, 5);
+    // Level 5 but hardly any chat messages (report #167): not yet.
+    setup.setLevel(NEWBIE, 5, 3);
+    assert.equal(await sweepInviteRewards(setup.client, { now: NOW + 3 * DAY }), 0);
+    assert.equal(setup.ccOf(INVITER), 0);
+
+    setup.setMessages(NEWBIE, INVITE_REWARDS.minMessages);
     assert.equal(await sweepInviteRewards(setup.client, { now: NOW + 3 * DAY }), 1);
     assert.equal(setup.ccOf(INVITER), 1000);
     assert.match(setup.sent[0].content, /1,000/);
