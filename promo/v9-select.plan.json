@@ -1,0 +1,110 @@
+{
+ "video": "out/v9-select.video.mp4",
+ "html": "v9-select.html",
+ "music": "vo/v9/music.mp3",
+ "music_offset": 0,
+ "lines": [
+  {
+   "file": "vo/v9/choose.mp3",
+   "at": 0.2
+  },
+  {
+   "file": "vo/v9/name0.mp3",
+   "at": 3.5
+  },
+  {
+   "file": "vo/v9/name1.mp3",
+   "at": 7.1
+  },
+  {
+   "file": "vo/v9/name2.mp3",
+   "at": 10.7
+  },
+  {
+   "file": "vo/v9/name3.mp3",
+   "at": 14.3
+  },
+  {
+   "file": "vo/v9/name4.mp3",
+   "at": 17.9
+  },
+  {
+   "file": "vo/v9/end.mp3",
+   "at": 21.55
+  }
+ ],
+ "sfx": [
+  {
+   "file": "vo/v9/pop.mp3",
+   "at": 0.0,
+   "gain": 0.35
+  },
+  {
+   "file": "vo/v9/pop.mp3",
+   "at": 0.4,
+   "gain": 0.35
+  },
+  {
+   "file": "vo/v9/pop.mp3",
+   "at": 0.8,
+   "gain": 0.35
+  },
+  {
+   "file": "vo/v9/pop.mp3",
+   "at": 1.2,
+   "gain": 0.35
+  },
+  {
+   "file": "vo/v9/pop.mp3",
+   "at": 1.6,
+   "gain": 0.35
+  },
+  {
+   "file": "vo/v9/pop.mp3",
+   "at": 2.0,
+   "gain": 0.35
+  },
+  {
+   "file": "vo/v9/pop.mp3",
+   "at": 2.4,
+   "gain": 0.35
+  },
+  {
+   "file": "vo/v9/pop.mp3",
+   "at": 2.8,
+   "gain": 0.35
+  },
+  {
+   "file": "vo/v9/hit.mp3",
+   "at": 3.2,
+   "gain": 0.8
+  },
+  {
+   "file": "vo/v9/hit.mp3",
+   "at": 6.8,
+   "gain": 0.8
+  },
+  {
+   "file": "vo/v9/hit.mp3",
+   "at": 10.4,
+   "gain": 0.8
+  },
+  {
+   "file": "vo/v9/hit.mp3",
+   "at": 14.0,
+   "gain": 0.8
+  },
+  {
+   "file": "vo/v9/hit.mp3",
+   "at": 17.6,
+   "gain": 0.8
+  },
+  {
+   "file": "vo/v9/hit.mp3",
+   "at": 21.2,
+   "gain": 0.8
+  }
+ ],
+ "no_synth_sfx": true,
+ "out": "out/v9-select-vo.mp4"
+}

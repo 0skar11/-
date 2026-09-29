@@ -1,0 +1,117 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<title>CHAOS — اختار شخصيتك</title>
+<link rel="stylesheet" href="shared.css">
+<style>
+  #stage { background: #0b0a12; }
+  .stripes { position: absolute; inset: -200px; z-index: 1;
+    background: repeating-linear-gradient(-30deg, rgba(255,255,255,.035) 0 40px, transparent 40px 120px);
+    animation: slide 2s linear infinite; }
+  @keyframes slide { to { transform: translateX(-139px); } }
+  .tint { position: absolute; inset: 0; z-index: 2; }
+  .scene { z-index: 10; }
+
+  /* select screen */
+  .sel-title { font-family: 'Lalezar'; font-size: 150px; line-height: 1; color: #fff;
+    text-shadow: 6px 6px 0 #ff2e4d, 12px 12px 0 rgba(0,0,0,.6); }
+  .sel-sub { font-size: 56px; font-weight: 900; color: #ffd66e; }
+  .cgrid { display: grid; grid-template-columns: repeat(3, 290px); gap: 26px; direction: rtl; }
+  .slot { position: relative; width: 290px; height: 330px; background: #15131f; border: 4px solid #2c2940; transform: skewX(-6deg); overflow: hidden; }
+  .slot img { width: 100%; height: 270px; object-fit: cover; display: block; filter: saturate(.9); }
+  .slot .nm { height: 60px; display: grid; place-items: center; font-family: 'Lalezar'; font-size: 40px; color: #fff; background: #1f1c2c; }
+  .slot.on { border-color: #ffd66e; box-shadow: 0 0 0 6px #ff2e4d, 0 0 50px rgba(255,214,110,.6); }
+  .slot.on img { filter: saturate(1.2) brightness(1.1); }
+  .p1 { position: absolute; top: 8px; right: 10px; background: #ff2e4d; color: #fff; font-family: 'Anton'; font-size: 30px; padding: 0 12px; display: none; }
+  .slot.on .p1 { display: block; }
+
+  /* character scene */
+  .scene.ch { justify-content: flex-start; padding: 170px 60px 0; gap: 26px; }
+  .por { position: relative; width: 900px; height: 900px; transform: skewX(-4deg); border: 6px solid var(--c); box-shadow: 0 0 80px var(--c); overflow: hidden; }
+  .por img { width: 100%; height: 100%; object-fit: cover; }
+  .wipe { animation: wipe .5s cubic-bezier(.2,.9,.2,1) both; }
+  @keyframes wipe { from { clip-path: polygon(0 0, 0 0, -30% 100%, -30% 100%); } to { clip-path: polygon(0 0, 130% 0, 100% 100%, -30% 100%); } }
+  .badge1 { position: absolute; top: 20px; right: 20px; background: var(--c); color: #0b0a12; font-family: 'Anton'; font-size: 40px; padding: 2px 18px; transform: skewX(4deg); }
+  .cname { font-family: 'Lalezar'; font-size: 170px; line-height: .95; color: #fff; text-shadow: 7px 7px 0 var(--c); margin-top: -120px; z-index: 3; }
+  .trait { font-size: 50px; font-weight: 900; color: #fff; line-height: 1.4; text-shadow: 0 4px 16px #000; }
+  .perk { background: rgba(255,255,255,.07); border: 3px solid var(--c); border-radius: 26px; padding: 18px 34px; transform: skewX(-4deg); }
+  .perk .k { font-size: 36px; font-weight: 900; color: var(--c); }
+  .perk .v { font-size: 50px; font-weight: 900; color: #fff; }
+
+  /* end */
+  .end-t { font-family: 'Lalezar'; font-size: 140px; color: #fff; text-shadow: 6px 6px 0 #ff2e4d; }
+  .end-s { font-size: 56px; font-weight: 900; color: #ffd66e; line-height: 1.5; }
+  .brand9 { font-family: 'Anton'; font-size: 90px; letter-spacing: 10px; color: #fff; direction: ltr; }
+</style>
+</head>
+<body data-duration="24.8" data-cover="1.6">
+<div id="stage">
+  <div class="stripes"></div>
+  <div class="tint" id="tint"></div>
+
+  <section class="scene" id="select" data-start="0" data-end="3.2" data-noflash>
+    <div class="sel-title slam" data-at="0">اختار شخصيتك</div>
+    <div class="sel-sub up" data-at="0.3">إنت شبه مين فيهم؟ <span class="emoji">👀</span></div>
+    <div class="cgrid" id="grid1"></div>
+  </section>
+
+  <section class="scene" id="end" data-start="21.2" data-end="24.8">
+    <div class="end-t slam" data-at="0">لقيت نفسك؟ <span class="emoji">👀</span></div>
+    <div class="cgrid pop" data-at="0.2" id="grid2" style="transform:scale(.8)"></div>
+    <div class="end-s up" data-at="0.6">اكتب اسم شخصيتك في الكومنتات<br>ومكانك مستنيك في</div>
+    <div class="brand9 slam" data-at="1.0">CHAOS</div>
+    <div class="bio up" data-at="1.4">اللينك في البايو <span class="bounce">👇</span></div>
+  </section>
+
+  <div id="flash"></div>
+</div>
+<script>
+  // name, image, accent, personality, what they'll love in CHAOS
+  window.CHARS = [
+    ['توكا', 'touka', '#7c8cff', 'هادية ومش بتحب الزحمة… بس جدعة مع شلتها', 'سهرات الفويس بالليل مع الشلة 🌙'],
+    ['ريزي', 'rize', '#c56bff', 'ذكية وبتبتسم… وهي بتلعب بعقلك', 'المافيا… وهتقتل الكل 😈'],
+    ['زيكو', 'ziko', '#3ee07a', 'بيحسبها صح وبيحب الفلوس', 'البورصة: اشتري رخيص وبيع غالي 📈'],
+    ['لولي', 'loli', '#22d3ee', 'مابتقعدش في مكان… عايزة تلعب', 'ألعاب كل ليلة واللي يكسب ياخد CC 🎮'],
+    ['حمو', 'hamo', '#ffb03a', 'صاحب صحابه والكل بيحبه', 'الانفايتات: كل صاحب بـ 1000 CC 🤑'],
+  ];
+  const slot = ([n, img]) => `<div class="slot"><img src="vo/v9/${img}.png"><div class="nm">${n}</div><div class="p1">P1</div></div>`;
+  document.getElementById('grid1').innerHTML = CHARS.map(slot).join('');
+  document.getElementById('grid2').innerHTML = CHARS.map(slot).join('');
+  const end = document.getElementById('end');
+  CHARS.forEach(([n, img, c, trait, perk], i) => {
+    const a = 3.2 + i * 3.6;
+    const sc = document.createElement('section');
+    sc.className = 'scene ch'; sc.id = 'ch' + i;
+    sc.dataset.start = a.toFixed(2); sc.dataset.end = (a + 3.6).toFixed(2);
+    sc.style.setProperty('--c', c);
+    sc.innerHTML = `<div class="por wipe" data-at="0"><img src="vo/v9/${img}.png"><div class="badge1">P1 SELECT</div></div>
+      <div class="cname slam" data-at="0.25">${n}</div>
+      <div class="trait up" data-at="0.6">${trait}</div>
+      <div class="perk fromR" data-at="1.3"><div class="k">هتحب في CHAOS:</div><div class="v">${perk}</div></div>`;
+    end.parentNode.insertBefore(sc, end);
+  });
+</script>
+<script src="shared.js"></script>
+<script>
+  const { hook, clamp } = CHAOS;
+  // P1 cursor hops across the grid on the select screen, landing on each character in turn.
+  const slots1 = [...document.querySelectorAll('#grid1 .slot')], slots2 = [...document.querySelectorAll('#grid2 .slot')];
+  hook(t => {
+    const k = t < 3.2 ? Math.floor(t / 0.4) % CHARS.length : -1;
+    slots1.forEach((s, i) => s.classList.toggle('on', i === k));
+    const e = t >= 21.2 ? Math.floor((t - 21.2) / 0.3) % CHARS.length : -1;
+    slots2.forEach((s, i) => s.classList.toggle('on', i === e));
+    // background tint follows the character on screen
+    const i = Math.floor((t - 3.2) / 3.6);
+    const c = t >= 3.2 && i < CHARS.length ? CHARS[i][2] : '#ff2e4d';
+    document.getElementById('tint').style.background = `radial-gradient(ellipse at 50% 35%, ${c}55, transparent 65%)`;
+    // slow push on the portrait
+    if (i >= 0 && i < CHARS.length && t >= 3.2) {
+      const p = clamp((t - 3.2 - i * 3.6) / 3.6);
+      document.querySelector(`#ch${i} .por img`).style.transform = `scale(${(1.02 + 0.08 * p).toFixed(3)})`;
+    }
+  });
+</script>
+</body>
+</html>
