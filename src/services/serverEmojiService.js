@@ -16,6 +16,15 @@ export async function listServerEmojiFiles() {
     .map((file) => ({ name: path.basename(file, '.png'), file: path.join(EMOJI_DIR, file) }));
 }
 
+const ANIMATED_DIR = path.join(EMOJI_DIR, 'animated');
+
+export async function listAnimatedEmojiFiles() {
+  const files = await readdir(ANIMATED_DIR);
+  return files
+    .filter((file) => file.endsWith('.gif'))
+    .map((file) => ({ name: path.basename(file, '.gif'), file: path.join(ANIMATED_DIR, file) }));
+}
+
 /** Uploads the missing server emojis. Returns counts, or `skipped` when the bot lacks the permission. */
 export async function ensureServerEmojis(guild) {
   const botMember = guild.members.me || await guild.members.fetchMe().catch(() => null);
@@ -56,6 +65,30 @@ export async function ensurePeepoEmojis(guild) {
     if (existingNames.has(name)) continue;
     try {
       await guild.emojis.create({ attachment: url, name, reason: 'Peepo emoji pack' });
+      added += 1;
+    } catch {
+      failed += 1;
+    }
+  }
+  return { skipped: false, added, failed };
+}
+
+/** Home server only: uploads the animated face emojis (GIFs in src/assets/emojis/animated). */
+export async function ensureAnimatedEmojis(guild) {
+  if (!isHomeGuild(guild.id)) return { skipped: true, added: 0, failed: 0 };
+  const botMember = guild.members.me || await guild.members.fetchMe().catch(() => null);
+  if (!botMember?.permissions.has(PermissionFlagsBits.ManageGuildExpressions)) {
+    return { skipped: true, added: 0, failed: 0 };
+  }
+
+  const existing = await guild.emojis.fetch();
+  const existingNames = new Set(existing.map((emoji) => emoji.name));
+  let added = 0;
+  let failed = 0;
+  for (const { name, file } of await listAnimatedEmojiFiles()) {
+    if (existingNames.has(name)) continue;
+    try {
+      await guild.emojis.create({ attachment: file, name, reason: 'Animated face emojis' });
       added += 1;
     } catch {
       failed += 1;

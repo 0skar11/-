@@ -55,3 +55,23 @@ describe('peepo emoji pack (home server only)', () => {
     assert.equal(guild.created.length, 0);
   });
 });
+
+describe('animated face emojis (home server only)', () => {
+  test('uploads the missing animated GIFs in the home server', async () => {
+    const { HOME_GUILD_ID } = await import('../src/config/homeGuild.js');
+    const { ensureAnimatedEmojis, listAnimatedEmojiFiles } = await import('../src/services/serverEmojiService.js');
+    const files = await listAnimatedEmojiFiles();
+    assert.equal(files.length, 24);
+    for (const { name } of files) assert.match(name, /^\w{2,32}$/u);
+    const guild = { ...guildWith({ existing: ['face_laugh'] }), id: HOME_GUILD_ID };
+    assert.deepEqual(await ensureAnimatedEmojis(guild), { skipped: false, added: 23, failed: 0 });
+    assert.ok(guild.created.every((emoji) => emoji.attachment.endsWith(`${emoji.name}.gif`)));
+  });
+
+  test('leaves other servers alone', async () => {
+    const { ensureAnimatedEmojis } = await import('../src/services/serverEmojiService.js');
+    const guild = { ...guildWith(), id: '1' };
+    assert.deepEqual(await ensureAnimatedEmojis(guild), { skipped: true, added: 0, failed: 0 });
+    assert.equal(guild.created.length, 0);
+  });
+});
