@@ -19,14 +19,16 @@
 //                              invites up to `maxMembers - 1` others with `رولي انفايت @member`)
 //   maxOwned     for type 'item', optional (default: no limit)
 
+// Shown in the store by price, cheapest first, with the custom roles always at the bottom
+// (ccStoreService.js sorts them; this list is kept in the same order).
 export const ccStoreItems = [
-    { id: 'luck_box', name: 'صندوق حظ', emoji: '🎁', description: 'جواه جايزة عشوائية: CC (لحد 7,500) أو بوست XP', price: 1500, type: 'luckbox' },
     { id: 'xp_boost', name: 'بوست XP ×2', emoji: '⚡', description: 'ضعف XP الشات لمدة ساعة', price: 1000, type: 'boost', sources: ['chat'], minutes: 60 },
-    { id: 'custom_role', name: 'رول مميزة باسمك', emoji: '🎨', description: 'رول ليك لوحدك، بتختار اسمها ولونها وأيقونتها ・ في الشهر', price: 7500, type: 'custom_role', kind: 'personal', maxMembers: 1 },
-    { id: 'friends_role', name: 'رول ليك ولصحابك', emoji: '👥', description: 'رول ليك و15 من صحابك وإنت المسؤول، بتبعتلهم `رولي انفايت` ・ في الشهر', price: 25000, type: 'custom_role', kind: 'friends', maxMembers: 16 },
+    { id: 'luck_box', name: 'صندوق حظ', emoji: '🎁', description: 'جواه جايزة عشوائية: CC (لحد 7,500) أو بوست XP', price: 1500, type: 'luckbox' },
     { id: 'level_boost', name: 'لفل ×2', emoji: '🚀', description: 'ضعف XP الشات والفويس لمدة ساعة', price: 1500, type: 'boost', sources: ['chat', 'voice'], minutes: 60 },
     { id: 'trader_role', name: 'رول تاجر', emoji: '💼', description: 'رول التاجر، فوق رول Level 100', price: 2500, type: 'role', roleKey: 'trader' },
     { id: 'bourse_forecast', name: 'تنبؤ البورصة', emoji: '🔮', description: 'تعرف كل أصل في البورصة هيطلع ولا هينزل الساعة الجاية', price: 6500, type: 'forecast' },
+    { id: 'custom_role', name: 'رول مميزة باسمك', emoji: '🎨', description: 'رول ليك لوحدك، بتختار اسمها ولونها وأيقونتها ・ في الشهر', price: 7500, type: 'custom_role', kind: 'personal', maxMembers: 1 },
+    { id: 'friends_role', name: 'رول ليك ولصحابك', emoji: '👥', description: 'رول ليك و15 من صحابك وإنت المسؤول، بتبعتلهم `رولي انفايت` ・ في الشهر', price: 25000, type: 'custom_role', kind: 'friends', maxMembers: 16 },
 ];
 
 // Other servers (not HOME_GUILD_ID in src/config/homeGuild.js) keep the store as it was before these

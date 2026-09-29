@@ -42,9 +42,10 @@ function fakeMember(roles = new Map()) {
 
 describe('store catalog', () => {
     test('has the owner\'s seven items at their prices, and all of them are valid', () => {
+        // By price, cheapest first, with the two custom roles at the bottom (the owner's order).
         assert.deepEqual(ccStoreItems.map((item) => [item.id, item.price]), [
-            ['luck_box', 1500], ['xp_boost', 1000], ['custom_role', 7500], ['friends_role', 25000],
-            ['level_boost', 1500], ['trader_role', 2500], ['bourse_forecast', 6500],
+            ['xp_boost', 1000], ['luck_box', 1500], ['level_boost', 1500], ['trader_role', 2500],
+            ['bourse_forecast', 6500], ['custom_role', 7500], ['friends_role', 25000],
         ]);
         assert.equal(listStoreItems().length, ccStoreItems.length);
         assert.equal(byId('friends_role').maxMembers, 16);
@@ -426,5 +427,22 @@ describe('custom roles', () => {
         assert.ok(applyWordAliases('رولي', [], false));
         assert.ok(applyWordAliases('رولي', ['انفايت', '<@1>'], false));
         assert.equal(applyWordAliases('رولي', ['اتمسحت'], false), null);
+    });
+});
+
+describe('store order', async () => {
+    const { sortStoreItems, storeCatalog } = await import('../src/services/cc/ccStoreService.js');
+    test('cheapest first, custom roles always last even when cheaper', () => {
+        const items = [
+            { id: 'b', price: 900, type: 'item' },
+            { id: 'role', price: 100, type: 'custom_role' },
+            { id: 'a', price: 50, type: 'item' },
+            { id: 'c', price: 5000, type: 'boost' },
+        ];
+        assert.deepEqual(sortStoreItems(items).map((item) => item.id), ['a', 'b', 'c', 'role']);
+        const catalog = storeCatalog(undefined, { guildId: HOME_GUILD_ID });
+        assert.deepEqual(catalog.slice(-2).map((item) => item.type), ['custom_role', 'custom_role']);
+        const prices = catalog.filter((item) => item.type !== 'custom_role').map((item) => item.price);
+        assert.deepEqual(prices, [...prices].sort((x, y) => x - y));
     });
 });
