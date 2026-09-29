@@ -2,6 +2,8 @@ import { readdir } from 'fs/promises';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { PermissionFlagsBits } from 'discord.js';
+import { isHomeGuild } from '../config/homeGuild.js';
+import { PEEPO_EMOJIS } from '../config/peepoEmojis.js';
 
 // Server emojis (void / chaos, shop, economy, moderation...) live as PNGs in src/assets/emojis.
 // Each file is uploaded once under its file name; emojis already on the server are left alone.
@@ -32,6 +34,30 @@ export async function ensureServerEmojis(guild) {
       added += 1;
     } catch {
       // Usually the server's emoji slots are full.
+      failed += 1;
+    }
+  }
+  return { skipped: false, added, failed };
+}
+
+/** Home server only: uploads the Peepo pack (from Discord's CDN) for the ones the server does not have yet. */
+export async function ensurePeepoEmojis(guild) {
+  if (!isHomeGuild(guild.id)) return { skipped: true, added: 0, failed: 0 };
+  const botMember = guild.members.me || await guild.members.fetchMe().catch(() => null);
+  if (!botMember?.permissions.has(PermissionFlagsBits.ManageGuildExpressions)) {
+    return { skipped: true, added: 0, failed: 0 };
+  }
+
+  const existing = await guild.emojis.fetch();
+  const existingNames = new Set(existing.map((emoji) => emoji.name));
+  let added = 0;
+  let failed = 0;
+  for (const { name, url } of PEEPO_EMOJIS) {
+    if (existingNames.has(name)) continue;
+    try {
+      await guild.emojis.create({ attachment: url, name, reason: 'Peepo emoji pack' });
+      added += 1;
+    } catch {
       failed += 1;
     }
   }
