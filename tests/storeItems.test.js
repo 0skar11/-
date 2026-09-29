@@ -194,10 +194,52 @@ describe('bourse forecast', () => {
         assert.ok(forecastAsset(car, rush).changePercent > 0);
     });
 
-    test('reads as up, down or flat', () => {
-        assert.equal(forecastLine(4.2), '⬆️ هيطلع حوالي 4%');
-        assert.equal(forecastLine(-2.6), '⬇️ هينزل حوالي 3%');
-        assert.equal(forecastLine(0), '➖ تقريباً ثابت');
+    test('reads as up, down or flat, with the exact percent', () => {
+        assert.equal(forecastLine(4.2), '⬆️ هيطلع **4.2%**');
+        assert.equal(forecastLine(-2.6), '⬇️ هينزل **2.6%**');
+        assert.equal(forecastLine(0), '➖ ثابت');
+    });
+
+    test('a sold forecast locks the next hour: trading after it can\'t change the price (report #172)', async () => {
+        const { forecastMarket, invest } = await import('../src/services/cc/bourseService.js');
+        const { adjustCC } = await import('../src/services/cc/ccService.js');
+        const client = fakeClient();
+        const now = Date.UTC(2026, 8, 29, 20, 10);
+        const hour = 60 * 60 * 1000;
+        const { forecasts } = await forecastMarket(client, HOME_GUILD_ID, { now, rng: () => 0.3 });
+        // Heavy buying and a second forecast in the same hour change nothing.
+        await adjustCC(client, HOME_GUILD_ID, MEMBER, 10_000_000, 'staff');
+        await invest(client, HOME_GUILD_ID, MEMBER, 'motorcycle', 25, { now: now + 60_000, rng: () => 0.3 });
+        const again = await forecastMarket(client, HOME_GUILD_ID, { now: now + 120_000, rng: () => 0.9 });
+        assert.deepEqual(again.forecasts.map((f) => f.next), forecasts.map((f) => f.next));
+        const { quotes } = await getMarket(client, HOME_GUILD_ID, { now: now + hour, rng: () => 0.9 });
+        assert.deepEqual(quotes.map((q) => q.price), forecasts.map((f) => f.next));
+        // The hour after that is free again.
+        const stored = client.store.get(`guild:${HOME_GUILD_ID}:bourse`);
+        assert.ok(Object.values(stored.assets).every((entry) => !('locked' in entry)));
+    });
+
+    test('another server never locks prices', async () => {
+        const { forecastMarket } = await import('../src/services/cc/bourseService.js');
+        const client = fakeClient();
+        await forecastMarket(client, '100000000000000099', { now: Date.UTC(2026, 8, 29, 20, 10) });
+        const stored = client.store.get('guild:100000000000000099:bourse');
+        assert.ok(Object.values(stored.assets).every((entry) => !('locked' in entry)));
+    });
+
+    test('the forecast goes to the buyer in DM, or stays private when DMs are closed', async () => {
+        const { purchase } = await import('../src/services/cc/storeUi.js');
+        for (const dmOpen of [true, false]) {
+            const client = fakeClient();
+            client.store.set(`guild:${GUILD_ID}:economy:${MEMBER}`, { cc: 7000 });
+            const dms = [];
+            const member = { ...fakeMember(), user: { id: MEMBER, toString: () => `<@${MEMBER}>`, send: async (payload) => { if (!dmOpen) throw new Error('closed'); dms.push(payload); } } };
+            const { ok, payload, privatePayload } = await purchase(client, member, 'bourse_forecast', 1);
+            assert.equal(ok, true);
+            assert.equal(dms.length, dmOpen ? 1 : 0);
+            assert.equal(Boolean(privatePayload), !dmOpen);
+            assert.match(payload.embeds[0].description, dmOpen ? /في الخاص/u : /الخاص عندك مقفول/u);
+        }
     });
 
     test('an open store sells it and returns the forecast of every asset', async () => {

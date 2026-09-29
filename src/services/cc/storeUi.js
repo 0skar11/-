@@ -224,7 +224,11 @@ function deliveryLines(result) {
         if (chat) lines.push(`⚡ XP الشات ×2 لحد ما يخلص ${timestamp(chat)}`);
         if (voice) lines.push(`🎙️ XP الفويس ×2 لحد ما يخلص ${timestamp(voice)}`);
     }
-    if (result.forecast) lines.push('🔮 التنبؤ اتبعتلك في رسالة ليك إنت بس.');
+    if (result.forecast) {
+        lines.push(result.forecastDm
+            ? '🔮 التنبؤ اتبعتلك في الخاص.'
+            : '🔮 الخاص عندك مقفول، فالتنبؤ ظاهر ليك إنت بس هنا.');
+    }
     return lines;
 }
 
@@ -245,13 +249,19 @@ export function purchaseReceiptEmbed(user, result) {
 }
 
 /**
- * Buys and returns the reply payload (receipt or the reason it failed). A forecast also returns
- * `privatePayload`, to be shown only to the buyer.
+ * Buys and returns the reply payload (receipt or the reason it failed). A forecast is sent to the buyer
+ * in DM (report #172); when their DMs are closed it comes back as `privatePayload`, to be shown only to them.
  */
 export async function purchase(client, member, itemId, quantity) {
     const result = await buyItem(client, member, itemId, quantity);
     if (!result.ok) return { ok: false, payload: { content: purchaseFailureText(result), embeds: [], components: [], allowedMentions: { parse: [] } } };
-    const payload = { content: '', embeds: [purchaseReceiptEmbed(member.user || member, result)], components: [], allowedMentions: { parse: [] } };
-    const privatePayload = result.forecast ? { embeds: [forecastEmbed(result.forecast)], allowedMentions: { parse: [] } } : null;
+    const user = member.user || member;
+    let privatePayload = null;
+    if (result.forecast) {
+        const forecast = { embeds: [forecastEmbed(result.forecast)], allowedMentions: { parse: [] } };
+        result.forecastDm = await user.send?.(forecast).then(() => true).catch(() => false) ?? false;
+        if (!result.forecastDm) privatePayload = forecast;
+    }
+    const payload = { content: '', embeds: [purchaseReceiptEmbed(user, result)], components: [], allowedMentions: { parse: [] } };
     return { ok: true, payload, privatePayload };
 }
