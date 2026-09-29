@@ -57,9 +57,17 @@ export function storeMode(settings = ccStoreSettings, guildId = null) {
  * The items the store shows right now in `guildId`: the catalog (open or trial), or none when it is
  * closed. Other servers than ours see the old samples.
  */
+/** The order the store shows items in: cheapest first, and the custom roles last (the owner's request). */
+export function sortStoreItems(items) {
+    const isCustomRole = (item) => item.type === 'custom_role';
+    return [...items].sort((a, b) => Number(isCustomRole(a)) - Number(isCustomRole(b)) || a.price - b.price);
+}
+
 export function storeCatalog(settings = ccStoreSettings, { items = ccStoreItems, demoItems = ccStoreDemoItems, guildId = null } = {}) {
     if (storeMode(settings, guildId) === 'closed') return [];
-    return listStoreItems(guildId && !isHomeGuild(guildId) ? demoItems : items);
+    // Other servers keep their old sample store exactly as it was (no updates).
+    if (guildId && !isHomeGuild(guildId)) return listStoreItems(demoItems);
+    return sortStoreItems(listStoreItems(items));
 }
 
 /** How many of `item` can be bought at once. */
