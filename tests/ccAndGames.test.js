@@ -1,5 +1,6 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
+import { HOME_GUILD_ID } from '../src/config/homeGuild.js';
 import {
     groupRewards, soloRewardLeft, grantCC, awardGroupGame, awardSoloWin, spendCC, adjustCC, getProfile, getLeaderboard,
 } from '../src/services/cc/ccService.js';
@@ -23,7 +24,8 @@ import bourseCommand from '../src/commands/Games/bourse.js';
 // These tests check the normal reward rules; a running CC event (CC.boost) is tested on its own.
 CC.boost = { multiplier: 1, until: null };
 
-const GUILD = '100000000000000001';
+// Our server: the store only sells its items there (src/config/homeGuild.js).
+const GUILD = HOME_GUILD_ID;
 const A = '200000000000000001';
 const B = '200000000000000002';
 const C = '200000000000000003';

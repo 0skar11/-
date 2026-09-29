@@ -15,7 +15,7 @@ export default {
         .setDMPermission(false),
 
     async execute(interaction) {
-        const sent = await interaction.user.send({ embeds: buildGuideEmbeds() }).then(() => true).catch(() => false);
+        const sent = await interaction.user.send({ embeds: buildGuideEmbeds({ guildId: interaction.guildId }) }).then(() => true).catch(() => false);
         const content = sent ? SENT : DM_CLOSED;
         const source = interaction._sourceMessage;
         if (!source) {

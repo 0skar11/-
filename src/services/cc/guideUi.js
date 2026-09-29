@@ -6,10 +6,12 @@ import { CC, ccEmbed, ccBoostLine } from '../../config/cc.js';
 import { bourseSettings } from '../../config/store/bourse.js';
 import { INVITE_REWARDS } from '../../config/inviteRewards.js';
 import { GAMES_BOTS_CHANNEL_ID } from '../../config/games.js';
+import { isHomeGuild } from '../../config/homeGuild.js';
 
 const n = (value) => Number(value || 0).toLocaleString('en-US');
 
-export function buildGuideEmbeds({ boostLine = ccBoostLine() } = {}) {
+// `guildId`: our server's guide also explains the custom roles (`رولي`), sold there only.
+export function buildGuideEmbeds({ boostLine = ccBoostLine(), guildId = null } = {}) {
     const { demand } = bourseSettings;
     const { transfer, gamesBot, levelUp } = CC;
     return [
@@ -31,6 +33,13 @@ export function buildGuideEmbeds({ boostLine = ccBoostLine() } = {}) {
             '🛒 `متجر 1` أو `متجر اسم المنتج` ← تشتري منتج',
             '🔢 `متجر 1 3` ← تشتري 3 قطع مرة واحدة',
             '🎒 `مخزني` ← الحاجات اللي اشتريتها',
+            ...(isHomeGuild(guildId) ? [
+                '',
+                '🎨 `رولي` ← الرول المميزة بتاعتك، وأعضاءها وميعاد التجديد',
+                '📨 `رولي انفايت @صاحبك` ← تضيف صاحبك لرول الصحاب (هو بيقبل بزرار)',
+                '🚪 `رولي اخرج` ← تخرج من رول صحاب',
+                '🛑 `رولي الغي` / `رولي كمل` ← توقف أو ترجع التجديد الشهري',
+            ] : []),
             '',
             'قبل أي شراء بيجيلك زرار ✅ تأكد بيه.',
         ].join('\n')),

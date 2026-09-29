@@ -9,7 +9,7 @@
 // Paid invites count towards the invite roles below; a member only keeps the role of their highest tier.
 
 // The Chaos server and its welcome channel (voidWelcome.js posts the welcome there too).
-export const CHAOS_GUILD_ID = '1155236281706627173';
+export { HOME_GUILD_ID as CHAOS_GUILD_ID } from './homeGuild.js';
 export const WELCOME_CHANNEL_ID = '1547305745417113700';
 
 export const INVITE_REWARDS = {

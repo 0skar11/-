@@ -2,7 +2,7 @@ import { SlashCommandBuilder } from 'discord.js';
 import { CC } from '../../config/cc.js';
 import { ccStoreSettings } from '../../config/store/ccStoreItems.js';
 import { getProfile } from '../../services/cc/ccService.js';
-import { storeCatalog, findStoreItem, storeMode } from '../../services/cc/ccStoreService.js';
+import { storeCatalog, findStoreItem, storeMode, maxQuantityOf } from '../../services/cc/ccStoreService.js';
 import { buildStorePanel, inventoryEmbed, confirmPurchasePayload, purchaseFailureText } from '../../services/cc/storeUi.js';
 import { InteractionHelper } from '../../utils/interactionHelper.js';
 
@@ -48,14 +48,15 @@ export default {
             return reply({ embeds: [inventoryEmbed(interaction.user, inventory)] });
         }
 
-        if (storeMode() === 'closed') return reply({ content: purchaseFailureText({ reason: 'closed' }) });
-        const item = findStoreItem(interaction.options.getString('item'), storeCatalog());
+        const mode = storeMode(undefined, interaction.guildId);
+        if (mode === 'closed') return reply({ content: purchaseFailureText({ reason: 'closed' }) });
+        const item = findStoreItem(interaction.options.getString('item'), storeCatalog(undefined, { guildId: interaction.guildId }));
         if (!item) return reply({ content: purchaseFailureText({ reason: 'not_found' }) });
         const quantity = interaction.options.getInteger('quantity') || 1;
-        if (quantity < 1 || quantity > ccStoreSettings.maxQuantity || (item.type === 'role' && quantity !== 1)) {
+        if (quantity < 1 || quantity > maxQuantityOf(item)) {
             return reply({ content: purchaseFailureText({ reason: 'bad_quantity' }) });
         }
         const { cc } = await getProfile(client, interaction.guildId, interaction.user.id);
-        return reply(confirmPurchasePayload(item, quantity, interaction.user.id, cc));
+        return reply(confirmPurchasePayload(item, quantity, interaction.user.id, cc, mode));
     },
 };
