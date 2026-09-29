@@ -10,7 +10,8 @@ import { addXp } from '../src/services/leveling/xpSystem.js';
 import { forecastLine } from '../src/services/cc/bourseUi.js';
 import { ensureTraderRole } from '../src/services/cc/traderRoleService.js';
 import { validateRoleName, parseRoleColor, renewalStep, buyCustomRole, listCustomRoles, sweepGuildCustomRoles, checkInvite, acceptInvite } from '../src/services/cc/customRoleService.js';
-import { customRoleModal, myRolesEmbed } from '../src/services/cc/customRoleUi.js';
+import { customRoleModal, myRolesEmbed, myRolesComponents, myRolesPayload } from '../src/services/cc/customRoleUi.js';
+import myRoleButtons from '../src/interactions/buttons/store/myRole.js';
 import { applyWordAliases } from '../src/config/commands/commandAliases.js';
 import myrole from '../src/commands/Games/myrole.js';
 import { LEVEL_TIERS } from '../src/services/leveling/levelTierRoles.js';
@@ -366,6 +367,47 @@ describe('custom roles', () => {
         assert.equal((await sweepGuildCustomRoles(client, guild, { now: due + 3 * DAY })).ended, 1);
         assert.equal(cache.size, 0);
         assert.deepEqual(await listCustomRoles(client, GUILD_ID), []);
+    });
+
+    test('رولي has a button for each thing the member can do', () => {
+        const base = { maxMembers: 16, price: 25000, paidUntil: Date.now() + DAY, cancelled: false };
+        const friends = { ...base, roleId: '11', kind: 'friends', name: 'Legends', leaderId: MEMBER, members: [MEMBER, '2'] };
+        const personal = { ...base, roleId: '12', kind: 'personal', name: 'Me', leaderId: MEMBER, members: [MEMBER], cancelled: true };
+        const joined = { ...base, roleId: '13', kind: 'friends', name: 'Others', leaderId: '3', members: ['3', MEMBER] };
+        const ids = (rows) => rows.map((row) => row.toJSON().components.map((component) => component.custom_id));
+        assert.deepEqual(ids(myRolesComponents(MEMBER, [friends, personal, joined])), [
+            [`myrole:invite:${MEMBER}:11`, `myrole:kick:${MEMBER}:11`, `myrole:leader:${MEMBER}:11`, `myrole:cancel:${MEMBER}:11`],
+            [`myrole:resume:${MEMBER}:12`],
+            [`myrole:leave:${MEMBER}:13`],
+        ]);
+        // Alone in the role: nobody to remove or hand it to.
+        const [alone] = myRolesComponents(MEMBER, [{ ...friends, members: [MEMBER] }]).map((row) => row.toJSON().components);
+        assert.deepEqual(alone.map((component) => Boolean(component.disabled)), [false, true, true, false]);
+        assert.deepEqual(ids(myRolesComponents(MEMBER, [])), [[`myrole:shop:${MEMBER}`]]);
+        assert.equal(myRolesPayload({ id: MEMBER, toString: () => 'x' }, []).components.length, 1);
+    });
+
+    test('the buttons work only for the member who asked, and only in our server', async () => {
+        const client = fakeClient();
+        const paidUntil = Date.now() + DAY;
+        client.store.set(`guild:${GUILD_ID}:customroles`, { 21: { roleId: '21', kind: 'personal', name: 'Me', leaderId: MEMBER, members: [MEMBER], maxMembers: 1, price: 7500, paidUntil, cancelled: false } });
+        const replies = [];
+        const edits = [];
+        const press = (userId, guildId = GUILD_ID) => ({
+            inGuild: () => true, guildId, guild: { id: guildId }, user: { id: userId, toString: () => `<@${userId}>` },
+            message: { edit: async (payload) => { edits.push(payload); } },
+            reply: async (payload) => { replies.push(payload); },
+        });
+        await myRoleButtons.execute(press('someone'), client, ['cancel', MEMBER, '21']);
+        assert.match(replies.pop().content, /مش ليك/u);
+        await myRoleButtons.execute(press(MEMBER, '100000000000000099'), client, ['cancel', MEMBER, '21']);
+        assert.equal(replies.length, 0);
+
+        await myRoleButtons.execute(press(MEMBER), client, ['cancel', MEMBER, '21']);
+        assert.match(replies.pop().content, /وقفت تجديد/u);
+        assert.equal((await listCustomRoles(client, GUILD_ID))[0].cancelled, true);
+        // The رولي message now offers to restart the renewal.
+        assert.equal(edits.pop().components[0].toJSON().components[0].custom_id, `myrole:resume:${MEMBER}:21`);
     });
 
     test('رولي shows the member\'s roles', () => {

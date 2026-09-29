@@ -246,7 +246,7 @@ attachments, links, reactions and threads, and has a 3 second slowmode.
 | `متجر` / `shop` | `/store list` | The store panel: items, buy menu and buttons |
 | `متجر 1` / `متجر رتبة vip` / `متجر 1 3` / `buy` | `/store buy item [quantity]` | Buy item 1 (by number or name, or 3 of it); a ✅ button confirms, only for the buyer |
 | `مخزني` / `inventory` | `/store inventory` | What the member bought |
-| `رولي` | `/myrole info` | The member's custom roles: members, leader, renewal |
+| `رولي` | `/myrole info` | The member's custom roles (members, leader, renewal) with a button for each thing they can do: 📨 invite (pick a member), ➖ remove and 👑 hand over (pick one of the role's members), 🛑 / ▶️ stop or restart the renewal, 🚪 leave; 🛍️ opens the store when they have none. Only the member who asked can press them; the message refreshes after each change |
 | `رولي انفايت @x` / `رولي شيل @x` / `رولي ليدر @x` | `/myrole invite\|kick\|leader user` | The friends role leader invites, removes or hands over |
 | `رولي اخرج` | `/myrole leave [role]` | Leave a friends role |
 | `رولي الغي` / `رولي كمل` (`شخصي` / `صحاب`) | `/myrole cancel\|resume [kind]` | Stop or restart the renewal |

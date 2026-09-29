@@ -1,12 +1,13 @@
 import { SlashCommandBuilder } from 'discord.js';
 import { listCustomRoles, memberRoles, checkInvite, removeMember, leaveRole, handOver, setCancelled } from '../../services/cc/customRoleService.js';
-import { myRolesEmbed, invitePayload, customRoleFailureText } from '../../services/cc/customRoleUi.js';
+import { myRolesPayload, invitePayload, customRoleFailureText, renewalChangedText, leftText, kickedText, handedText } from '../../services/cc/customRoleUi.js';
 import { InteractionHelper } from '../../utils/interactionHelper.js';
 import { myRoleWords } from '../../config/commands/commandAliases.js';
 import { isHomeGuild } from '../../config/homeGuild.js';
 
 // `رولي`: the custom roles bought in the CC store (customRoleService.js).
-//   رولي                  your roles, their members and renewal
+//   رولي                  your roles, their members and renewal, with a button for each thing you can do
+//                         (src/interactions/buttons/store/myRole.js); the words below still work too
 //   رولي انفايت @member   invite a friend to your friends role (they accept with a button)
 //   رولي شيل @member      remove a member      ・ رولي ليدر @member  hand the role over
 //   رولي اخرج [@role]     leave a friends role ・ رولي الغي / رولي كمل [شخصي|صحاب]  stop / restart the renewal
@@ -53,23 +54,20 @@ export default {
         const sub = interaction.options.getSubcommand() || 'info';
 
         if (sub === 'info') {
-            return reply({ embeds: [myRolesEmbed(user, memberRoles(await listCustomRoles(client, guild.id), user.id))] });
+            return reply(myRolesPayload(user, memberRoles(await listCustomRoles(client, guild.id), user.id)));
         }
 
         if (sub === 'cancel' || sub === 'resume') {
             const cancelled = sub === 'cancel';
             const result = await setCancelled(client, guild, user.id, interaction.options.getString('kind'), cancelled);
             if (!result.ok) return fail(result.reason === 'no_role' ? { reason: 'no_role_any' } : result);
-            const until = `<t:${Math.floor(result.record.paidUntil / 1000)}:R>`;
-            return reply({ content: cancelled
-                ? `🛑 وقفت تجديد رول **${result.record.name}**. هتفضل معاك لحد ما تخلص ${until}، ولو غيرت رأيك اكتب \`رولي كمل\`.`
-                : `✅ رجعت تجديد رول **${result.record.name}**، هتتجدد ${until}.` });
+            return reply({ content: renewalChangedText(result.record, cancelled) });
         }
 
         if (sub === 'leave') {
             const result = await leaveRole(client, guild, user.id, interaction.options.getRole('role')?.id || null);
             if (!result.ok) return fail(result);
-            return reply({ content: `🚪 خرجت من رول **${result.record.name}**.` });
+            return reply({ content: leftText(result.record) });
         }
 
         const target = interaction.options.getUser('user');
@@ -84,13 +82,13 @@ export default {
         if (sub === 'kick') {
             const result = await removeMember(client, guild, user.id, targetMember.id);
             if (!result.ok) return fail(result);
-            return reply({ content: `✅ شيلت ${targetMember} من رول **${result.record.name}**.` });
+            return reply({ content: kickedText(targetMember.id, result.record) });
         }
         if (sub === 'leader') {
             const result = await handOver(client, guild, user.id, targetMember.id);
             if (!result.ok) return fail(result);
-            return reply({ content: `👑 ${targetMember} بقى المسؤول عن رول **${result.record.name}**، والتجديد بقى من رصيده.` });
+            return reply({ content: handedText(targetMember.id, result.record) });
         }
-        return reply({ embeds: [myRolesEmbed(user, [])] });
+        return reply(myRolesPayload(user, []));
     },
 };
