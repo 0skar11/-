@@ -23,7 +23,7 @@ export function buildGuideEmbeds({ boostLine = ccBoostLine() } = {}) {
         ccEmbed('💡 تكسب CC ازاي؟', [
             `🎮 **الألعاب** في <#${GAMES_BOTS_CHANNEL_ID}>: الفوز في لعبة جماعية **${n(gamesBot.win)}**، وأول واحد يكتب الإجابة **${n(gamesBot.answer)}**`,
             `⭐ **اللفل**: كل لفل جديد بيديك (رقم اللفل × ${n(levelUp.perLevel)})، يعني لفل 10 = ${n(levelUp.perLevel * 10)}`,
-            `📨 **الدعوات**: **${n(INVITE_REWARDS.reward)}** لكل حد تدعوه ويوصل لفل ${INVITE_REWARDS.level} ويقعد ${INVITE_REWARDS.minStayDays} أيام`,
+            `📨 **الدعوات**: **${n(INVITE_REWARDS.reward)}** لكل حد تدعوه ويوصل لفل ${INVITE_REWARDS.level} ويكتب ${INVITE_REWARDS.minMessages} رسالة ويقعد ${INVITE_REWARDS.minStayDays} أيام`,
             '🔁 **التحويل**: صحابك يقدروا يحوّلولك',
         ].join('\n\n'), { color: 'success' }),
         ccEmbed('🛒 المتجر', [

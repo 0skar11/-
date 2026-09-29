@@ -11,6 +11,7 @@ import { INVITE_REWARDS, CHAOS_GUILD_ID, WELCOME_CHANNEL_ID } from '../config/in
 import { CC, ccEmbed } from '../config/cc.js';
 import { grantCC } from './cc/ccService.js';
 import { getUserLevelData } from './leveling/leveling.js';
+import { getChatCounts } from './leveling/chatCounter.js';
 import { getEconomyKey } from '../utils/database.js';
 import { Mutex } from '../utils/mutex.js';
 import { logger } from '../utils/logger.js';
@@ -40,10 +41,14 @@ export function joinVerdict({ memberId, inviterId, inviterIsBot = false, account
   return null;
 }
 
-/** True when the invite is pending, the invited member reached the level and the stay days are over. */
-export function isReadyToPay(record, level, now = Date.now()) {
+/**
+ * True when the invite is pending, the invited member reached the level, sent enough chat messages
+ * (they really took part, not only voice XP) and the stay days are over.
+ */
+export function isReadyToPay(record, level, now = Date.now(), messages = 0) {
   return record?.status === STATUS.PENDING
     && level >= INVITE_REWARDS.level
+    && messages >= (INVITE_REWARDS.minMessages || 0)
     && now - record.joinedAt >= INVITE_REWARDS.minStayDays * DAY_MS;
 }
 
@@ -86,7 +91,7 @@ export function inviteWelcomeNotice(memberId, join) {
   if (!join?.inviterId || ['unknown', 'self', 'bot'].includes(join.reason)) return null;
   const lines = [`-# 📨 دعاه <@${join.inviterId}>`];
   if (!join.reason) {
-    lines.push(`-# 🎁 <@${join.inviterId}> هياخد ${reward()} لما <@${memberId}> يوصل لفل ${INVITE_REWARDS.level} ويكمّل ${INVITE_REWARDS.minStayDays} أيام في السيرفر`);
+    lines.push(`-# 🎁 <@${join.inviterId}> هياخد ${reward()} لما <@${memberId}> يوصل لفل ${INVITE_REWARDS.level} ويكتب ${INVITE_REWARDS.minMessages} رسالة ويكمّل ${INVITE_REWARDS.minStayDays} أيام في السيرفر`);
   } else if (join.reason === 'fake') {
     lines.push(`-# ⚠️ الدعوة دي مش محسوبة: الحساب عمره أقل من ${INVITE_REWARDS.minAccountAgeDays} أيام`);
   } else if (join.reason === 'rejoin') {
@@ -163,7 +168,8 @@ export async function checkInviteReward(client, guild, memberId, { level = null,
     const record = await loadRecord(client, guild.id, memberId);
     if (record?.status !== STATUS.PENDING) return null;
     const currentLevel = level ?? (await getUserLevelData(client, guild.id, memberId)).level;
-    if (!isReadyToPay(record, currentLevel, now)) return null;
+    const messages = (await getChatCounts(client, guild.id).catch(() => ({})))[memberId] || 0;
+    if (!isReadyToPay(record, currentLevel, now, messages)) return null;
     const member = guild.members.cache.get(memberId) || await guild.members.fetch(memberId).catch(() => null);
     if (!member) return null;
 
@@ -273,7 +279,7 @@ export async function inviteTopEmbed(client, guild, userId = null) {
     '',
     summary.join('\n'),
     '',
-    `🎁 ${reward()} لكل عضو تدعيه يوصل لفل ${INVITE_REWARDS.level} ويكمّل ${INVITE_REWARDS.minStayDays} أيام في السيرفر (الحسابات الأقل من ${INVITE_REWARDS.minAccountAgeDays} أيام واللي كانوا في السيرفر قبل كده مش بيتحسبوا)`,
+    `🎁 ${reward()} لكل عضو تدعيه يوصل لفل ${INVITE_REWARDS.level} ويكتب ${INVITE_REWARDS.minMessages} رسالة ويكمّل ${INVITE_REWARDS.minStayDays} أيام في السيرفر (الحسابات الأقل من ${INVITE_REWARDS.minAccountAgeDays} أيام واللي كانوا في السيرفر قبل كده مش بيتحسبوا)`,
     `🏅 رولات الدعوات: ${tiers}`,
   ].join('\n'));
 }
