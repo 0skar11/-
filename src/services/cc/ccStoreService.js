@@ -43,8 +43,12 @@ export function listStoreItems(items = ccStoreItems) {
     });
 }
 
-/** 'open' (real buying), 'trial' (demo items, preview only) or 'closed'. */
-export function storeMode(settings = ccStoreSettings) {
+/**
+ * 'open' (real buying), 'trial' (preview only) or 'closed'. Only our server can be open: other servers
+ * keep the store as it was (trial) and get no updates.
+ */
+export function storeMode(settings = ccStoreSettings, guildId = null) {
+    if (guildId && !isHomeGuild(guildId)) return settings.open || settings.trial ? 'trial' : 'closed';
     if (settings.open) return 'open';
     return settings.trial ? 'trial' : 'closed';
 }
@@ -54,7 +58,7 @@ export function storeMode(settings = ccStoreSettings) {
  * closed. Other servers than ours see the old samples.
  */
 export function storeCatalog(settings = ccStoreSettings, { items = ccStoreItems, demoItems = ccStoreDemoItems, guildId = null } = {}) {
-    if (storeMode(settings) === 'closed') return [];
+    if (storeMode(settings, guildId) === 'closed') return [];
     return listStoreItems(guildId && !isHomeGuild(guildId) ? demoItems : items);
 }
 
@@ -106,7 +110,7 @@ export function findStoreItem(query, items) {
  * A luck box adds `prize` (and `boostUntil` for a boost prize), a boost `boostUntil`, a forecast `forecast`.
  */
 export async function buyItem(client, member, itemId, quantity = 1, { items = ccStoreItems, demoItems = ccStoreDemoItems, settings = ccStoreSettings, rng = Math.random } = {}) {
-    const mode = storeMode(settings);
+    const mode = storeMode(settings, member?.guild?.id);
     if (mode === 'closed') return { ok: false, reason: 'closed' };
     // Other servers: the old samples, only ever previewed.
     if (!isHomeGuild(member.guild.id)) {

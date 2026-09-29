@@ -7,7 +7,7 @@ import {
 } from '../src/services/cc/storeChannel.js';
 import { buildStorePanel, confirmPurchasePayload, STORE_PANEL_FOOTER } from '../src/services/cc/storeUi.js';
 import { buyItem, storeCatalog, storeMode, findStoreItem } from '../src/services/cc/ccStoreService.js';
-import { ccStoreItems, storeRoomSettings } from '../src/config/store/ccStoreItems.js';
+import { ccStoreItems, ccStoreDemoItems, storeRoomSettings } from '../src/config/store/ccStoreItems.js';
 import { typedCommandName } from '../src/services/games/gamesChannel.js';
 import { SERVER_OWNER_IDS } from '../src/config/serverOwners.js';
 import { HOME_GUILD_ID } from '../src/config/homeGuild.js';
@@ -126,11 +126,16 @@ describe('store room', () => {
 
 describe('store panel', () => {
     test('shows the items, a commands card, a buy menu and the buttons', () => {
-        const guild = { name: 'Void', iconURL: () => null };
+        const guild = { id: HOME_GUILD_ID, name: 'Void', iconURL: () => null };
         const panel = buildStorePanel(guild);
         const [items, commands] = panel.embeds;
         assert.ok(isStorePanel(panel));
-        assert.match(items.description, /تجريبي/u);
+        // Open in our server: no trial line.
+        assert.ok(!/تجريبي/u.test(items.description || ''));
+        // Another server keeps the trial store with the old samples.
+        const other = buildStorePanel({ id: '100000000000000099', name: 'Other', iconURL: () => null }).embeds[0];
+        assert.match(other.description, /تجريبي/u);
+        assert.equal(other.fields.length, ccStoreDemoItems.length);
         assert.equal(items.fields.length, ccStoreItems.length);
         assert.ok(items.fields[0].name.includes(ccStoreItems[0].name));
         assert.match(items.fields[0].value, /السعر/u);
@@ -160,9 +165,11 @@ describe('store panel', () => {
     });
 });
 
-describe('trial buying', () => {
-    test('the store is in trial mode and shows its items', () => {
-        assert.equal(storeMode(), 'trial');
+describe('buying modes', () => {
+    test('the store is open in our server only and shows its items', () => {
+        assert.equal(storeMode(), 'open');
+        assert.equal(storeMode(undefined, HOME_GUILD_ID), 'open');
+        assert.equal(storeMode(undefined, '100000000000000099'), 'trial');
         assert.equal(storeCatalog().length, ccStoreItems.length);
         assert.equal(findStoreItem('1', storeCatalog()).id, ccStoreItems[0].id);
         assert.equal(findStoreItem(ccStoreItems[1].id, storeCatalog()).id, ccStoreItems[1].id);
@@ -177,14 +184,15 @@ describe('trial buying', () => {
             set: async () => { saved += 1; return true; },
         };
         const member = { id: MEMBER, guild: { id: HOME_GUILD_ID }, roles: { cache: new Map() } };
-        const result = await buyItem({ db }, member, item.id, 2);
+        const trial = { settings: { open: false, trial: true, maxQuantity: 10 } };
+        const result = await buyItem({ db }, member, item.id, 2, trial);
         assert.equal(result.ok, true);
         assert.equal(result.trial, true);
         assert.equal(result.cost, item.price * 2);
         assert.equal(result.balance, item.price * 2);
         assert.equal(saved, 0);
 
-        const tooMany = await buyItem({ db }, member, item.id, 3);
+        const tooMany = await buyItem({ db }, member, item.id, 3, trial);
         assert.equal(tooMany.reason, 'no_cc');
         assert.equal(saved, 0);
     });

@@ -79,10 +79,11 @@ export const traderRoleSettings = {
 };
 
 export const ccStoreSettings = {
-    // Real buying (takes CC, gives the item). Flip to true to open the store.
-    open: false,
-    // Trial mode (while `open` is false): the store shows its items, but buying one only checks the
-    // balance and shows the receipt: no CC is taken and nothing is given.
+    // Real buying (takes CC, gives the item), in our server only (src/config/homeGuild.js). Other servers
+    // stay as they were: trial mode with the old samples.
+    open: true,
+    // Trial mode (while `open` is false, and always in other servers): the store shows its items, but
+    // buying one only checks the balance and shows the receipt: no CC is taken and nothing is given.
     trial: true,
     maxQuantity: 10,
 };

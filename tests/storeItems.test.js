@@ -9,7 +9,7 @@ import { normalizeMarket, tickAsset, forecastAsset, getMarket } from '../src/ser
 import { addXp } from '../src/services/leveling/xpSystem.js';
 import { forecastLine } from '../src/services/cc/bourseUi.js';
 import { ensureTraderRole } from '../src/services/cc/traderRoleService.js';
-import { validateRoleName, parseRoleColor, renewalStep } from '../src/services/cc/customRoleService.js';
+import { validateRoleName, parseRoleColor, renewalStep, buyCustomRole, listCustomRoles, sweepGuildCustomRoles, checkInvite, acceptInvite } from '../src/services/cc/customRoleService.js';
 import { customRoleModal, myRolesEmbed } from '../src/services/cc/customRoleUi.js';
 import { applyWordAliases } from '../src/config/commands/commandAliases.js';
 import myrole from '../src/commands/Games/myrole.js';
@@ -51,8 +51,9 @@ describe('store catalog', () => {
         assert.deepEqual(byId('level_boost').sources, ['chat', 'voice']);
     });
 
-    test('is still in trial mode', () => {
-        assert.equal(storeMode(), 'trial');
+    test('is open in our server, and stays trial in other servers', () => {
+        assert.equal(storeMode(undefined, HOME_GUILD_ID), 'open');
+        assert.equal(storeMode(undefined, '100000000000000099'), 'trial');
     });
 
     test('roles, the luck box and the forecast are bought one at a time; boosts stack', () => {
@@ -312,9 +313,59 @@ describe('custom roles', () => {
     test('a trial purchase opens the form instead of buying (buyItem only previews it)', async () => {
         const client = fakeClient();
         client.store.set(`guild:${GUILD_ID}:economy:${MEMBER}`, { cc: 8000 });
-        const result = await buyItem(client, fakeMember(), 'custom_role', 1);
+        const result = await buyItem(client, fakeMember(), 'custom_role', 1, { settings: { open: false, trial: true, maxQuantity: 10 } });
         assert.equal(result.trial, true);
         assert.equal((await buyItem(client, fakeMember(), 'custom_role', 1, { settings: OPEN })).reason, 'use_form');
+    });
+
+    test('buying one takes the first month, makes the role without permissions and renews it every 30 days', async () => {
+        const client = fakeClient();
+        client.users = { fetch: async () => ({ send: async () => {} }) };
+        client.store.set(`guild:${GUILD_ID}:economy:${MEMBER}`, { cc: 30_000 });
+        const cache = new Map();
+        const created = [];
+        const guild = {
+            id: GUILD_ID, name: 'CHAOS', features: [],
+            roles: {
+                cache,
+                fetch: async (id) => (id ? cache.get(id) || null : cache),
+                create: async (options) => {
+                    created.push(options);
+                    const role = { id: `50000000000000000${created.length}`, name: options.name, position: 1, setPosition: async () => role, delete: async () => { cache.delete(role.id); } };
+                    cache.set(role.id, role);
+                    return role;
+                },
+            },
+            members: { fetch: async (id) => ({ id, roles: { add: async () => {}, remove: async () => {} } }) },
+        };
+        const given = [];
+        const member = { id: MEMBER, user: { tag: 'm' }, guild, roles: { add: async (role) => { given.push(role.id); } } };
+        const item = byId('friends_role');
+
+        assert.equal((await buyCustomRole(client, member, item, { name: 'Admins' })).reason, 'staff_name');
+        assert.equal((await getProfile(client, GUILD_ID, MEMBER)).cc, 30_000);
+
+        const now = Date.now();
+        const bought = await buyCustomRole(client, member, item, { name: 'Legends', color: 'ذهبي' }, { now });
+        assert.equal(bought.ok, true);
+        assert.deepEqual(created[0].permissions, []);
+        assert.deepEqual(given, [bought.role.id]);
+        assert.equal((await getProfile(client, GUILD_ID, MEMBER)).cc, 5000);
+        assert.equal((await buyCustomRole(client, member, item, { name: 'Other' })).reason, 'has_role');
+
+        // The leader invites a friend, who accepts.
+        const friend = { id: '200000000000000078', bot: false };
+        assert.equal((await checkInvite(client, guild, MEMBER, friend)).ok, true);
+        const friendMember = { id: friend.id, guild, roles: { add: async () => {} } };
+        assert.equal((await acceptInvite(client, friendMember, bought.role.id, now, { now })).ok, true);
+        assert.deepEqual((await listCustomRoles(client, GUILD_ID))[0].members, [MEMBER, friend.id]);
+
+        // 30 days later: 5,000 CC isn't enough → grace; 3 more days → the role is deleted.
+        const due = bought.record.paidUntil;
+        assert.equal((await sweepGuildCustomRoles(client, guild, { now: due + 1000 })).grace, 1);
+        assert.equal((await sweepGuildCustomRoles(client, guild, { now: due + 3 * DAY })).ended, 1);
+        assert.equal(cache.size, 0);
+        assert.deepEqual(await listCustomRoles(client, GUILD_ID), []);
     });
 
     test('رولي shows the member\'s roles', () => {

@@ -190,9 +190,9 @@ The items below are for our server only (`1155236281706627173`, `src/config/home
 servers keep the old sample store, always as a preview, and get no `رولي`, custom roles, trader role
 or boosts (see `CLAUDE.md`).
 
-The store is **in trial mode** for now: it shows the real items below, and buying one checks the
-balance and shows a receipt but takes no CC and gives nothing (a custom role shows its form and a
-preview of the role). `ccStoreSettings.open = true` opens it.
+The store is **open** in our server: buying takes the CC and gives the item. Setting
+`ccStoreSettings.open = false` puts it back in trial mode (buying only checks the balance and shows a
+receipt).
 
 | # | Item | Price | What it gives |
 |---|---|---|---|

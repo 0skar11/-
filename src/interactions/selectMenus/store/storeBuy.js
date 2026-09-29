@@ -1,6 +1,6 @@
 import { MessageFlags } from 'discord.js';
 import { STORE_BUTTON_PREFIX, confirmPurchasePayload, purchaseFailureText } from '../../../services/cc/storeUi.js';
-import { storeCatalog, findStoreItem } from '../../../services/cc/ccStoreService.js';
+import { storeCatalog, findStoreItem, storeMode } from '../../../services/cc/ccStoreService.js';
 import { getProfile } from '../../../services/cc/ccService.js';
 
 // The "choose an item" menu of the store panel (`storepanel:buy`): answers privately with the
@@ -14,7 +14,7 @@ async function execute(interaction, client, [action]) {
     }
     await interaction.deferReply({ flags: MessageFlags.Ephemeral });
     const { cc } = await getProfile(client, interaction.guildId, interaction.user.id);
-    await interaction.editReply(confirmPurchasePayload(item, 1, interaction.user.id, cc));
+    await interaction.editReply(confirmPurchasePayload(item, 1, interaction.user.id, cc, storeMode(undefined, interaction.guildId)));
     // Clear the member's choice on the panel so picking the same item again works.
     interaction.message?.edit({ components: interaction.message.components }).catch(() => {});
 }

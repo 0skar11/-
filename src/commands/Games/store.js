@@ -48,7 +48,8 @@ export default {
             return reply({ embeds: [inventoryEmbed(interaction.user, inventory)] });
         }
 
-        if (storeMode() === 'closed') return reply({ content: purchaseFailureText({ reason: 'closed' }) });
+        const mode = storeMode(undefined, interaction.guildId);
+        if (mode === 'closed') return reply({ content: purchaseFailureText({ reason: 'closed' }) });
         const item = findStoreItem(interaction.options.getString('item'), storeCatalog(undefined, { guildId: interaction.guildId }));
         if (!item) return reply({ content: purchaseFailureText({ reason: 'not_found' }) });
         const quantity = interaction.options.getInteger('quantity') || 1;
@@ -56,6 +57,6 @@ export default {
             return reply({ content: purchaseFailureText({ reason: 'bad_quantity' }) });
         }
         const { cc } = await getProfile(client, interaction.guildId, interaction.user.id);
-        return reply(confirmPurchasePayload(item, quantity, interaction.user.id, cc));
+        return reply(confirmPurchasePayload(item, quantity, interaction.user.id, cc, mode));
     },
 };

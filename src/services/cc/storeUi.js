@@ -59,7 +59,7 @@ export function commandFields(header = 'اكتب الأمر هنا في الرو
     ];
 }
 
-function modeLine(mode = storeMode()) {
+function modeLine(mode) {
     if (mode === 'trial') return TRIAL_LINE;
     return mode === 'closed' ? CLOSED_LINE : '';
 }
@@ -92,7 +92,7 @@ function modeTag(mode) {
  * commands under it, then the buy menu and the buttons.
  */
 export function buildStorePanel(guild, { settings = ccStoreSettings } = {}) {
-    const mode = storeMode(settings);
+    const mode = storeMode(settings, guild?.id);
     const items = storeCatalog(settings, { guildId: guild?.id });
     const itemsEmbed = ccEmbed(`🛒 متجر ${CC.name}`, modeTag(mode), { fields: itemFields(items) });
     const commandsEmbed = ccEmbed('⌨️ الأوامر', '', {
@@ -134,9 +134,10 @@ function storePanelComponents(items, mode) {
 }
 
 export function storeHelpEmbed(guildId = null) {
+    const line = modeLine(storeMode(undefined, guildId));
     return ccEmbed('❓ ازاي تستخدم المتجر', [
         '🛒 تقدر تشتري من القايمة اللي في الرسالة المثبتة، وبعدها تأكد بزرار ✅.',
-        ...(modeLine() ? ['', modeLine()] : []),
+        ...(line ? ['', line] : []),
     ].join('\n'), {
         fields: [
             ...commandFields('ودي الأوامر اللي تقدر تكتبها 👇', guildId),
