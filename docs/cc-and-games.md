@@ -34,7 +34,7 @@ pays the winner.
 | 10 | 50 | 30 | 20 |
 | 30+ | 150 | 90 | 60 |
 
-Solo games (`سؤال`, `رقم`, `سلوت`, `حجر`, `اكس`): 5 CC per win (×5 during a CC event). During a CC event a member can earn at most 1,500 CC a day (UTC) from solo games; outside an event there is no daily cap.
+Solo games (`سؤال`, `رقم`, `سلوت`, `حجر`, `اكس`): 50 CC per win (×5 during a CC event). During a CC event a member can earn at most 1,500 CC a day (UTC) from solo games; outside an event there is no daily cap.
 
 Games against another member (`اكس @عضو`, `fight @عضو`) start with an invite: the other member has
 20 seconds to press قبول or رفض (the challenger can take it back with رفض). Only after قبول does the
@@ -319,7 +319,9 @@ name, optionally with a number (`بيع سبيكة دهب 2`, `استثمار ا
 
 The games bot is [Clover](https://clovers.gg). When a Clover game ends it posts `👑 | @winner`;
 this bot reads that message (`src/services/cc/gamesBotWins.js`) and pays the winner
-**10 CC**, at most **200 CC a day** (UTC) from Clover wins (`CC.gamesBot` in `src/config/cc.js`).
+**500 CC** for a group game win and **50 CC** for a solo win (first to type the answer), a fixed
+amount whatever the number of players (`CC.gamesBot` in `src/config/cc.js`). There is no daily cap
+outside a CC event.
 Every win also counts as a game, a top 3 and a 1st place in the member's stats, even after the cap.
 A short reply under Clover's message shows the CC and new balance and is deleted after 15 seconds.
 
@@ -346,7 +348,7 @@ Only guilds this bot is in are accepted (`404` otherwise). User IDs are strings.
 | `GET /api/cc/:guildId/users/:userId` | – | `{ userId, cc, stats }` |
 | `GET /api/cc/:guildId/top?limit=10` | – | `{ members, total, top: [{ userId, cc, earned }] }` (1–100 rows) |
 | `POST /api/cc/:guildId/group-game` | `{ game, players: [ids], ranking: [ids] }` | Pays a finished group game with the rules above (pool `10 × players`, 50/30/20 for the top 3); `ranking` is the finishing order, 1st first. Returns `{ paid: [{ userId, place, amount, balance }] }` |
-| `POST /api/cc/:guildId/solo-win` | `{ userId, game }` | A solo win: 5 CC (×event), at most 1,500 CC a day during a CC event, no cap after. Returns `{ amount, capped, balance }` |
+| `POST /api/cc/:guildId/solo-win` | `{ userId, game }` | A solo win: 50 CC (×event), at most 1,500 CC a day during a CC event, no cap after. Returns `{ amount, capped, balance }` |
 | `POST /api/cc/:guildId/add` | `{ userId, amount, reason }` | Custom reward, 1–10,000 CC. Returns `{ ok, amount, balance }` |
 | `POST /api/cc/:guildId/spend` | `{ userId, amount, reason }` | Takes CC (entry fee, bet). Returns `{ ok: false, balance }` when the member can't afford it |
 

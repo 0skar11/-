@@ -1,4 +1,4 @@
-// solo.js — one-player games. A win pays CC.solo.win (5 CC) until the member hits the daily solo cap (only during the CC event).
+// solo.js — one-player games. A win pays CC.solo.win (50 CC) until the member hits the daily solo cap (only during the CC event).
 // rps (حجر) and xo (اكس) use soloRewardText() too.
 
 import { triviaQuestions } from './data/trivia.js';

@@ -22,7 +22,7 @@ export const CC = {
 
     solo: {
         // CC for winning a solo game (rps, xo, solo question, solo number, slots).
-        win: 5,
+        win: 50,
         // Most CC a member can earn from solo games per day (UTC): `boostDailyCap` while the CC event runs
         // (a flat amount, not multiplied), `dailyCap` after it (null = no cap).
         boostDailyCap: 1500,
@@ -34,8 +34,8 @@ export const CC = {
     // - a solo win, `✅ | قام @member بكتابة الاجابة الصحيحة خلال ... ثانية` (first to type the answer), pays `answer`.
     // Its messages don't say how many played, so a win pays a fixed amount (times the CC event multiplier).
     gamesBot: {
-        win: 50,
-        answer: 10,
+        win: 500,
+        answer: 50,
         // Most CC a member can get from games bot wins per day (UTC), both kinds together: `boostDailyCap`
         // while the CC event runs (a flat amount, not multiplied), `dailyCap` after it (null = no cap).
         boostDailyCap: 5000,

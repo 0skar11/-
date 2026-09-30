@@ -139,9 +139,10 @@ describe('CC API for the games bot', () => {
         const before = (await call('GET', `/${GUILD}/users/${C}`)).body.cc;
         assert.equal((await call('POST', `/${GUILD}/add`, { userId: C, amount: 40, reason: 'event' })).body.balance, before + 40);
         const solo = await call('POST', `/${GUILD}/solo-win`, { userId: C, game: 'xo' });
-        assert.equal(solo.body.amount, 5);
-        assert.deepEqual((await call('POST', `/${GUILD}/spend`, { userId: C, amount: 1000 })).body, { ok: false, balance: before + 45 });
-        assert.deepEqual((await call('POST', `/${GUILD}/spend`, { userId: C, amount: 45 })).body, { ok: true, balance: before });
+        assert.equal(solo.body.amount, CC.solo.win);
+        const paid = 40 + CC.solo.win;
+        assert.deepEqual((await call('POST', `/${GUILD}/spend`, { userId: C, amount: 1000 })).body, { ok: false, balance: before + paid });
+        assert.deepEqual((await call('POST', `/${GUILD}/spend`, { userId: C, amount: paid })).body, { ok: true, balance: before });
         const top = await call('GET', `/${GUILD}/top?limit=2`);
         assert.equal(top.body.top.length, 2);
         assert.equal(top.body.top[0].userId, B);
@@ -209,7 +210,7 @@ describe('games bot (Clover) wins', async () => {
             const win = winMessage(`👑 | <@${A}>`);
             await handleGamesBotWin(win, client);
             assert.equal((await getProfile(client, GUILD, A)).cc, CC.gamesBot.win * 5);
-            assert.match(win.replies[0].content, new RegExp(`\\+\\*\\*${CC.gamesBot.win * 5}\\*\\*`, 'u'));
+            assert.match(win.replies[0].content, new RegExp(`\\+\\*\\*${(CC.gamesBot.win * 5).toLocaleString('en-US')}\\*\\*`, 'u'));
             assert.match(win.replies[0].content, /🔥 \*\*CC ×5\*\*.*<t:\d+:R>/u);
         } finally {
             CC.boost = saved;
@@ -238,8 +239,8 @@ describe('games bot (Clover) wins', async () => {
         assert.deepEqual(parseWin(`قام <@${A}> بكتابة الاجابة الصحيحة`), { userId: A, kind: 'answer' });
         assert.equal(parseWin(`مبروك قام <@${A}> بكتابة الاجابة الصحيحة`), null);
         assert.equal(parseWin(`✅ | قام <@${A}> بكتابة اجابة غلط`), null);
-        assert.equal(CC.gamesBot.win, 50);
-        assert.equal(CC.gamesBot.answer, 10);
+        assert.equal(CC.gamesBot.win, 500);
+        assert.equal(CC.gamesBot.answer, 50);
 
         const saved = CC.boost;
         CC.boost = { multiplier: 1, until: '2000-01-01T00:00:00Z' };
@@ -248,21 +249,21 @@ describe('games bot (Clover) wins', async () => {
             const message = winMessage(answer);
             assert.equal(await handleGamesBotWin(message, client), true);
             let profile = await getProfile(client, GUILD, A);
-            assert.equal(profile.cc, 10);
+            assert.equal(profile.cc, 50);
             assert.equal(profile.stats.soloWins, 1);
             assert.equal(profile.stats.groupWins, 0);
-            assert.match(message.replies[0].content, /\+\*\*10\*\*/u);
+            assert.match(message.replies[0].content, /\+\*\*50\*\*/u);
             await handleGamesBotWin(winMessage(`👑 | <@${A}>`), client);
             profile = await getProfile(client, GUILD, A);
-            assert.equal(profile.cc, 60);
+            assert.equal(profile.cc, 550);
             assert.equal(profile.stats.groupWins, 1);
 
             CC.boost = { multiplier: 5, until: '2999-01-01T00:00:00Z' };
             const boosted = { db: memoryDb() };
             await handleGamesBotWin(winMessage(answer), boosted);
-            assert.equal((await getProfile(boosted, GUILD, A)).cc, 50);
+            assert.equal((await getProfile(boosted, GUILD, A)).cc, 250);
             await handleGamesBotWin(winMessage(`👑 | <@${A}>`), boosted);
-            assert.equal((await getProfile(boosted, GUILD, A)).cc, 50 + 250);
+            assert.equal((await getProfile(boosted, GUILD, A)).cc, 250 + 2500);
         } finally {
             CC.boost = saved;
         }
