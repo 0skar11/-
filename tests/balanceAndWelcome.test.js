@@ -26,6 +26,22 @@ describe('balance on متجر and ممتلكاتي (report #174)', () => {
 });
 
 describe('welcome message (report #175)', () => {
+  test('uses the bot\'s own copy of the emoji, uploaded once, or 👋 until then (report #177)', async () => {
+    const { ensureWelcomeEmoji, getWelcomeEmoji, WELCOME_EMOJI_URL } = await import('../src/services/welcomeEmojiService.js');
+    assert.equal(getWelcomeEmoji({}), '👋');
+    const created = [];
+    const store = new Map();
+    const client = { application: { emojis: {
+      cache: store,
+      fetch: async () => store,
+      create: async ({ attachment, name }) => { created.push(attachment); const e = { name, toString: () => '<a:smileywave:999>' }; store.set('999', e); return e; },
+    } } };
+    assert.equal(await ensureWelcomeEmoji(client), '<a:smileywave:999>');
+    assert.equal(await ensureWelcomeEmoji(client), '<a:smileywave:999>');
+    assert.deepEqual(created, [WELCOME_EMOJI_URL]);
+    assert.equal(getWelcomeEmoji(client), '<a:smileywave:999>');
+  });
+
   test('ends with the waving emoji', async () => {
     const sent = [];
     const channel = { isTextBased: () => true, permissionsFor: () => new PermissionsBitField(PermissionsBitField.All), send: async (payload) => { sent.push(payload); } };
@@ -36,6 +52,6 @@ describe('welcome message (report #175)', () => {
       guild: { id: CHAOS_GUILD_ID, members: { me: {} }, channels: { cache: new Map([[WELCOME_CHANNEL_ID, channel]]) }, invites: { fetch: async () => new Map() } },
     };
     await welcome.execute(member);
-    assert.equal(sent[0].content, 'welcome to chaos <@200000000000000001> <a:smileywave:1537905313628291142>');
+    assert.equal(sent[0].content, 'welcome to chaos <@200000000000000001> <a:smileywave:999>');
   });
 });

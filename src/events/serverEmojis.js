@@ -1,12 +1,15 @@
 import { Events } from 'discord.js';
 import { logger, startupLog } from '../utils/logger.js';
 import { ensureServerEmojis, ensurePeepoEmojis, ensureAnimatedEmojis } from '../services/serverEmojiService.js';
+import { ensureWelcomeEmoji } from '../services/welcomeEmojiService.js';
 
 export default {
   name: Events.ClientReady,
   once: true,
 
   async execute(client) {
+    // The welcome message's waving emoji, uploaded once as the bot's own emoji.
+    startupLog(`Welcome emoji: ${await ensureWelcomeEmoji(client)}`);
     for (const guild of client.guilds.cache.values()) {
       try {
         const { skipped, added, failed } = await ensureServerEmojis(guild);
