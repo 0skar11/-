@@ -52,9 +52,11 @@ export function pricesEmbed({ quotes, nextChangeAt }) {
 }
 
 /** `ممتلكاتي`: what the member owns, what they paid and what they'd get selling now. */
-export function holdingsEmbed(user, { rows, totalValue, totalPaid, totalIfSold }) {
+export function holdingsEmbed(user, { rows, totalValue, totalPaid, totalIfSold }, { balance = null } = {}) {
+    // The member's CC balance (report #174), when given.
+    const balanceField = balance === null ? [] : [{ name: '💰 رصيدك', value: formatCC(balance), inline: true }];
     if (!rows.length) {
-        return ccEmbed('💼 ممتلكاتي', `${user}\n\nمعندكش حاجة لسه. اكتب \`اسعار\` وشوف تشتري إيه 📈`);
+        return ccEmbed('💼 ممتلكاتي', `${user}\n\nمعندكش حاجة لسه. اكتب \`اسعار\` وشوف تشتري إيه 📈`, { fields: balanceField });
     }
     const lines = rows.map((row) => [
         `${row.asset.emoji} **${row.asset.name}** × ${row.qty}`,
@@ -66,6 +68,7 @@ export function holdingsEmbed(user, { rows, totalValue, totalPaid, totalIfSold }
             { name: '💵 دفعت', value: formatCC(totalPaid), inline: true },
             { name: '📊 قيمتها', value: formatCC(totalValue), inline: true },
             { name: '🧾 لو بعت كله', value: `${formatCC(totalIfSold)}\n${signedCC(totalIfSold - totalPaid)}`, inline: true },
+            ...balanceField,
         ],
         thumbnail: user.displayAvatarURL?.() || null,
     });

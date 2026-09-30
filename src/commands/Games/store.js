@@ -5,6 +5,7 @@ import { getProfile } from '../../services/cc/ccService.js';
 import { storeCatalog, findStoreItem, storeMode, maxQuantityOf } from '../../services/cc/ccStoreService.js';
 import { buildStorePanel, inventoryEmbed, confirmPurchasePayload, purchaseFailureText } from '../../services/cc/storeUi.js';
 import { InteractionHelper } from '../../utils/interactionHelper.js';
+import { isHomeGuild } from '../../config/homeGuild.js';
 
 // The CC store: `متجر` alone sends the store panel (items, buy menu and buttons), `متجر 1` /
 // `متجر رتبة vip` / `متجر 1 3` buys (confirmed with a button), `مخزني` shows the inventory.
@@ -41,7 +42,11 @@ export default {
         const reply = (payload) => InteractionHelper.safeReply(interaction, { allowedMentions: { parse: [] }, ...payload });
         const sub = interaction.options.getSubcommand();
 
-        if (sub === 'list') return reply(buildStorePanel(interaction.guild));
+        if (sub === 'list') {
+            // Our server shows the member's balance on the panel (report #174); other servers keep the old panel.
+            const balance = isHomeGuild(interaction.guildId) ? (await getProfile(client, interaction.guildId, interaction.user.id)).cc : null;
+            return reply(buildStorePanel(interaction.guild, { balance }));
+        }
 
         if (sub === 'inventory') {
             const { inventory } = await getProfile(client, interaction.guildId, interaction.user.id);

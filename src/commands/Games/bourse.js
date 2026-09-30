@@ -7,6 +7,7 @@ import { getProfile } from '../../services/cc/ccService.js';
 import { findAsset, getMarket, getHoldings } from '../../services/cc/bourseService.js';
 import { pricesEmbed, holdingsEmbed, confirmInvestPayload, confirmSellPayload, bourseFailureText } from '../../services/cc/bourseUi.js';
 import { InteractionHelper } from '../../utils/interactionHelper.js';
+import { isHomeGuild } from '../../config/homeGuild.js';
 
 // The CC bourse: `اسعار` (prices of the hour), `شراء عربية` / `استثمار عربية` / `شراء 3 2` (buy), `بيع عربية` /
 // `بيع 3 2` (sell) and `ممتلكاتي` (holdings). Buying and selling are confirmed with a button
@@ -61,7 +62,10 @@ export default {
         const { guildId, user } = interaction;
 
         if (sub === 'prices') return reply({ embeds: [pricesEmbed(await getMarket(client, guildId))] });
-        if (sub === 'holdings') return reply({ embeds: [holdingsEmbed(user, await getHoldings(client, guildId, user.id))] });
+        if (sub === 'holdings') {
+            const balance = isHomeGuild(guildId) ? (await getProfile(client, guildId, user.id)).cc : null;
+            return reply({ embeds: [holdingsEmbed(user, await getHoldings(client, guildId, user.id), { balance })] });
+        }
 
         const asset = findAsset(interaction.options.getString('asset'));
         if (!asset) return reply({ content: bourseFailureText({ reason: 'not_found' }) });
