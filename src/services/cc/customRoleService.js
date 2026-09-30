@@ -16,7 +16,7 @@
 // Saved per guild at `guild:<id>:customroles`: `{ <roleId>: { roleId, kind, itemId, price, name,
 // leaderId, members: [userId], createdAt, paidUntil, cancelled, graceUntil, remindedFor } }`.
 
-import { customRoleSettings, CUSTOM_ROLE_VOUCHER } from '../../config/store/ccStoreItems.js';
+import { customRoleSettings, CUSTOM_ROLE_VOUCHER, voucherFor } from '../../config/store/ccStoreItems.js';
 import { CC, formatCC } from '../../config/cc.js';
 import { getCustomRolesKey } from '../../utils/database/keys.js';
 import { Mutex } from '../../utils/mutex.js';
@@ -28,12 +28,12 @@ import { isHomeGuild } from '../../config/homeGuild.js';
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 /** Takes (`change` -1) or gives back (+1) a free custom role month. Returns true when one was taken/given. */
-export async function useVoucher(client, guildId, userId, change) {
+export async function useVoucher(client, guildId, userId, change, voucherId = CUSTOM_ROLE_VOUCHER.id) {
     const result = await updateCCState(client, guildId, userId, (state) => {
-        const held = state.inventory[CUSTOM_ROLE_VOUCHER.id] || 0;
+        const held = state.inventory[voucherId] || 0;
         if (held + change < 0) return { ok: false, skipSave: true };
-        if (held + change === 0) delete state.inventory[CUSTOM_ROLE_VOUCHER.id];
-        else state.inventory[CUSTOM_ROLE_VOUCHER.id] = held + change;
+        if (held + change === 0) delete state.inventory[voucherId];
+        else state.inventory[voucherId] = held + change;
         return { ok: true };
     });
     return Boolean(result?.ok);
@@ -139,13 +139,14 @@ export async function buyCustomRole(client, member, item, { name, color, iconUrl
     if (!checkedColor.ok) return { ok: false, reason: 'bad_color' };
 
     // A free month won in the luck box (report #179) pays the first month instead of CC.
-    const voucher = item.id === CUSTOM_ROLE_VOUCHER.itemId && await useVoucher(client, guild.id, member.id, -1);
+    const voucherId = voucherFor(item.id)?.id;
+    const voucher = Boolean(voucherId) && await useVoucher(client, guild.id, member.id, -1, voucherId);
     const paid = voucher
         ? { ok: true, balance: (await getProfile(client, guild.id, member.id)).cc, voucher: true }
         : await spendCC(client, guild.id, member.id, item.price, `custom role ${item.id}`);
     if (!paid.ok) return { ok: false, reason: 'no_cc', balance: paid.balance };
     const refund = () => (voucher
-        ? useVoucher(client, guild.id, member.id, 1)
+        ? useVoucher(client, guild.id, member.id, 1, voucherId)
         : grantCC(client, guild.id, member.id, item.price, { source: 'store', reason: 'custom role refund' }))
         .catch((error) => logger.error(`[CUSTOM_ROLE] Failed to refund ${member.id}`, error));
 

@@ -1,6 +1,6 @@
 import { SlashCommandBuilder } from 'discord.js';
 import { CC } from '../../config/cc.js';
-import { ccStoreSettings, CUSTOM_ROLE_VOUCHER } from '../../config/store/ccStoreItems.js';
+import { ccStoreSettings, voucherFor } from '../../config/store/ccStoreItems.js';
 import { getProfile } from '../../services/cc/ccService.js';
 import { storeCatalog, findStoreItem, storeMode, maxQuantityOf } from '../../services/cc/ccStoreService.js';
 import { buildStorePanel, inventoryEmbed, confirmPurchasePayload, purchaseFailureText } from '../../services/cc/storeUi.js';
@@ -62,6 +62,6 @@ export default {
             return reply({ content: purchaseFailureText({ reason: 'bad_quantity' }) });
         }
         const { cc, inventory } = await getProfile(client, interaction.guildId, interaction.user.id);
-        return reply(confirmPurchasePayload(item, quantity, interaction.user.id, cc, mode, { vouchers: inventory?.[CUSTOM_ROLE_VOUCHER.id] || 0 }));
+        return reply(confirmPurchasePayload(item, quantity, interaction.user.id, cc, mode, { vouchers: inventory?.[voucherFor(item.id)?.id] || 0 }));
     },
 };

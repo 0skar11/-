@@ -2,7 +2,7 @@ import { MessageFlags } from 'discord.js';
 import { STORE_BUTTON_PREFIX, confirmPurchasePayload, purchaseFailureText } from '../../../services/cc/storeUi.js';
 import { storeCatalog, findStoreItem, storeMode } from '../../../services/cc/ccStoreService.js';
 import { getProfile } from '../../../services/cc/ccService.js';
-import { CUSTOM_ROLE_VOUCHER } from '../../../config/store/ccStoreItems.js';
+import { voucherFor } from '../../../config/store/ccStoreItems.js';
 
 // The "choose an item" menu of the store panel (`storepanel:buy`): answers privately with the
 // confirmation, whose buttons are handled by src/interactions/buttons/store/storePanel.js.
@@ -15,7 +15,7 @@ async function execute(interaction, client, [action]) {
     }
     await interaction.deferReply({ flags: MessageFlags.Ephemeral });
     const { cc, inventory } = await getProfile(client, interaction.guildId, interaction.user.id);
-    await interaction.editReply(confirmPurchasePayload(item, 1, interaction.user.id, cc, storeMode(undefined, interaction.guildId), { vouchers: inventory?.[CUSTOM_ROLE_VOUCHER.id] || 0 }));
+    await interaction.editReply(confirmPurchasePayload(item, 1, interaction.user.id, cc, storeMode(undefined, interaction.guildId), { vouchers: inventory?.[voucherFor(item.id)?.id] || 0 }));
     // Clear the member's choice on the panel so picking the same item again works.
     interaction.message?.edit({ components: interaction.message.components }).catch(() => {});
 }
