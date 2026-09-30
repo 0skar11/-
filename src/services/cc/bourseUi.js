@@ -32,11 +32,14 @@ function signedCC(amount) {
  * `اسعار`: a grid of cards (3 per row on a computer), one per asset with its price and its move since
  * last hour, then a card with how to buy and sell. The rules are in the small footer.
  */
-export function pricesEmbed({ quotes, nextChangeAt }) {
+export function pricesEmbed({ quotes, nextChangeAt }, { balance = null } = {}) {
     const next = Math.floor(nextChangeAt / 1000);
+    // With the member's balance (our server), the 🔥 demand mark and its legend are gone and the footer
+    // shows the balance instead (the owner's request); other servers keep the old card.
+    const showDemand = balance === null;
     const cards = quotes.map(({ asset, price, changePercent, raised }) => ({
         name: `${asset.emoji} ${asset.name}`,
-        value: [`**${number(price)}** ${CC.emoji}`, [changeArrow(changePercent), raised ? '🔥' : ''].filter(Boolean).join(' ')].filter(Boolean).join('\n'),
+        value: [`**${number(price)}** ${CC.emoji}`, [changeArrow(changePercent), showDemand && raised ? '🔥' : ''].filter(Boolean).join(' ')].filter(Boolean).join('\n'),
         inline: true,
     }));
     const embed = ccEmbed('📈 البورصة', `⏰ الأسعار الجاية <t:${next}:R>`, {
@@ -46,7 +49,7 @@ export function pricesEmbed({ quotes, nextChangeAt }) {
         ],
     });
     embed.footer = {
-        text: `رسوم البيع ${bourseSettings.sellFeePercent}% ・ أقصى ${bourseSettings.maxOwnedPerAsset} قطعة من كل حاجة ・ 🔥 = عليها طلب`,
+        text: `رسوم البيع ${bourseSettings.sellFeePercent}% ・ أقصى ${bourseSettings.maxOwnedPerAsset} قطعة من كل حاجة ・ ${showDemand ? '🔥 = عليها طلب' : `💰 رصيدك: ${number(balance)} ${CC.short}`}`,
     };
     return embed;
 }

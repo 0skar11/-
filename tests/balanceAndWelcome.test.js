@@ -1,7 +1,7 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import { buildStorePanel } from '../src/services/cc/storeUi.js';
-import { holdingsEmbed } from '../src/services/cc/bourseUi.js';
+import { holdingsEmbed, pricesEmbed } from '../src/services/cc/bourseUi.js';
 import { HOME_GUILD_ID } from '../src/config/homeGuild.js';
 import { CHAOS_GUILD_ID, WELCOME_CHANNEL_ID } from '../src/config/inviteRewards.js';
 import welcome from '../src/events/voidWelcome.js';
@@ -12,6 +12,18 @@ describe('balance on متجر and ممتلكاتي (report #174)', () => {
     const guild = { id: HOME_GUILD_ID };
     assert.match(buildStorePanel(guild, { balance: 12345 }).embeds[0].description, /💰 رصيدك: \*\*12,345\*\*/u);
     assert.doesNotMatch(buildStorePanel(guild).embeds[0].description || '', /رصيدك/u);
+  });
+
+  test('prices: the balance replaces the 🔥 demand mark and its legend; without a balance nothing changes', () => {
+    const asset = { emoji: '🚗', name: 'عربية' };
+    const market = { quotes: [{ asset, price: 1300, changePercent: 2, raised: true }], nextChangeAt: Date.now() + 1000 };
+    const ours = pricesEmbed(market, { balance: 12345 });
+    assert.equal(ours.footer.text.includes('🔥'), false);
+    assert.match(ours.footer.text, /💰 رصيدك: 12,345 CC/u);
+    assert.equal(ours.fields[0].value.includes('🔥'), false);
+    const old = pricesEmbed(market);
+    assert.match(old.footer.text, /🔥 = عليها طلب/u);
+    assert.match(old.fields[0].value, /🔥/u);
   });
 
   test('holdings show the balance, with or without assets', () => {
