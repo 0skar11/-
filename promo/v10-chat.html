@@ -15,6 +15,7 @@
   .list { position: absolute; left: 0; right: 0; top: 0; padding: 30px 44px 40px; }
   .grp { display: flex; gap: 28px; margin-top: 34px; }
   .av { width: 116px; height: 116px; border-radius: 50%; flex: none; object-fit: cover; }
+  .av.letter { display: grid; place-items: center; color: #fff; font-family: 'Anton'; font-size: 60px; }
   .body { flex: 1; min-width: 0; }
   .meta { display: flex; align-items: center; gap: 16px; }
   .meta .nm { font-size: 48px; font-weight: 900; }
@@ -37,14 +38,14 @@
   .cta { position: absolute; left: 0; right: 0; bottom: 30px; text-align: center; font-size: 40px; font-weight: 900; color: #b04a78; direction: rtl; opacity: 0; }
 </style>
 </head>
-<body data-duration="22.05" data-cover="12">
+<body data-duration="20.8" data-cover="12">
 <div id="stage">
   <div class="hdr"><span class="hash">#</span><span class="ch">الشات</span><span class="srv">CHAOS</span></div>
   <div class="view" id="view"><div class="list" id="list"></div></div>
   <div class="typing" id="typing"></div>
   <div class="inp"><span class="plus">+</span><span class="ph">ابعت رسالة في #الشات</span><span class="ic">🎁😊</span></div>
   <div class="cta" id="cta">لينك CHAOS في البايو 👇</div>
-  <section class="scene" data-start="0" data-end="22.05" data-noflash style="animation:none;opacity:1"></section>
+  <section class="scene" data-start="0" data-end="20.8" data-noflash style="animation:none;opacity:1"></section>
   <div id="flash"></div>
 </div>
 <script src="v10-chat.timeline.js"></script>
@@ -58,7 +59,7 @@
     if (it.kind === 'head') {
       grp = document.createElement('div');
       grp.className = 'grp'; grp.id = 'it' + i;
-      grp.innerHTML = `<img class="av" src="${u.img}"><div class="body"><div class="meta"><span class="nm" style="color:${u.color}">${u.name}</span><span class="tg">${u.tag}</span><span class="tm">${it.time}</span></div></div>`;
+      grp.innerHTML = `${u.img ? `<img class="av" src="${u.img}">` : `<div class="av letter" style="background:${u.bg}">${u.name[0].toUpperCase()}</div>`}<div class="body"><div class="meta"><span class="nm" style="color:${u.color}">${u.name}</span><span class="tg">${u.tag}</span><span class="tm">${it.time}</span></div></div>`;
       list.appendChild(grp);
     } else if (it.kind === 'line') {
       const ln = document.createElement('div');

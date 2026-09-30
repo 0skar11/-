@@ -3,26 +3,30 @@
     python3 v10_timeline.py    # writes v10-chat.timeline.js
 
 Each line appears on its own like a real Discord chat; when the author changes, "X is typing…" shows
-first. The avatars are the original characters from v9 (vo/v9/ziko.png, loli.png, hamo.png).
+first. The cast is the CHAOS admins; avatars live in vo/v10/av/ (gitignored),
+and an admin with img None gets a Discord-style letter avatar on the bg color.
 """
 import json
 from pathlib import Path
 
 here = Path(__file__).parent
 USERS = {
-    'ziko': {'name': 'زيكو', 'color': '#2f8f5b', 'tag': '💸 CC', 'img': 'vo/v9/ziko.png'},
-    'loli': {'name': 'لولي', 'color': '#0e8fa6', 'tag': '🎮 lol', 'img': 'vo/v9/loli.png'},
-    'hamo': {'name': 'حمو', 'color': '#b86a12', 'tag': '🤝 inv', 'img': 'vo/v9/hamo.png'},
+    'oskar': {'name': 'oskar', 'color': '#c2185b', 'tag': '👑 OWNER', 'img': 'vo/v10/av/oskar.png'},
+    'adam': {'name': 'adam', 'color': '#1e7fd1', 'tag': '🛡️ ADMIN', 'img': None, 'bg': '#5865f2'},
+    '7assep': {'name': '7assep', 'color': '#7b3fc4', 'tag': '🛡️ ADMIN', 'img': 'vo/v10/av/7assep.png'},
+    'zatona': {'name': 'zatona', 'color': '#2f8f5b', 'tag': '🛡️ ADMIN', 'img': None, 'bg': '#3ba55c'},
+    'ali': {'name': 'ali', 'color': '#b86a12', 'tag': '🛡️ ADMIN', 'img': None, 'bg': '#faa61a'},
+    'retlex': {'name': 'retlex', 'color': '#d83c3e', 'tag': '🛡️ ADMIN', 'img': 'vo/v10/av/retlex.png'},
 }
 # (author, time shown, lines, seconds between lines)
 GROUPS = [
-    ('ziko', '8:24 م', ['بقولكو', 'نعمل فيديو للسيرفر', 'وننزله على التيك', '#ديسكورد', '#كيوس', '#مود_السهر'], 0.55),
-    ('loli', '8:24 م', ['ههههههههههههههههه اخخخ'], 0.6),
-    ('hamo', '8:24 م', ['.', '.', '.', '.'], 0.3),
-    ('ziko', '8:29 م', ['هيتشهر في يومين', 'فجأة', 'السيرفر يبقى فيه مليون واحد', 'وإحنا نبقى مشاهير'], 0.65),
-    ('hamo', '8:29 م', ['وزيكو يخسر كل فلوسه في البورصة'], 0.6),
-    ('ziko', '8:29 م', ['؟؟؟؟؟؟؟؟؟؟؟؟؟؟؟؟؟؟؟؟؟؟؟؟'], 0.6),
-    ('loli', '8:29 م', ['وأنا أبقى أدمن وأطرده 😭😂💀'], 0.6),
+    ('oskar', '8:24 م', ['بقولكو', 'نعمل فيديو للسيرفر', 'وننزله على التيك', '#ديسكورد', '#كيوس', '#مود_السهر'], 0.5),
+    ('adam', '8:24 م', ['ههههههههههههههههه اخخخ'], 0.55),
+    ('7assep', '8:24 م', ['.', '.', '.', '.'], 0.3),
+    ('oskar', '8:29 م', ['هيتشهر في يومين', 'فجأة', 'السيرفر يبقى فيه مليون واحد', 'وإحنا نبقى مشاهير'], 0.6),
+    ('zatona', '8:29 م', ['وعلي يخسر كل فلوسه في البورصة'], 0.6),
+    ('ali', '8:29 م', ['؟؟؟؟؟؟؟؟؟؟؟؟؟؟؟؟؟؟؟؟؟؟'], 0.6),
+    ('retlex', '8:29 م', ['وأنا أبقى الديكتاتور وأطرده 😭😂💀'], 0.6),
 ]
 
 
@@ -30,8 +34,8 @@ def main():
     t, prev, items = 0.4, None, []
     for who, time, lines, step in GROUPS:
         if who != prev:
-            items.append({'kind': 'typing', 'who': who, 'at': round(t, 2), 'len': 0.7})
-            t += 0.8
+            items.append({'kind': 'typing', 'who': who, 'at': round(t, 2), 'len': 0.6})
+            t += 0.7
         items.append({'kind': 'head', 'who': who, 'time': time, 'at': round(t, 2)})
         for line in lines:
             items.append({'kind': 'line', 'who': who, 'text': line, 'at': round(t, 2)})
