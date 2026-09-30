@@ -4,6 +4,9 @@ import { CHAOS_GUILD_ID as TARGET_GUILD_ID, WELCOME_CHANNEL_ID } from '../config
 import { handleMemberJoinInvite } from '../services/inviteTrackerService.js';
 import { inviteWelcomeNotice } from '../services/inviteRewardService.js';
 
+// The waving emoji the owner asked for on every welcome (report #175).
+const WELCOME_EMOJI = '<a:smileywave:1537905313628291142>';
+
 export default {
   name: Events.GuildMemberAdd,
   once: false,
@@ -31,7 +34,7 @@ export default {
 
     try {
       await channel.send({
-        content: `welcome to chaos ${member}`,
+        content: `welcome to chaos ${member} ${WELCOME_EMOJI}`,
         allowedMentions: { users: [member.id] },
       });
       logger.info(`Sent chaos welcome for ${member.user.tag} in channel ${WELCOME_CHANNEL_ID}.`);

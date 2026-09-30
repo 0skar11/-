@@ -91,10 +91,12 @@ function modeTag(mode) {
  * The pinned panel of the store room: a card with the items, a small grey card with the main
  * commands under it, then the buy menu and the buttons.
  */
-export function buildStorePanel(guild, { settings = ccStoreSettings } = {}) {
+export function buildStorePanel(guild, { settings = ccStoreSettings, balance = null } = {}) {
     const mode = storeMode(settings, guild?.id);
     const items = storeCatalog(settings, { guildId: guild?.id });
-    const itemsEmbed = ccEmbed(`🛒 متجر ${CC.name}`, modeTag(mode), { fields: itemFields(items) });
+    // `متجر` shows the member's own balance on top (report #174); the pinned panel is for everyone, so none.
+    const top = [balance === null ? '' : `💰 رصيدك: ${formatCC(balance)}`, modeTag(mode)].filter(Boolean).join('\n');
+    const itemsEmbed = ccEmbed(`🛒 متجر ${CC.name}`, top, { fields: itemFields(items) });
     const commandsEmbed = ccEmbed('⌨️ الأوامر', '', {
         color: PANEL_COMMANDS_COLOR,
         fields: PANEL_COMMANDS.map(([name, value]) => ({ name, value, inline: true })),
