@@ -70,7 +70,8 @@ export function customRolePreviewEmbed(user, item, { name, color, iconUrl }) {
 
 export function customRoleReceiptEmbed(user, item, result) {
     const lines = [
-        `${user} اشترى **${item.emoji || ''} ${item.name}**: <@&${result.role.id}>`,
+        `${user} ${result.voucher ? 'عمل' : 'اشترى'} **${item.emoji || ''} ${item.name}**: <@&${result.role.id}>`,
+        ...(result.voucher ? ['🎟️ أول شهر ببلاش من صندوق الحظ.'] : []),
         '',
         `⏰ بتتجدد ${timestamp(result.record.paidUntil)} بـ ${formatCC(item.price)} من رصيدك.`,
         '🛑 `رولي الغي` يوقف التجديد (الرول بتفضل لآخر الشهر المدفوع).',

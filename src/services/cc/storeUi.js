@@ -4,7 +4,7 @@
 
 import { ActionRowBuilder, ButtonBuilder, ButtonStyle, StringSelectMenuBuilder } from 'discord.js';
 import { CC, ccEmbed, formatCC } from '../../config/cc.js';
-import { ccStoreItems, ccStoreDemoItems, ccStoreSettings, storeRoomSettings, customRoleSettings } from '../../config/store/ccStoreItems.js';
+import { ccStoreItems, ccStoreDemoItems, ccStoreSettings, storeRoomSettings, customRoleSettings, CUSTOM_ROLE_VOUCHER } from '../../config/store/ccStoreItems.js';
 import { isHomeGuild } from '../../config/homeGuild.js';
 import { storeMode, storeCatalog, buyItem } from './ccStoreService.js';
 import { forecastEmbed } from './bourseUi.js';
@@ -150,7 +150,7 @@ export function storeHelpEmbed(guildId = null) {
 
 /** `مخزني`: what the member owns. */
 export function inventoryEmbed(user, inventory = {}) {
-    const known = [...ccStoreItems, ...ccStoreDemoItems];
+    const known = [...ccStoreItems, ...ccStoreDemoItems, CUSTOM_ROLE_VOUCHER];
     const lines = Object.entries(inventory)
         .filter(([, count]) => Number(count) > 0)
         .map(([id, count]) => {
@@ -163,14 +163,18 @@ export function inventoryEmbed(user, inventory = {}) {
 }
 
 /** The "are you sure?" step before buying. The buttons only work for `userId`. */
-export function confirmPurchasePayload(item, quantity, userId, balance, mode = storeMode()) {
-    const cost = item.price * quantity;
+export function confirmPurchasePayload(item, quantity, userId, balance, mode = storeMode(), { vouchers = 0 } = {}) {
+    // A free month won in the luck box pays the first month of that custom role (report #179).
+    const free = item.id === CUSTOM_ROLE_VOUCHER.itemId && vouchers > 0;
+    const cost = free ? 0 : item.price * quantity;
     const after = balance - cost;
     const embed = ccEmbed(`${mode === 'trial' ? '🧪 ' : ''}تأكيد الشراء`, [
         `${itemLabel(item)}${quantity > 1 ? ` × ${quantity}` : ''}`,
         `> ${item.description || '—'}`,
         '',
-        `💵 السعر: ${formatCC(cost)}${item.type === 'custom_role' ? ` (كل ${customRoleSettings.days} يوم، بيتجدد من رصيدك)` : ''}`,
+        free
+            ? `🎟️ أول شهر **ببلاش** من صندوق الحظ، وبعدها ${formatCC(item.price)} كل ${customRoleSettings.days} يوم من رصيدك`
+            : `💵 السعر: ${formatCC(cost)}${item.type === 'custom_role' ? ` (كل ${customRoleSettings.days} يوم، بيتجدد من رصيدك)` : ''}`,
         `💰 رصيدك: ${formatCC(balance)}`,
         after >= 0 ? `📉 بعد الشراء: ${formatCC(after)}` : `❌ ناقصك ${formatCC(-after)}`,
         ...(mode === 'trial' ? ['', TRIAL_LINE] : []),
@@ -218,7 +222,8 @@ const timestamp = (ms) => `<t:${Math.floor(ms / 1000)}:R>`;
 /** What the purchase gave, as lines under the receipt (luck box prize, boost end, forecast). */
 function deliveryLines(result) {
     const lines = [];
-    if (result.prize?.cc) lines.push(`🎉 الصندوق طلعلك **${formatCC(result.prize.cc)}**!`);
+    if (result.prize?.cc) lines.push(`${result.prize.cc >= 50000 ? '💎 **جاكبوت!** ' : ''}🎉 الصندوق طلعلك **${formatCC(result.prize.cc)}**!`);
+    if (result.prize?.customRole) lines.push('🎟️ **نادرة!** الصندوق طلعلك **شهر ببلاش لرول مميزة باسمك**! اكتب `متجر` واختار 🎨 رول مميزة باسمك وقت ما تحب.');
     if (result.prize?.boost) lines.push('🎉 الصندوق طلعلك **بوست XP ×2** لمدة ساعة!');
     const { chat = 0, voice = 0 } = result.boostUntil || {};
     if (chat && voice && chat === voice) lines.push(`⚡ XP الشات والفويس ×2 لحد ما يخلص ${timestamp(chat)}`);

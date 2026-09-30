@@ -6,7 +6,7 @@
 // The items are for our server only (src/config/homeGuild.js); other servers keep the old samples
 // (ccStoreDemoItems), always as a preview.
 
-import { ccStoreItems, ccStoreDemoItems, ccStoreSettings, luckBoxPrizes } from '../../config/store/ccStoreItems.js';
+import { ccStoreItems, ccStoreDemoItems, ccStoreSettings, luckBoxPrizes, CUSTOM_ROLE_VOUCHER } from '../../config/store/ccStoreItems.js';
 import { isHomeGuild } from '../../config/homeGuild.js';
 import { getProfile, updateCCState } from './ccService.js';
 import { logger } from '../../utils/logger.js';
@@ -75,7 +75,7 @@ export function maxQuantityOf(item, settings = ccStoreSettings) {
     return SINGLE_TYPES.has(item.type) ? 1 : settings.maxQuantity;
 }
 
-/** Draws a luck box prize by weight: `{ cc }` or `{ boost }` (see luckBoxPrizes). */
+/** Draws a luck box prize by weight: `{ cc }`, `{ boost }` or `{ customRole }` (see luckBoxPrizes). */
 export function drawLuckBoxPrize(prizes = luckBoxPrizes, rng = Math.random) {
     const total = prizes.reduce((sum, prize) => sum + prize.weight, 0);
     let pick = rng() * total;
@@ -154,6 +154,7 @@ export async function buyItem(client, member, itemId, quantity = 1, { items = cc
             state.cc += prize.cc;
             state.stats.earned += prize.cc;
         }
+        if (prize?.customRole) state.inventory[CUSTOM_ROLE_VOUCHER.id] = (state.inventory[CUSTOM_ROLE_VOUCHER.id] || 0) + 1;
         return { ok: true };
     });
     if (!result.ok) return result;
@@ -163,6 +164,7 @@ export async function buyItem(client, member, itemId, quantity = 1, { items = cc
             state.cc += cost - (prize?.cc || 0);
             state.stats.spent -= cost;
             state.stats.earned -= prize?.cc || 0;
+            if (prize?.customRole) state.inventory[CUSTOM_ROLE_VOUCHER.id] = Math.max(0, (state.inventory[CUSTOM_ROLE_VOUCHER.id] || 0) - 1);
         }).catch((error) => logger.error(`[CC_STORE] Failed to refund ${member.id}`, error));
         return { ok: false, reason };
     };
