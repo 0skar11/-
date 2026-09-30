@@ -61,7 +61,10 @@ export default {
         const sub = interaction.options.getSubcommand();
         const { guildId, user } = interaction;
 
-        if (sub === 'prices') return reply({ embeds: [pricesEmbed(await getMarket(client, guildId))] });
+        if (sub === 'prices') {
+            const balance = isHomeGuild(guildId) ? (await getProfile(client, guildId, user.id)).cc : null;
+            return reply({ embeds: [pricesEmbed(await getMarket(client, guildId), { balance })] });
+        }
         if (sub === 'holdings') {
             const balance = isHomeGuild(guildId) ? (await getProfile(client, guildId, user.id)).cc : null;
             return reply({ embeds: [holdingsEmbed(user, await getHoldings(client, guildId, user.id), { balance })] });
