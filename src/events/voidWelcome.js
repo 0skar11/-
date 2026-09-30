@@ -3,9 +3,7 @@ import { logger } from '../utils/logger.js';
 import { CHAOS_GUILD_ID as TARGET_GUILD_ID, WELCOME_CHANNEL_ID } from '../config/inviteRewards.js';
 import { handleMemberJoinInvite } from '../services/inviteTrackerService.js';
 import { inviteWelcomeNotice } from '../services/inviteRewardService.js';
-
-// The waving emoji the owner asked for on every welcome (report #175).
-const WELCOME_EMOJI = '<a:smileywave:1537905313628291142>';
+import { getWelcomeEmoji } from '../services/welcomeEmojiService.js';
 
 export default {
   name: Events.GuildMemberAdd,
@@ -34,7 +32,8 @@ export default {
 
     try {
       await channel.send({
-        content: `welcome to chaos ${member} ${WELCOME_EMOJI}`,
+        // The waving emoji (report #175), the bot's own copy so it shows (welcomeEmojiService.js).
+        content: `welcome to chaos ${member} ${getWelcomeEmoji(member.client)}`,
         allowedMentions: { users: [member.id] },
       });
       logger.info(`Sent chaos welcome for ${member.user.tag} in channel ${WELCOME_CHANNEL_ID}.`);
