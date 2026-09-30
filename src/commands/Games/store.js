@@ -1,6 +1,6 @@
 import { SlashCommandBuilder } from 'discord.js';
 import { CC } from '../../config/cc.js';
-import { ccStoreSettings } from '../../config/store/ccStoreItems.js';
+import { ccStoreSettings, voucherFor } from '../../config/store/ccStoreItems.js';
 import { getProfile } from '../../services/cc/ccService.js';
 import { storeCatalog, findStoreItem, storeMode, maxQuantityOf } from '../../services/cc/ccStoreService.js';
 import { buildStorePanel, inventoryEmbed, confirmPurchasePayload, purchaseFailureText } from '../../services/cc/storeUi.js';
@@ -61,7 +61,7 @@ export default {
         if (quantity < 1 || quantity > maxQuantityOf(item)) {
             return reply({ content: purchaseFailureText({ reason: 'bad_quantity' }) });
         }
-        const { cc } = await getProfile(client, interaction.guildId, interaction.user.id);
-        return reply(confirmPurchasePayload(item, quantity, interaction.user.id, cc, mode));
+        const { cc, inventory } = await getProfile(client, interaction.guildId, interaction.user.id);
+        return reply(confirmPurchasePayload(item, quantity, interaction.user.id, cc, mode, { vouchers: inventory?.[voucherFor(item.id)?.id] || 0 }));
     },
 };

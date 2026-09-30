@@ -6,7 +6,7 @@
 // The items are for our server only (src/config/homeGuild.js); other servers keep the old samples
 // (ccStoreDemoItems), always as a preview.
 
-import { ccStoreItems, ccStoreDemoItems, ccStoreSettings, luckBoxPrizes } from '../../config/store/ccStoreItems.js';
+import { ccStoreItems, ccStoreDemoItems, ccStoreSettings, luckBoxPrizes, voucherFor } from '../../config/store/ccStoreItems.js';
 import { isHomeGuild } from '../../config/homeGuild.js';
 import { getProfile, updateCCState } from './ccService.js';
 import { logger } from '../../utils/logger.js';
@@ -75,7 +75,7 @@ export function maxQuantityOf(item, settings = ccStoreSettings) {
     return SINGLE_TYPES.has(item.type) ? 1 : settings.maxQuantity;
 }
 
-/** Draws a luck box prize by weight: `{ cc }` or `{ boost }` (see luckBoxPrizes). */
+/** Draws a luck box prize by weight (see luckBoxPrizes). */
 export function drawLuckBoxPrize(prizes = luckBoxPrizes, rng = Math.random) {
     const total = prizes.reduce((sum, prize) => sum + prize.weight, 0);
     let pick = rng() * total;
@@ -84,6 +84,23 @@ export function drawLuckBoxPrize(prizes = luckBoxPrizes, rng = Math.random) {
         if (pick < 0) return prize;
     }
     return prizes[prizes.length - 1];
+}
+
+/**
+ * Opens a luck box: the drawn prize, plus a second one for a free box prize (never another free box).
+ * A role prize carries the `roleId` to give, or turns into `cc: fallbackCC` when the member already has
+ * the role (or it's missing).
+ */
+async function drawLuckBox(client, member, items, rng) {
+    const first = drawLuckBoxPrize(luckBoxPrizes, rng);
+    const drawn = first.extraBox ? [first, drawLuckBoxPrize(luckBoxPrizes.filter((prize) => !prize.extraBox), rng)] : [first];
+    return Promise.all(drawn.map(async (prize) => {
+        if (!prize.role) return prize;
+        const roleItem = getStoreItem(prize.role, items);
+        const roleId = roleItem && await itemRoleId(client, member.guild, roleItem).catch(() => null);
+        if (!roleId || member.roles.cache.has(roleId)) return { ...prize, cc: prize.fallbackCC, hadRole: true };
+        return { ...prize, roleId };
+    }));
 }
 
 /** The role a 'role' item gives: its `roleId`, or the trader role for `roleKey: 'trader'`. */
@@ -115,7 +132,8 @@ export function findStoreItem(query, items) {
  * Buys `quantity` of an item for `member`. Returns `{ ok: true, item, quantity, cost, balance, ... }` or
  * `{ ok: false, reason }` with reason one of: closed, not_found, bad_quantity, owned, max_owned, no_cc,
  * role_failed, role_missing, use_form (custom roles are bought through their form).
- * A luck box adds `prize` (and `boostUntil` for a boost prize), a boost `boostUntil`, a forecast `forecast`.
+ * A luck box adds `prize` (and `bonusPrize` for a free second box, `boostUntil` for a boost prize, `forecast`
+ * for a forecast prize), a boost `boostUntil`, a forecast `forecast`.
  */
 export async function buyItem(client, member, itemId, quantity = 1, { items = ccStoreItems, demoItems = ccStoreDemoItems, settings = ccStoreSettings, rng = Math.random } = {}) {
     const mode = storeMode(settings, member?.guild?.id);
@@ -142,7 +160,9 @@ export async function buyItem(client, member, itemId, quantity = 1, { items = cc
     }
 
     const cost = item.price * quantity;
-    const prize = item.type === 'luckbox' ? drawLuckBoxPrize(luckBoxPrizes, rng) : null;
+    const prizes = item.type === 'luckbox' ? await drawLuckBox(client, member, items, rng) : [];
+    const prizeCC = prizes.reduce((sum, prize) => sum + (prize.cc || 0), 0);
+    const vouchers = prizes.map((prize) => voucherFor(prize.customRole)?.id).filter(Boolean);
     const result = await updateCCState(client, guildId, member.id, (state) => {
         const owned = state.inventory[item.id] || 0;
         if (item.maxOwned && owned + quantity > item.maxOwned) return { ok: false, reason: 'max_owned', skipSave: true };
@@ -150,19 +170,19 @@ export async function buyItem(client, member, itemId, quantity = 1, { items = cc
         state.cc -= cost;
         state.stats.spent += cost;
         if (item.type === 'item') state.inventory[item.id] = owned + quantity;
-        if (prize?.cc) {
-            state.cc += prize.cc;
-            state.stats.earned += prize.cc;
-        }
+        state.cc += prizeCC;
+        state.stats.earned += prizeCC;
+        for (const id of vouchers) state.inventory[id] = (state.inventory[id] || 0) + 1;
         return { ok: true };
     });
     if (!result.ok) return result;
 
     const refund = async (reason) => {
         await updateCCState(client, guildId, member.id, (state) => {
-            state.cc += cost - (prize?.cc || 0);
+            state.cc += cost - prizeCC;
             state.stats.spent -= cost;
-            state.stats.earned -= prize?.cc || 0;
+            state.stats.earned -= prizeCC;
+            for (const id of vouchers) state.inventory[id] = Math.max(0, (state.inventory[id] || 0) - 1);
         }).catch((error) => logger.error(`[CC_STORE] Failed to refund ${member.id}`, error));
         return { ok: false, reason };
     };
@@ -172,17 +192,21 @@ export async function buyItem(client, member, itemId, quantity = 1, { items = cc
         if (item.type === 'role') await member.roles.add(roleId, `CC store: ${item.name}`);
         if (item.type === 'boost') extra.boostUntil = await addXpBoost(client, guildId, member.id, item.sources, item.minutes * quantity);
         if (item.type === 'forecast') extra.forecast = await forecastMarket(client, guildId);
-        if (prize) {
-            extra.prize = prize;
-            const boostItem = prize.boost && getStoreItem(prize.boost, items);
-            if (boostItem) extra.boostUntil = await addXpBoost(client, guildId, member.id, boostItem.sources, boostItem.minutes);
+        if (prizes.length) {
+            [extra.prize, extra.bonusPrize] = prizes;
+            for (const prize of prizes) {
+                const boostItem = prize.boost && getStoreItem(prize.boost, items);
+                if (boostItem) extra.boostUntil = await addXpBoost(client, guildId, member.id, boostItem.sources, boostItem.minutes);
+                if (prize.forecast) extra.forecast = await forecastMarket(client, guildId);
+                if (prize.roleId) await member.roles.add(prize.roleId, 'CC store: luck box prize');
+            }
         }
     } catch (error) {
         logger.error(`[CC_STORE] Could not deliver ${item.id} to ${member.id}, refunding`, error);
         return refund(item.type === 'role' ? 'role_failed' : 'deliver_failed');
     }
 
-    logger.info('[CC_STORE] Purchase', { guildId, userId: member.id, itemId: item.id, quantity, cost, prize: prize ? JSON.stringify(prize) : undefined });
+    logger.info('[CC_STORE] Purchase', { guildId, userId: member.id, itemId: item.id, quantity, cost, prize: prizes.length ? JSON.stringify(prizes) : undefined });
     const balance = result.balance;
     return { ok: true, item, quantity, cost, balance, ...extra };
 }

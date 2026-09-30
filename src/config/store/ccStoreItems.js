@@ -23,7 +23,7 @@
 // (ccStoreService.js sorts them; this list is kept in the same order).
 export const ccStoreItems = [
     { id: 'xp_boost', name: 'بوست XP ×2', emoji: '⚡', description: 'ضعف XP الشات لمدة ساعة', price: 1000, type: 'boost', sources: ['chat'], minutes: 60 },
-    { id: 'luck_box', name: 'صندوق حظ', emoji: '🎁', description: 'جواه جايزة عشوائية: CC (لحد 7,500) أو بوست XP', price: 1500, type: 'luckbox' },
+    { id: 'luck_box', name: 'صندوق حظ', emoji: '🎁', description: 'جواه جايزة عشوائية: CC (لحد 50,000)، بوست، تنبؤ بورصة، رول تاجر، صندوق تاني ببلاش، أو نادراً شهر ببلاش لرول مميزة', price: 1500, type: 'luckbox' },
     { id: 'level_boost', name: 'لفل ×2', emoji: '🚀', description: 'ضعف XP الشات والفويس لمدة ساعة', price: 1500, type: 'boost', sources: ['chat', 'voice'], minutes: 60 },
     { id: 'trader_role', name: 'رول تاجر', emoji: '💼', description: 'رول التاجر، فوق رول Level 100', price: 2500, type: 'role', roleKey: 'trader' },
     { id: 'bourse_forecast', name: 'تنبؤ البورصة', emoji: '🔮', description: 'تعرف سعر كل أصل في البورصة الساعة الجاية بالظبط، بيوصلك في الخاص', price: 6500, type: 'forecast' },
@@ -40,19 +40,45 @@ export const ccStoreDemoItems = [
     { id: 'demo_box', name: 'صندوق حظ', emoji: '🎁', description: 'جواه جايزة عشوائية', price: 300, type: 'item', maxOwned: 10 },
 ];
 
-// The luck box: one prize is drawn by `weight` (the chance is weight / total). On average it gives back
-// a little less than its price (about 1,235 CC, plus an XP boost 11% of the time, for 1,500), so buying
-// boxes doesn't create CC.
-// A prize is `{ cc }` or `{ boost: <id of a 'boost' item> }`.
+// The luck box: one prize is drawn by `weight` (the chance is weight / total, here out of 1,000).
+// Rebalanced at the owner's request (report #179), then given more kinds of prizes. On average it gives
+// back about 1,300 CC (counting the trader role fallback and the free second box), less than its 1,500
+// price, so buying boxes doesn't create CC. A prize is one of:
+//   { cc }                        that much CC
+//   { boost: <'boost' item id> }  that boost, as if bought
+//   { forecast: true }            the bourse forecast, as if bought (sent in DM)
+//   { role: <'role' item id> }    that role; a member who already has it gets `fallbackCC` instead
+//   { extraBox: true }            a second box opened right away, for free (never another free box)
+//   { customRole: <'custom_role' item id> }  one free month of that role, kept in the inventory and used
+//                                 from the store (CUSTOM_ROLE_VOUCHERS below)
 export const luckBoxPrizes = [
-    { cc: 500, weight: 25 },
-    { cc: 1000, weight: 25 },
-    { cc: 1500, weight: 20 },
-    { cc: 2000, weight: 10 },
-    { cc: 3000, weight: 7 },
-    { cc: 7500, weight: 2 },
-    { boost: 'xp_boost', weight: 11 },
+    { cc: 500, weight: 250 },
+    { cc: 1000, weight: 210 },
+    { cc: 1500, weight: 150 },
+    { cc: 2000, weight: 80 },
+    { cc: 3000, weight: 45 },
+    { cc: 5000, weight: 25 },
+    { cc: 7500, weight: 12 },
+    { cc: 10000, weight: 6 },
+    { cc: 25000, weight: 2 },
+    { cc: 50000, weight: 1 },
+    { boost: 'xp_boost', weight: 100 },
+    { boost: 'level_boost', weight: 60 },
+    { role: 'trader_role', fallbackCC: 2500, weight: 20 },
+    { extraBox: true, weight: 19 },
+    { forecast: true, weight: 15 },
+    { customRole: 'custom_role', weight: 4 },
+    { customRole: 'friends_role', weight: 1 },
 ];
+
+// The inventory entry of a free custom role month won in the luck box, one per custom role item.
+export const CUSTOM_ROLE_VOUCHERS = {
+    custom_role: { id: 'custom_role_voucher', itemId: 'custom_role', name: 'شهر مجاني لرول مميزة باسمك', emoji: '🎟️' },
+    friends_role: { id: 'friends_role_voucher', itemId: 'friends_role', name: 'شهر مجاني لرول ليك ولصحابك', emoji: '🎫' },
+};
+export const CUSTOM_ROLE_VOUCHER = CUSTOM_ROLE_VOUCHERS.custom_role;
+/** The free month voucher of a custom role item, or null. */
+export const voucherFor = (itemId) => CUSTOM_ROLE_VOUCHERS[itemId] || null;
 
 // Custom roles (type 'custom_role'): paid every `days` days from the leader's CC. When the leader can't
 // pay, the role stays `graceDays` more days; then the bot deletes it. `رولي الغي` stops the renewal and

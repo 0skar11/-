@@ -16,16 +16,28 @@
 // Saved per guild at `guild:<id>:customroles`: `{ <roleId>: { roleId, kind, itemId, price, name,
 // leaderId, members: [userId], createdAt, paidUntil, cancelled, graceUntil, remindedFor } }`.
 
-import { customRoleSettings } from '../../config/store/ccStoreItems.js';
+import { customRoleSettings, CUSTOM_ROLE_VOUCHER, voucherFor } from '../../config/store/ccStoreItems.js';
 import { CC, formatCC } from '../../config/cc.js';
 import { getCustomRolesKey } from '../../utils/database/keys.js';
 import { Mutex } from '../../utils/mutex.js';
 import { logger } from '../../utils/logger.js';
-import { spendCC, grantCC, getProfile } from './ccService.js';
+import { spendCC, grantCC, getProfile, updateCCState } from './ccService.js';
 import { getTraderRole } from './traderRoleService.js';
 import { isHomeGuild } from '../../config/homeGuild.js';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
+
+/** Takes (`change` -1) or gives back (+1) a free custom role month. Returns true when one was taken/given. */
+export async function useVoucher(client, guildId, userId, change, voucherId = CUSTOM_ROLE_VOUCHER.id) {
+    const result = await updateCCState(client, guildId, userId, (state) => {
+        const held = state.inventory[voucherId] || 0;
+        if (held + change < 0) return { ok: false, skipSave: true };
+        if (held + change === 0) delete state.inventory[voucherId];
+        else state.inventory[voucherId] = held + change;
+        return { ok: true };
+    });
+    return Boolean(result?.ok);
+}
 
 export const COLOR_NAMES = {
     احمر: 0xe74c3c, أحمر: 0xe74c3c, ازرق: 0x3498db, أزرق: 0x3498db, اخضر: 0x2ecc71, أخضر: 0x2ecc71,
@@ -126,9 +138,16 @@ export async function buyCustomRole(client, member, item, { name, color, iconUrl
     const checkedColor = parseRoleColor(color);
     if (!checkedColor.ok) return { ok: false, reason: 'bad_color' };
 
-    const paid = await spendCC(client, guild.id, member.id, item.price, `custom role ${item.id}`);
+    // A free month won in the luck box (report #179) pays the first month instead of CC.
+    const voucherId = voucherFor(item.id)?.id;
+    const voucher = Boolean(voucherId) && await useVoucher(client, guild.id, member.id, -1, voucherId);
+    const paid = voucher
+        ? { ok: true, balance: (await getProfile(client, guild.id, member.id)).cc, voucher: true }
+        : await spendCC(client, guild.id, member.id, item.price, `custom role ${item.id}`);
     if (!paid.ok) return { ok: false, reason: 'no_cc', balance: paid.balance };
-    const refund = () => grantCC(client, guild.id, member.id, item.price, { source: 'store', reason: 'custom role refund' })
+    const refund = () => (voucher
+        ? useVoucher(client, guild.id, member.id, 1, voucherId)
+        : grantCC(client, guild.id, member.id, item.price, { source: 'store', reason: 'custom role refund' }))
         .catch((error) => logger.error(`[CUSTOM_ROLE] Failed to refund ${member.id}`, error));
 
     const wantsIcon = Boolean(iconUrl) && canUseRoleIcons(guild);
@@ -192,7 +211,7 @@ export async function buyCustomRole(client, member, item, { name, color, iconUrl
         roles[role.id] = record;
     });
     logger.info('[CUSTOM_ROLE] Bought', { guildId: guild.id, userId: member.id, roleId: role.id, kind: item.kind, price: item.price });
-    return { ok: true, role, record, iconSkipped, balance: paid.balance };
+    return { ok: true, role, record, iconSkipped, balance: paid.balance, voucher: Boolean(voucher) };
 }
 
 /**

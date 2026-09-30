@@ -4,7 +4,7 @@
 
 import { ActionRowBuilder, ButtonBuilder, ButtonStyle, StringSelectMenuBuilder } from 'discord.js';
 import { CC, ccEmbed, formatCC } from '../../config/cc.js';
-import { ccStoreItems, ccStoreDemoItems, ccStoreSettings, storeRoomSettings, customRoleSettings } from '../../config/store/ccStoreItems.js';
+import { ccStoreItems, ccStoreDemoItems, ccStoreSettings, storeRoomSettings, customRoleSettings, CUSTOM_ROLE_VOUCHERS, voucherFor } from '../../config/store/ccStoreItems.js';
 import { isHomeGuild } from '../../config/homeGuild.js';
 import { storeMode, storeCatalog, buyItem } from './ccStoreService.js';
 import { forecastEmbed } from './bourseUi.js';
@@ -150,7 +150,7 @@ export function storeHelpEmbed(guildId = null) {
 
 /** `مخزني`: what the member owns. */
 export function inventoryEmbed(user, inventory = {}) {
-    const known = [...ccStoreItems, ...ccStoreDemoItems];
+    const known = [...ccStoreItems, ...ccStoreDemoItems, ...Object.values(CUSTOM_ROLE_VOUCHERS)];
     const lines = Object.entries(inventory)
         .filter(([, count]) => Number(count) > 0)
         .map(([id, count]) => {
@@ -163,14 +163,18 @@ export function inventoryEmbed(user, inventory = {}) {
 }
 
 /** The "are you sure?" step before buying. The buttons only work for `userId`. */
-export function confirmPurchasePayload(item, quantity, userId, balance, mode = storeMode()) {
-    const cost = item.price * quantity;
+export function confirmPurchasePayload(item, quantity, userId, balance, mode = storeMode(), { vouchers = 0 } = {}) {
+    // A free month won in the luck box pays the first month of that custom role (report #179).
+    const free = Boolean(voucherFor(item.id)) && vouchers > 0;
+    const cost = free ? 0 : item.price * quantity;
     const after = balance - cost;
     const embed = ccEmbed(`${mode === 'trial' ? '🧪 ' : ''}تأكيد الشراء`, [
         `${itemLabel(item)}${quantity > 1 ? ` × ${quantity}` : ''}`,
         `> ${item.description || '—'}`,
         '',
-        `💵 السعر: ${formatCC(cost)}${item.type === 'custom_role' ? ` (كل ${customRoleSettings.days} يوم، بيتجدد من رصيدك)` : ''}`,
+        free
+            ? `${voucherFor(item.id).emoji} أول شهر **ببلاش** من صندوق الحظ، وبعدها ${formatCC(item.price)} كل ${customRoleSettings.days} يوم من رصيدك`
+            : `💵 السعر: ${formatCC(cost)}${item.type === 'custom_role' ? ` (كل ${customRoleSettings.days} يوم، بيتجدد من رصيدك)` : ''}`,
         `💰 رصيدك: ${formatCC(balance)}`,
         after >= 0 ? `📉 بعد الشراء: ${formatCC(after)}` : `❌ ناقصك ${formatCC(-after)}`,
         ...(mode === 'trial' ? ['', TRIAL_LINE] : []),
@@ -215,11 +219,27 @@ export function purchaseFailureText(result) {
 
 const timestamp = (ms) => `<t:${Math.floor(ms / 1000)}:R>`;
 
+/** One luck box prize, as a line under the receipt. */
+function prizeLine(prize) {
+    const item = (id) => ccStoreItems.find((entry) => entry.id === id);
+    if (prize.extraBox) return '🎁 الصندوق طلعلك **صندوق تاني ببلاش**! اتفتح على طول:';
+    if (prize.hadRole) return `🎉 الصندوق طلعلك **${item(prize.role)?.name || 'رول'}**، وهي معاك أصلاً، فخدت بدالها **${formatCC(prize.cc)}**!`;
+    if (prize.roleId) return `${item(prize.role)?.emoji || '🎉'} الصندوق طلعلك **${item(prize.role)?.name || 'رول'}**، واتضافتلك!`;
+    if (prize.cc) return `${prize.cc >= 25000 ? '💎 **جاكبوت!** ' : ''}🎉 الصندوق طلعلك **${formatCC(prize.cc)}**!`;
+    if (prize.customRole) {
+        const role = item(prize.customRole);
+        return `${voucherFor(prize.customRole)?.emoji || '🎟️'} **نادرة!** الصندوق طلعلك **شهر ببلاش لـ${role?.name || 'رول مميزة'}**! اكتب \`متجر\` واختار ${role?.emoji || ''} ${role?.name || ''} وقت ما تحب.`;
+    }
+    if (prize.boost) return `🎉 الصندوق طلعلك **${item(prize.boost)?.name || 'بوست'}** لمدة ساعة!`;
+    if (prize.forecast) return '🔮 الصندوق طلعلك **تنبؤ البورصة**!';
+    return '🎉 الصندوق طلعلك جايزة!';
+}
+
 /** What the purchase gave, as lines under the receipt (luck box prize, boost end, forecast). */
 function deliveryLines(result) {
     const lines = [];
-    if (result.prize?.cc) lines.push(`🎉 الصندوق طلعلك **${formatCC(result.prize.cc)}**!`);
-    if (result.prize?.boost) lines.push('🎉 الصندوق طلعلك **بوست XP ×2** لمدة ساعة!');
+    if (result.prize) lines.push(prizeLine(result.prize));
+    if (result.bonusPrize) lines.push(`↪️ ${prizeLine(result.bonusPrize)}`);
     const { chat = 0, voice = 0 } = result.boostUntil || {};
     if (chat && voice && chat === voice) lines.push(`⚡ XP الشات والفويس ×2 لحد ما يخلص ${timestamp(chat)}`);
     else {

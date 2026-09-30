@@ -1,6 +1,6 @@
 import { test, describe, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
-import { ccStoreItems, luckBoxPrizes, traderRoleSettings, customRoleSettings } from '../src/config/store/ccStoreItems.js';
+import { ccStoreItems, luckBoxPrizes, traderRoleSettings, customRoleSettings, CUSTOM_ROLE_VOUCHER, voucherFor } from '../src/config/store/ccStoreItems.js';
 import { bourseAssets } from '../src/config/store/bourse.js';
 import { buyItem, drawLuckBoxPrize, listStoreItems, maxQuantityOf, storeMode } from '../src/services/cc/ccStoreService.js';
 import { getProfile } from '../src/services/cc/ccService.js';
@@ -18,6 +18,7 @@ import { LEVEL_TIERS } from '../src/services/leveling/levelTierRoles.js';
 import { HOME_GUILD_ID, isHomeGuild } from '../src/config/homeGuild.js';
 import { ccStoreDemoItems } from '../src/config/store/ccStoreItems.js';
 import { storeCatalog } from '../src/services/cc/ccStoreService.js';
+import { confirmPurchasePayload } from '../src/services/cc/storeUi.js';
 
 const GUILD_ID = HOME_GUILD_ID;
 const MEMBER = '200000000000000077';
@@ -112,26 +113,123 @@ describe('our server only: shared code', () => {
 });
 
 describe('luck box', () => {
-    test('gives back less CC than it costs on average', () => {
+    test('gives back less CC than it costs on average, and every prize is valid', () => {
         const total = luckBoxPrizes.reduce((sum, prize) => sum + prize.weight, 0);
-        const averageCC = luckBoxPrizes.reduce((sum, prize) => sum + (prize.cc || 0) * prize.weight, 0) / total;
+        assert.equal(total, 1000);
+        const value = (prize) => prize.cc || prize.fallbackCC || 0;
+        const others = luckBoxPrizes.filter((prize) => !prize.extraBox);
+        const othersTotal = others.reduce((sum, prize) => sum + prize.weight, 0);
+        const perBox = others.reduce((sum, prize) => sum + value(prize) * prize.weight, 0);
+        const extraBox = luckBoxPrizes.find((prize) => prize.extraBox).weight;
+        // Counting a role prize as its fallback CC, and the free second box.
+        const averageCC = perBox / total + (extraBox / total) * (perBox / othersTotal);
         assert.ok(averageCC < byId('luck_box').price, String(averageCC));
-        assert.ok(luckBoxPrizes.every((prize) => prize.cc || byId(prize.boost)?.type === 'boost'));
+        assert.ok(luckBoxPrizes.every((prize) => prize.cc || prize.forecast || prize.extraBox
+            || byId(prize.boost)?.type === 'boost' || byId(prize.role)?.type === 'role' || byId(prize.customRole)?.type === 'custom_role'));
+        // The rarest: 50,000 CC and a free friends role month (1 in 1000 each), a free custom role month (4 in 1000).
+        assert.equal(luckBoxPrizes.find((prize) => prize.cc === 50_000).weight, 1);
+        assert.equal(luckBoxPrizes.find((prize) => prize.customRole === 'friends_role').weight, 1);
+        assert.equal(luckBoxPrizes.find((prize) => prize.customRole === 'custom_role').weight, 4);
     });
 
     test('draws prizes by weight', () => {
         assert.deepEqual(drawLuckBoxPrize(luckBoxPrizes, () => 0), luckBoxPrizes[0]);
-        assert.deepEqual(drawLuckBoxPrize(luckBoxPrizes, () => 0.999), luckBoxPrizes[luckBoxPrizes.length - 1]);
-        assert.deepEqual(drawLuckBoxPrize(luckBoxPrizes, () => 0.87), { cc: 7500, weight: 2 });
+        assert.deepEqual(drawLuckBoxPrize(luckBoxPrizes, () => 0.9995), luckBoxPrizes[luckBoxPrizes.length - 1]);
+        assert.deepEqual(drawLuckBoxPrize(luckBoxPrizes, () => 0.7805), { cc: 50000, weight: 1 });
+        assert.deepEqual(drawLuckBoxPrize(luckBoxPrizes, () => 0.997), { customRole: 'custom_role', weight: 4 });
+        assert.deepEqual(drawLuckBoxPrize(luckBoxPrizes, () => 0.765), { cc: 7500, weight: 12 });
     });
 
     test('an open store takes the price and pays the prize', async () => {
         const client = fakeClient();
         client.store.set(`guild:${GUILD_ID}:economy:${MEMBER}`, { cc: 2000 });
-        const result = await buyItem(client, fakeMember(), 'luck_box', 1, { settings: OPEN, rng: () => 0.87 });
+        const result = await buyItem(client, fakeMember(), 'luck_box', 1, { settings: OPEN, rng: () => 0.765 });
         assert.equal(result.ok, true);
         assert.equal(result.prize.cc, 7500);
         assert.equal((await getProfile(client, GUILD_ID, MEMBER)).cc, 2000 - 1500 + 7500);
+    });
+
+    test('the trader role prize gives the role, or its price in CC to a member who has it', async () => {
+        const client = fakeClient();
+        client.store.set(`guild:${GUILD_ID}:economy:${MEMBER}`, { cc: 3000 });
+        const roles = new Map([['400000000000000001', { id: '400000000000000001', name: traderRoleSettings.name, managed: false }]]);
+        const member = fakeMember(roles);
+        const won = await buyItem(client, member, 'luck_box', 1, { settings: OPEN, rng: () => 0.95 });
+        assert.equal(won.prize.role, 'trader_role');
+        assert.deepEqual(member.given, ['400000000000000001']);
+        assert.equal((await getProfile(client, GUILD_ID, MEMBER)).cc, 1500);
+
+        member.roles.cache.set('400000000000000001', roles.get('400000000000000001'));
+        const again = await buyItem(client, member, 'luck_box', 1, { settings: OPEN, rng: () => 0.95 });
+        assert.equal(again.prize.hadRole, true);
+        assert.equal(member.given.length, 1);
+        assert.equal((await getProfile(client, GUILD_ID, MEMBER)).cc, 1500 - 1500 + 2500);
+    });
+
+    test('a free box prize opens a second box, never another free box', async () => {
+        const client = fakeClient();
+        client.store.set(`guild:${GUILD_ID}:economy:${MEMBER}`, { cc: 2000 });
+        const draws = [0.97, 0];
+        const result = await buyItem(client, fakeMember(), 'luck_box', 1, { settings: OPEN, rng: () => draws.shift() });
+        assert.equal(result.prize.extraBox, true);
+        assert.equal(result.bonusPrize.cc, 500);
+        assert.equal((await getProfile(client, GUILD_ID, MEMBER)).cc, 2000 - 1500 + 500);
+        // Whatever the second draw is, it's never another free box.
+        for (let i = 0; i < 100; i += 1) {
+            client.store.set(`guild:${GUILD_ID}:economy:${MEMBER}`, { cc: 2000 });
+            const seq = [0.97, i / 100];
+            const again = await buyItem(client, fakeMember(), 'luck_box', 1, { settings: OPEN, rng: () => seq.shift() });
+            assert.equal(again.prize.extraBox, true);
+            assert.ok(again.bonusPrize && !again.bonusPrize.extraBox, String(i));
+        }
+    });
+
+    test('the forecast prize comes with the forecast, and a boost prize with its boost', async () => {
+        const client = fakeClient();
+        client.store.set(`guild:${GUILD_ID}:economy:${MEMBER}`, { cc: 4000 });
+        const forecast = await buyItem(client, fakeMember(), 'luck_box', 1, { settings: OPEN, rng: () => 0.99 });
+        assert.equal(forecast.prize.forecast, true);
+        assert.ok(forecast.forecast);
+        const boost = await buyItem(client, fakeMember(), 'luck_box', 1, { settings: OPEN, rng: () => 0.9 });
+        assert.equal(boost.prize.boost, 'level_boost');
+        assert.ok(boost.boostUntil.chat > Date.now() && boost.boostUntil.voice > Date.now());
+    });
+
+    test('the rarest prize is a free month of the friends role', async () => {
+        const client = fakeClient();
+        client.store.set(`guild:${GUILD_ID}:economy:${MEMBER}`, { cc: 2000 });
+        const result = await buyItem(client, fakeMember(), 'luck_box', 1, { settings: OPEN, rng: () => 0.9995 });
+        assert.equal(result.prize.customRole, 'friends_role');
+        const profile = await getProfile(client, GUILD_ID, MEMBER);
+        assert.equal(profile.inventory[voucherFor('friends_role').id], 1);
+        const confirm = confirmPurchasePayload(byId('friends_role'), 1, MEMBER, profile.cc, 'open', { vouchers: 1 });
+        assert.equal(confirm.components[0].toJSON().components[0].disabled, false);
+        assert.ok(JSON.stringify(confirm.embeds).includes('ببلاش'));
+    });
+
+    test('the rare custom role prize gives a voucher for a free first month', async () => {
+        const client = fakeClient();
+        client.store.set(`guild:${GUILD_ID}:economy:${MEMBER}`, { cc: 2000 });
+        const result = await buyItem(client, fakeMember(), 'luck_box', 1, { settings: OPEN, rng: () => 0.997 });
+        assert.equal(result.prize.customRole, 'custom_role');
+        const profile = await getProfile(client, GUILD_ID, MEMBER);
+        assert.equal(profile.cc, 500);
+        assert.equal(profile.inventory[CUSTOM_ROLE_VOUCHER.id], 1);
+
+        const confirm = confirmPurchasePayload(byId('custom_role'), 1, MEMBER, profile.cc, 'open', { vouchers: 1 });
+        assert.equal(confirm.components[0].toJSON().components[0].disabled, false);
+        assert.ok(JSON.stringify(confirm.embeds).includes('ببلاش'));
+    });
+
+    test('a luck box in another server is only previewed and gives nothing', async () => {
+        const client = fakeClient();
+        const other = '100000000000000099';
+        client.store.set(`guild:${other}:economy:${MEMBER}`, { cc: 2000 });
+        const member = { ...fakeMember(), guild: { id: other, roles: { cache: new Map(), fetch: async () => null } } };
+        await buyItem(client, member, 'luck_box', 1, { settings: OPEN, rng: () => 0.7805 });
+        const profile = await getProfile(client, other, MEMBER);
+        assert.equal(profile.cc, 2000);
+        assert.equal(profile.inventory?.[CUSTOM_ROLE_VOUCHER.id] || 0, 0);
     });
 });
 
@@ -410,6 +508,41 @@ describe('custom roles', () => {
         assert.equal((await sweepGuildCustomRoles(client, guild, { now: due + 3 * DAY })).ended, 1);
         assert.equal(cache.size, 0);
         assert.deepEqual(await listCustomRoles(client, GUILD_ID), []);
+    });
+
+    test('a luck box voucher pays the first month of a custom role instead of CC, and comes back if it fails', async () => {
+        const client = fakeClient();
+        client.users = { fetch: async () => ({ send: async () => {} }) };
+        client.store.set(`guild:${GUILD_ID}:economy:${MEMBER}`, { cc: 100, ccInventory: { [CUSTOM_ROLE_VOUCHER.id]: 1 } });
+        const cache = new Map();
+        let fail = true;
+        const guild = {
+            id: GUILD_ID, name: 'CHAOS', features: [],
+            roles: {
+                cache,
+                fetch: async (id) => (id ? cache.get(id) || null : cache),
+                create: async (options) => {
+                    if (fail) throw new Error('no perms');
+                    const role = { id: '500000000000000009', name: options.name, position: 1, setPosition: async () => role, delete: async () => {} };
+                    cache.set(role.id, role);
+                    return role;
+                },
+            },
+            members: { fetch: async (id) => ({ id, roles: { add: async () => {}, remove: async () => {} } }) },
+        };
+        const member = { id: MEMBER, user: { tag: 'm' }, guild, roles: { add: async () => {} } };
+
+        // The role can't be made: the voucher is given back.
+        assert.equal((await buyCustomRole(client, member, byId('custom_role'), { name: 'Mine' })).ok, false);
+        assert.equal((await getProfile(client, GUILD_ID, MEMBER)).inventory[CUSTOM_ROLE_VOUCHER.id], 1);
+
+        fail = false;
+        const bought = await buyCustomRole(client, member, byId('custom_role'), { name: 'Mine' });
+        assert.equal(bought.ok, true);
+        assert.equal(bought.voucher, true);
+        const profile = await getProfile(client, GUILD_ID, MEMBER);
+        assert.equal(profile.cc, 100);
+        assert.equal(profile.inventory[CUSTOM_ROLE_VOUCHER.id] || 0, 0);
     });
 
     test('رولي has a button for each thing the member can do', () => {
