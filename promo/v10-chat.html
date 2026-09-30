@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="ar">
+<head>
+<meta charset="utf-8">
+<title>CHAOS — شات الفوضى</title>
+<link rel="stylesheet" href="shared.css">
+<style>
+  #stage { background: linear-gradient(180deg, #f8e7ef 0%, #f3e6f3 55%, #e9e4f7 100%); direction: ltr; }
+  .hdr { position: absolute; top: 0; left: 0; right: 0; height: 150px; display: flex; align-items: center; gap: 22px; padding: 40px 44px 0;
+    border-bottom: 2px solid rgba(80,60,90,.12); background: rgba(255,255,255,.35); z-index: 5; }
+  .hdr .hash { font-size: 60px; color: #8a8494; font-weight: 700; }
+  .hdr .ch { font-size: 46px; font-weight: 900; color: #2e2a36; }
+  .hdr .srv { margin-left: auto; font-family: 'Anton'; font-size: 40px; letter-spacing: 4px; color: #b04a78; }
+  .view { position: absolute; top: 150px; left: 0; right: 0; bottom: 330px; overflow: hidden; }
+  .list { position: absolute; left: 0; right: 0; top: 0; padding: 30px 44px 40px; }
+  .grp { display: flex; gap: 28px; margin-top: 34px; }
+  .av { width: 116px; height: 116px; border-radius: 50%; flex: none; object-fit: cover; }
+  .body { flex: 1; min-width: 0; }
+  .meta { display: flex; align-items: center; gap: 16px; }
+  .meta .nm { font-size: 48px; font-weight: 900; }
+  .meta .tg { font-size: 28px; font-weight: 900; color: #4b4556; background: rgba(0,0,0,.07); padding: 2px 14px; border-radius: 10px; direction: ltr; }
+  .meta .tm { font-size: 30px; color: #8a8494; font-weight: 700; }
+  .ln { direction: rtl; text-align: right; font-size: 52px; line-height: 1.45; color: #2e2a36; font-weight: 700; }
+  .ln.hash { color: #2e2a36; }
+  .join { display: flex; align-items: flex-start; gap: 26px; margin-top: 44px; padding: 26px 20px; border-radius: 20px; background: rgba(35,165,90,.08); }
+  .join .arr { font-size: 58px; color: #23a55a; font-weight: 900; width: 116px; text-align: center; }
+  .join .tx { direction: rtl; text-align: right; flex: 1; font-size: 50px; line-height: 1.5; color: #2e2a36; font-weight: 700; }
+  .join .tx b { color: #b04a78; }
+  .join .wave { display: inline-block; margin-top: 16px; font-size: 40px; font-weight: 900; background: #fff; border: 2px solid rgba(0,0,0,.1); border-radius: 14px; padding: 8px 26px; }
+  .typing { position: absolute; left: 60px; right: 60px; bottom: 262px; direction: rtl; text-align: right; font-size: 34px; font-weight: 700; color: #5a5466; opacity: 0; }
+  .typing i { display: inline-block; width: 13px; height: 13px; border-radius: 50%; background: #5a5466; margin: 0 4px; }
+  .inp { position: absolute; left: 40px; right: 40px; bottom: 140px; height: 110px; border-radius: 26px; background: rgba(255,255,255,.75);
+    box-shadow: 0 4px 20px rgba(80,60,90,.12); display: flex; align-items: center; gap: 30px; padding: 0 36px; font-size: 42px; color: #8a8494; font-weight: 700; }
+  .inp .plus { font-size: 60px; color: #5a5466; }
+  .inp .ph { flex: 1; direction: rtl; text-align: right; }
+  .inp .ic { font-family: 'Noto Color Emoji'; font-size: 44px; letter-spacing: 18px; }
+  .cta { position: absolute; left: 0; right: 0; bottom: 30px; text-align: center; font-size: 40px; font-weight: 900; color: #b04a78; direction: rtl; opacity: 0; }
+</style>
+</head>
+<body data-duration="22.05" data-cover="12">
+<div id="stage">
+  <div class="hdr"><span class="hash">#</span><span class="ch">الشات</span><span class="srv">CHAOS</span></div>
+  <div class="view" id="view"><div class="list" id="list"></div></div>
+  <div class="typing" id="typing"></div>
+  <div class="inp"><span class="plus">+</span><span class="ph">ابعت رسالة في #الشات</span><span class="ic">🎁😊</span></div>
+  <div class="cta" id="cta">لينك CHAOS في البايو 👇</div>
+  <section class="scene" data-start="0" data-end="22.05" data-noflash style="animation:none;opacity:1"></section>
+  <div id="flash"></div>
+</div>
+<script src="v10-chat.timeline.js"></script>
+<script>
+  // Build the chat: one group per 'head', its lines under it, then the join message.
+  document.body.dataset.duration = TL.end;
+  const list = document.getElementById('list');
+  let grp = null;
+  TL.items.forEach((it, i) => {
+    const u = TL.users[it.who];
+    if (it.kind === 'head') {
+      grp = document.createElement('div');
+      grp.className = 'grp'; grp.id = 'it' + i;
+      grp.innerHTML = `<img class="av" src="${u.img}"><div class="body"><div class="meta"><span class="nm" style="color:${u.color}">${u.name}</span><span class="tg">${u.tag}</span><span class="tm">${it.time}</span></div></div>`;
+      list.appendChild(grp);
+    } else if (it.kind === 'line') {
+      const ln = document.createElement('div');
+      ln.className = 'ln'; ln.id = 'it' + i; ln.textContent = it.text;
+      grp.querySelector('.body').appendChild(ln);
+    } else if (it.kind === 'join') {
+      const j = document.createElement('div');
+      j.className = 'join'; j.id = 'it' + i;
+      j.innerHTML = `<div class="arr">→</div><div class="tx">نوّرت يا <b>إنت</b>! 👋<br>إنت العضو رقم 1,000,001 في <b>CHAOS</b><br><span class="wave">👋 قول أهلًا</span></div>`;
+      list.appendChild(j);
+    }
+  });
+</script>
+<script src="shared.js"></script>
+<script>
+  const { hook, clamp, ease } = CHAOS;
+  const view = document.getElementById('view');
+  const shown = TL.items.map((it, i) => ({ ...it, el: document.getElementById('it' + i) })).filter(x => x.el);
+  let targets = null;
+  hook(t => {
+    if (!targets) targets = shown.map(x => {
+      let top = 0, e = x.el; while (e && e !== list) { top += e.offsetTop; e = e.offsetParent; }
+      return Math.max(0, top + x.el.offsetHeight + 40 - view.clientHeight);
+    });
+    let k = -1;
+    shown.forEach((x, i) => { const on = t >= x.at; x.el.style.visibility = on ? 'visible' : 'hidden'; if (on) k = i; });
+    const prev = k > 0 ? targets[k - 1] : 0, cur = k >= 0 ? targets[k] : 0;
+    const off = prev + (cur - prev) * ease.out(k >= 0 ? (t - shown[k].at) / 0.22 : 0);
+    list.style.transform = `translateY(${(-off).toFixed(1)}px)`;
+    const typ = TL.items.find(x => x.kind === 'typing' && t >= x.at && t < x.at + x.len);
+    const tp = document.getElementById('typing');
+    tp.style.opacity = typ ? 1 : 0;
+    if (typ) tp.innerHTML = `<b>${TL.users[typ.who].name}</b> بيكتب… <i style="transform:translateY(${(Math.sin(t*12)*5).toFixed(1)}px)"></i><i style="transform:translateY(${(Math.sin(t*12-1.2)*5).toFixed(1)}px)"></i><i style="transform:translateY(${(Math.sin(t*12-2.4)*5).toFixed(1)}px)"></i>`;
+    const join = TL.items.find(x => x.kind === 'join');
+    document.getElementById('cta').style.opacity = clamp((t - join.at - 0.6) / 0.3).toFixed(2);
+  });
+</script>
+</body>
+</html>
