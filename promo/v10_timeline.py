@@ -1,55 +1,81 @@
-"""Timeline of the chaotic group-chat video (v10-chat.html): who says what, and when each line lands.
+"""Timeline of the group-chat video (v10-chat.html), a shot-for-shot copy of a TikTok chat trend
+with the CHAOS admins as the cast.
 
     python3 v10_timeline.py    # writes v10-chat.timeline.js
 
-Each line appears on its own like a real Discord chat; when the author changes, "X is typing…" shows
-first. The cast is the CHAOS admins; avatars live in vo/v10/av/ (gitignored),
-and an admin with img None gets a Discord-style letter avatar on the bg color.
+Every time below is when that line lands in the original video, so the lines hit the same beats
+of its song (vo/v10/song.mp3). The chat opens mid-conversation: everything with at=0 is already
+on screen.
+
+Avatars: drop vo/v10/av/<key>.png (or .jpg / .webp) and it is used; otherwise the admin gets a
+default Discord avatar in their `bg` color.
 """
 import json
 from pathlib import Path
 
 here = Path(__file__).parent
+# name style: font / color of the display name, like the fancy names in the original.
 USERS = {
-    'oskar': {'name': 'oskar', 'color': '#c2185b', 'tag': '👑 OWNER', 'img': 'vo/v10/av/oskar.png'},
-    'adam': {'name': 'adam', 'color': '#1e7fd1', 'tag': '🛡️ ADMIN', 'img': None, 'bg': '#5865f2'},
-    '7assep': {'name': '7assep', 'color': '#7b3fc4', 'tag': '🛡️ ADMIN', 'img': 'vo/v10/av/7assep.png'},
-    'zatona': {'name': 'zatona', 'color': '#2f8f5b', 'tag': '🛡️ ADMIN', 'img': None, 'bg': '#3ba55c'},
-    'ali': {'name': 'ali', 'color': '#b86a12', 'tag': '🛡️ ADMIN', 'img': None, 'bg': '#faa61a'},
-    'retlex': {'name': 'retlex', 'color': '#d83c3e', 'tag': '🛡️ ADMIN', 'img': 'vo/v10/av/retlex.png'},
+    'retlex': {'name': 'retlex', 'bg': '#ed4245', 'font': 'Noto Sans', 'color': '#3b3438', 'tag': 'CHS', 'badge': '⚔️'},
+    'adam': {'name': 'adam', 'bg': '#5865f2', 'font': 'Noto Sans', 'color': '#4a4448', 'tag': 'CHS', 'badge': '🪽'},
+    '7assep': {'name': '7assep', 'bg': '#757e8a', 'font': 'Cinzel', 'color': '#c8bfc2', 'tag': None, 'badge': None},
+    'zatona': {'name': 'zatona', 'bg': '#3ba55c', 'font': 'Noto Sans', 'color': '#4a4448', 'tag': 'CHS', 'badge': '🫒'},
+    'ali': {'name': 'ali', 'bg': '#faa61a', 'font': 'Courier Prime', 'color': '#3a3346', 'tag': 'CHS', 'badge': '💜'},
+    'oskar': {'name': 'oskar', 'bg': '#eb459e', 'font': 'Pacifico', 'color': '#c0569a', 'tag': 'CHS', 'badge': '👑'},
 }
-# (author, time shown, lines, seconds between lines)
-GROUPS = [
-    ('oskar', '8:24 م', ['بقولكو', 'نعمل فيديو للسيرفر', 'وننزله على التيك', '#ديسكورد', '#كيوس', '#مود_السهر'], 0.5),
-    ('adam', '8:24 م', ['ههههههههههههههههه اخخخ'], 0.55),
-    ('7assep', '8:24 م', ['.', '.', '.', '.'], 0.3),
-    ('oskar', '8:29 م', ['هيتشهر في يومين', 'فجأة', 'السيرفر يبقى فيه مليون واحد', 'وإحنا نبقى مشاهير'], 0.6),
-    ('zatona', '8:29 م', ['وعلي يخسر كل فلوسه في البورصة'], 0.6),
-    ('ali', '8:29 م', ['؟؟؟؟؟؟؟؟؟؟؟؟؟؟؟؟؟؟؟؟؟؟'], 0.6),
-    ('retlex', '8:29 م', ['وأنا أبقى الديكتاتور وأطرده 😭😂💀'], 0.6),
+AV_DIR = here / 'vo' / 'v10' / 'av'
+
+# (at, kind, who, text) — kind: head (new message group, text = time), line, typing (text = length)
+ITEMS = [
+    (0, 'head', 'retlex', '8:24 PM'), (0, 'line', 'retlex', 'بطني'), (0, 'line', 'retlex', 'وجعتني من الضحك'), (0, 'line', 'retlex', 'ه'),
+    (0, 'head', 'adam', '8:24 PM'), (0, 'line', 'adam', 'ههههههههههههههههه اخخ'),
+    (0, 'head', '7assep', '8:24 PM'), (0, 'line', '7assep', '.'), (0, 'line', '7assep', '.'), (0, 'line', '7assep', '.'), (0, 'line', '7assep', '.'),
+    (0.23, 'line', '7assep', 'نعمل سيرفر'),
+    (1.60, 'typing', 'zatona', 3.67),
+    (1.60, 'line', '7assep', 'وننزله على التيك'),
+    (3.00, 'line', '7assep', '#مود_السهر'),
+    (3.40, 'line', '7assep', '#ديسكورد'),
+    (4.40, 'line', '7assep', '#كيوس'),
+    (5.27, 'head', 'zatona', '8:29 PM'), (5.27, 'line', 'zatona', 'يتشهر بسرعة'),
+    (6.97, 'line', 'zatona', 'فجأة'),
+    (7.60, 'typing', 'zatona', 0.40),
+    (8.00, 'line', 'zatona', 'نبقى أغنيا'),
+    (8.80, 'line', 'zatona', 'واتشهرنا'),
+    (9.30, 'typing', '7assep', 0.57),
+    (9.87, 'head', '7assep', '8:29 PM'), (9.87, 'line', '7assep', 'وعلي يموت في حادثة عربية'),
+    (10.90, 'head', 'ali', '8:29 PM'), (10.90, 'line', 'ali', '؟' * 36),
+    (11.35, 'head', 'oskar', '8:29 PM'), (11.35, 'line', 'oskar', 'ونورث حسابه في البورصة 🥹😭😨😡🤭'),
 ]
+FOCUS = 11.6   # the caret jumps to the start of the message box, like in the original
+END = 13.17    # the original cuts to the TikTok outro here
+
+
+def avatar(key):
+    for ext in ('png', 'jpg', 'jpeg', 'webp'):
+        f = AV_DIR / f'{key}.{ext}'
+        if f.exists():
+            return f.relative_to(here).as_posix()
+    return None
 
 
 def main():
-    t, prev, items = 0.4, None, []
-    for who, time, lines, step in GROUPS:
-        if who != prev:
-            items.append({'kind': 'typing', 'who': who, 'at': round(t, 2), 'len': 0.6})
-            t += 0.7
-        items.append({'kind': 'head', 'who': who, 'time': time, 'at': round(t, 2)})
-        for line in lines:
-            items.append({'kind': 'line', 'who': who, 'text': line, 'at': round(t, 2)})
-            t += step
-        t += 0.35
-        prev = who
-    t += 0.5
-    items.append({'kind': 'join', 'at': round(t, 2)})
-    end = round(t + 3.6, 2)
+    users = {k: {**u, 'img': avatar(k)} for k, u in USERS.items()}
+    items = []
+    for at, kind, who, text in ITEMS:
+        it = {'kind': kind, 'who': who, 'at': at}
+        if kind == 'head':
+            it['time'] = text
+        elif kind == 'line':
+            it['text'] = text
+        else:
+            it['len'] = text
+        items.append(it)
     (here / 'v10-chat.timeline.js').write_text(
         '// Generated by v10_timeline.py. Do not edit by hand.\n'
-        'window.TL = ' + json.dumps({'users': USERS, 'items': items, 'end': end}, ensure_ascii=False, indent=1) + ';\n',
+        'window.TL = ' + json.dumps({'users': users, 'items': items, 'focus': FOCUS, 'end': END}, ensure_ascii=False, indent=1) + ';\n',
         encoding='utf-8')
-    print(f"{sum(1 for i in items if i['kind'] == 'line')} lines, join at {t:.2f}s, end {end}s")
+    have = [k for k, u in users.items() if u['img']]
+    print(f"{sum(1 for i in items if i['kind'] == 'line')} lines, end {END}s, avatars: {', '.join(have) or 'none (default Discord)'}")
 
 
 if __name__ == '__main__':

@@ -2,99 +2,128 @@
 <html lang="ar">
 <head>
 <meta charset="utf-8">
-<title>CHAOS — شات الفوضى</title>
+<title>CHAOS — شات الإدارة</title>
 <link rel="stylesheet" href="shared.css">
 <style>
-  #stage { background: linear-gradient(180deg, #f8e7ef 0%, #f3e6f3 55%, #e9e4f7 100%); direction: ltr; }
-  .hdr { position: absolute; top: 0; left: 0; right: 0; height: 150px; display: flex; align-items: center; gap: 22px; padding: 40px 44px 0;
-    border-bottom: 2px solid rgba(80,60,90,.12); background: rgba(255,255,255,.35); z-index: 5; }
-  .hdr .hash { font-size: 60px; color: #8a8494; font-weight: 700; }
-  .hdr .ch { font-size: 46px; font-weight: 900; color: #2e2a36; }
-  .hdr .srv { margin-left: auto; font-family: 'Anton'; font-size: 40px; letter-spacing: 4px; color: #b04a78; }
-  .view { position: absolute; top: 150px; left: 0; right: 0; bottom: 330px; overflow: hidden; }
-  .list { position: absolute; left: 0; right: 0; top: 0; padding: 30px 44px 40px; }
-  .grp { display: flex; gap: 28px; margin-top: 34px; }
-  .av { width: 116px; height: 116px; border-radius: 50%; flex: none; object-fit: cover; }
-  .av.letter { display: grid; place-items: center; color: #fff; font-family: 'Anton'; font-size: 60px; }
-  .body { flex: 1; min-width: 0; }
-  .meta { display: flex; align-items: center; gap: 16px; }
-  .meta .nm { font-size: 48px; font-weight: 900; }
-  .meta .tg { font-size: 28px; font-weight: 900; color: #4b4556; background: rgba(0,0,0,.07); padding: 2px 14px; border-radius: 10px; direction: ltr; }
-  .meta .tm { font-size: 30px; color: #8a8494; font-weight: 700; }
-  .ln { direction: rtl; text-align: right; font-size: 52px; line-height: 1.45; color: #2e2a36; font-weight: 700; }
-  .ln.hash { color: #2e2a36; }
-  .join { display: flex; align-items: flex-start; gap: 26px; margin-top: 44px; padding: 26px 20px; border-radius: 20px; background: rgba(35,165,90,.08); }
-  .join .arr { font-size: 58px; color: #23a55a; font-weight: 900; width: 116px; text-align: center; }
-  .join .tx { direction: rtl; text-align: right; flex: 1; font-size: 50px; line-height: 1.5; color: #2e2a36; font-weight: 700; }
-  .join .tx b { color: #b04a78; }
-  .join .wave { display: inline-block; margin-top: 16px; font-size: 40px; font-weight: 900; background: #fff; border: 2px solid rgba(0,0,0,.1); border-radius: 14px; padding: 8px 26px; }
-  .typing { position: absolute; left: 60px; right: 60px; bottom: 262px; direction: rtl; text-align: right; font-size: 34px; font-weight: 700; color: #5a5466; opacity: 0; }
-  .typing i { display: inline-block; width: 13px; height: 13px; border-radius: 50%; background: #5a5466; margin: 0 4px; }
-  .inp { position: absolute; left: 40px; right: 40px; bottom: 140px; height: 110px; border-radius: 26px; background: rgba(255,255,255,.75);
-    box-shadow: 0 4px 20px rgba(80,60,90,.12); display: flex; align-items: center; gap: 30px; padding: 0 36px; font-size: 42px; color: #8a8494; font-weight: 700; }
-  .inp .plus { font-size: 60px; color: #5a5466; }
-  .inp .ph { flex: 1; direction: rtl; text-align: right; }
-  .inp .ic { font-family: 'Noto Color Emoji'; font-size: 44px; letter-spacing: 18px; }
-  .cta { position: absolute; left: 0; right: 0; bottom: 30px; text-align: center; font-size: 40px; font-weight: 900; color: #b04a78; direction: rtl; opacity: 0; }
+  /* A shot-for-shot copy of a light-theme Discord mobile chat trend, drawn at 1216×1152
+     (the original's frame, doubled). The chat and its timing come from v10_timeline.py. */
+  @font-face { font-family: 'Noto Sans Arabic'; font-weight: 400; src: url(fonts/noto-sans-arabic-arabic-400-normal.woff2); font-display: block; }
+  @font-face { font-family: 'Noto Sans Arabic'; font-weight: 500; src: url(fonts/noto-sans-arabic-arabic-500-normal.woff2); font-display: block; }
+  @font-face { font-family: 'Noto Sans'; font-weight: 400; src: url(fonts/noto-sans-latin-400-normal.woff2); font-display: block; }
+  @font-face { font-family: 'Noto Sans'; font-weight: 500; src: url(fonts/noto-sans-latin-500-normal.woff2); font-display: block; }
+  @font-face { font-family: 'Noto Sans'; font-weight: 600; src: url(fonts/noto-sans-latin-600-normal.woff2); font-display: block; }
+  @font-face { font-family: 'Cinzel'; src: url(fonts/cinzel-latin-400-normal.woff2); font-display: block; }
+  @font-face { font-family: 'Courier Prime'; src: url(fonts/courier-prime-latin-400-normal.woff2); font-display: block; }
+  @font-face { font-family: 'Pacifico'; src: url(fonts/pacifico-latin-400-normal.woff2); font-display: block; }
+  html, body, #stage { width: 1216px; height: 1152px; }
+  body { font-family: 'Noto Sans', 'Noto Sans Arabic', 'Noto Color Emoji', sans-serif; color: #1f1c20; }
+  #stage { background: linear-gradient(180deg, #f5e6e9 0%, #f3e6e9 60%, #f1e6ee 78%, #efe6f3 100%); }
+  .view { position: absolute; left: 0; right: 0; top: 0; height: 905px; overflow: hidden; }
+  .list { position: absolute; left: 0; right: 0; top: 0; padding: 0 50px 0 48px; }
+  .grp { position: relative; padding-left: 157px; margin-top: 51px; }
+  .av { position: absolute; left: 0; top: -6px; width: 122px; height: 122px; border-radius: 50%; object-fit: cover; overflow: hidden; }
+  .av.def { display: grid; place-items: center; }
+  .av.def svg { width: 64px; height: 64px; fill: #fff; }
+  .meta { height: 64px; display: flex; align-items: center; gap: 14px; direction: ltr; }
+  .nm { font-size: 44px; line-height: 1; white-space: nowrap; font-weight: 500; }
+  .tg { height: 50px; display: flex; align-items: center; gap: 4px; padding: 0 12px; border-radius: 10px; background: #e3d9db;
+    font: 600 33px/1 'Noto Sans'; color: #3d383d; }
+  .tg i { font-style: normal; font-size: 28px; }
+  .bd { font-size: 32px; }
+  .tm { font: 400 36px/1 'Noto Sans'; color: #57535b; }
+  .ln { height: 75px; line-height: 75px; font: 500 44px/75px 'Noto Sans Arabic', 'Noto Sans', 'Noto Color Emoji'; color: #1c191c;
+    text-align: start; white-space: nowrap; }
+  .ln .emo { font-size: 56px; vertical-align: -6px; letter-spacing: 6px; }
+  .ln.q { letter-spacing: -2px; font-size: 40px; }
+  /* bottom: the lavender strip (with "X is typing...") and the message box */
+  .bottom { position: absolute; left: 0; right: 0; top: 905px; bottom: 0;
+    background: linear-gradient(180deg, rgba(236,230,243,0) 0, #e7e4f4 26px, #dde0f5 90px, #d8ddf6 100%); }
+  .typing { position: absolute; left: 0; right: 0; padding-left: 40px; top: 10px; background: rgba(206,210,246,.55); height: 50px; display: flex; align-items: center; gap: 16px; opacity: 0;
+    font: 500 30px/1 'Noto Sans', 'Noto Sans Arabic'; color: #34323c; }
+  .typing .dots { display: flex; gap: 7px; }
+  .typing .dots b { width: 11px; height: 11px; border-radius: 50%; background: #34323c; }
+  .inp { position: absolute; left: 52px; right: 51px; top: 972px; height: 200px; border-radius: 44px;
+    background: linear-gradient(180deg, #f2f1f6 0%, #e1e1ea 30%, #dcdde7 100%); border: 2px solid rgba(255,255,255,.7); }
+  .inp svg { position: absolute; top: 57px; width: 56px; height: 56px; fill: #4c4a55; }
+  .inp .ph { position: absolute; left: 156px; top: 52px; font: 400 46px/66px 'Noto Sans'; color: #57555f; }
+  .caret { position: absolute; top: 48px; width: 5px; height: 72px; background: #3a3842; border-radius: 2px; }
 </style>
 </head>
-<body data-duration="20.8" data-cover="12">
+<body data-duration="13.17" data-cover="12" data-w="1216" data-h="1152">
 <div id="stage">
-  <div class="hdr"><span class="hash">#</span><span class="ch">الشات</span><span class="srv">CHAOS</span></div>
-  <div class="view" id="view"><div class="list" id="list"></div></div>
-  <div class="typing" id="typing"></div>
-  <div class="inp"><span class="plus">+</span><span class="ph">ابعت رسالة في #الشات</span><span class="ic">🎁😊</span></div>
-  <div class="cta" id="cta">لينك CHAOS في البايو 👇</div>
-  <section class="scene" data-start="0" data-end="20.8" data-noflash style="animation:none;opacity:1"></section>
+  <div class="view"><div class="list" id="list"></div></div>
+  <div class="bottom">
+    <div class="typing" id="typing"><span class="dots"><b></b><b></b><b></b></span><span id="typer" dir="auto"></span></div>
+  </div>
+  <div class="inp">
+    <svg viewBox="0 0 24 24" style="left:58px"><path d="M11 3h2v8h8v2h-8v8h-2v-8H3v-2h8z"/></svg>
+    <span class="ph">Message #Chat</span>
+    <div class="caret" id="caret"></div>
+    <svg viewBox="0 0 24 24" style="left:746px"><path d="M3 8.5h18v4H3zM4.2 13.5h15.6V21H4.2zM12 8.5C10.2 4.2 6.3 3.6 6.3 6c0 1.8 3.2 2.5 5.7 2.5zm0 0c1.8-4.3 5.7-4.9 5.7-2.5 0 1.8-3.2 2.5-5.7 2.5z"/><path d="M11.1 8.5h1.8V21h-1.8z" fill="#dcdde7"/></svg>
+    <svg viewBox="0 0 24 24" style="left:873px"><path fill-rule="evenodd" d="M12 2a10 10 0 110 20 10 10 0 010-20zM8.5 8.2a1.4 1.4 0 100 2.8 1.4 1.4 0 000-2.8zm7 0a1.4 1.4 0 100 2.8 1.4 1.4 0 000-2.8zM7 13.2c.9 2.3 2.8 3.6 5 3.6s4.1-1.3 5-3.6z"/></svg>
+    <svg viewBox="0 0 24 24" style="left:1003px"><path d="M2.5 3.5 22 12 2.5 20.5 5.3 12zM5.3 12h8.2"/><path d="M5 11h9v2H5z" fill="#dcdde7"/></svg>
+  </div>
+  <section class="scene" data-start="0" data-end="13.17" data-noflash style="animation:none;opacity:1"></section>
   <div id="flash"></div>
 </div>
 <script src="v10-chat.timeline.js"></script>
 <script>
-  // Build the chat: one group per 'head', its lines under it, then the join message.
+  const CLYDE = '<svg viewBox="0 0 24 24"><path d="M20.317 4.3698a19.7913 19.7913 0 00-4.8851-1.5152.0741.0741 0 00-.0785.0371c-.211.3753-.4447.8648-.6083 1.2495-1.8447-.2762-3.68-.2762-5.4868 0-.1636-.3933-.4058-.8742-.6177-1.2495a.077.077 0 00-.0785-.037 19.7363 19.7363 0 00-4.8852 1.515.0699.0699 0 00-.0321.0277C.5334 9.0458-.319 13.5799.0992 18.0578a.0824.0824 0 00.0312.0561c2.0528 1.5076 4.0413 2.4228 5.9929 3.0294a.0777.0777 0 00.0842-.0276c.4616-.6304.8731-1.2952 1.226-1.9942a.076.076 0 00-.0416-.1057c-.6528-.2476-1.2743-.5495-1.8722-.8923a.077.077 0 01-.0076-.1277c.1258-.0943.2517-.1923.3718-.2914a.0743.0743 0 01.0776-.0105c3.9278 1.7933 8.18 1.7933 12.0614 0a.0739.0739 0 01.0785.0095c.1202.099.246.1981.3728.2924a.077.077 0 01-.0066.1276 12.2986 12.2986 0 01-1.873.8914.0766.0766 0 00-.0407.1067c.3604.698.7719 1.3628 1.225 1.9932a.076.076 0 00.0842.0286c1.961-.6067 3.9495-1.5219 6.0023-3.0294a.077.077 0 00.0313-.0552c.5004-5.177-.8382-9.6739-3.5485-13.6604a.061.061 0 00-.0312-.0286zM8.02 15.3312c-1.1825 0-2.1569-1.0857-2.1569-2.419 0-1.3332.9555-2.4189 2.157-2.4189 1.2108 0 2.1757 1.0952 2.1568 2.419 0 1.3332-.9555 2.4189-2.1569 2.4189zm7.9748 0c-1.1825 0-2.1569-1.0857-2.1569-2.419 0-1.3332.9554-2.4189 2.1569-2.4189 1.2108 0 2.1757 1.0952 2.1568 2.419 0 1.3332-.946 2.4189-2.1568 2.4189Z"/></svg>';
+  // Build the whole chat up front; the hook reveals items at their time and scrolls to the newest.
   document.body.dataset.duration = TL.end;
   const list = document.getElementById('list');
+  const esc = s => s.replace(/[&<>]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' })[c]);
   let grp = null;
-  TL.items.forEach((it, i) => {
+  const shown = [];
+  TL.items.forEach(it => {
     const u = TL.users[it.who];
     if (it.kind === 'head') {
       grp = document.createElement('div');
-      grp.className = 'grp'; grp.id = 'it' + i;
-      grp.innerHTML = `${u.img ? `<img class="av" src="${u.img}">` : `<div class="av letter" style="background:${u.bg}">${u.name[0].toUpperCase()}</div>`}<div class="body"><div class="meta"><span class="nm" style="color:${u.color}">${u.name}</span><span class="tg">${u.tag}</span><span class="tm">${it.time}</span></div></div>`;
+      grp.className = 'grp';
+      const av = u.img ? `<img class="av" src="${u.img}">` : `<div class="av def" style="background:${u.bg}">${CLYDE}</div>`;
+      const tag = u.tag ? `<span class="tg"><i>🌀</i>${u.tag}</span>` : '';
+      const badge = u.badge ? `<span class="bd">${u.badge}</span>` : '';
+      grp.innerHTML = `${av}<div class="meta"><span class="nm" style="font-family:'${u.font}';color:${u.color}">${u.name}</span>${tag}${badge}<span class="tm">${it.time}</span></div>`;
       list.appendChild(grp);
+      shown.push({ at: it.at, el: grp });
     } else if (it.kind === 'line') {
       const ln = document.createElement('div');
-      ln.className = 'ln'; ln.id = 'it' + i; ln.textContent = it.text;
-      grp.querySelector('.body').appendChild(ln);
-    } else if (it.kind === 'join') {
-      const j = document.createElement('div');
-      j.className = 'join'; j.id = 'it' + i;
-      j.innerHTML = `<div class="arr">→</div><div class="tx">نوّرت يا <b>إنت</b>! 👋<br>إنت العضو رقم 1,000,001 في <b>CHAOS</b><br><span class="wave">👋 قول أهلًا</span></div>`;
-      list.appendChild(j);
+      ln.className = 'ln' + (/^؟+$/.test(it.text) ? ' q' : '');
+      ln.dir = 'auto';
+      // Emoji at the end of a line are drawn bigger, like Discord's jumbo emoji.
+      ln.innerHTML = esc(it.text).replace(/((?:\p{Extended_Pictographic}️?)+)/u, '<span class="emo">$1</span>');
+      grp.appendChild(ln);
+      shown.push({ at: it.at, el: ln });
     }
   });
 </script>
 <script src="shared.js"></script>
 <script>
-  const { hook, clamp, ease } = CHAOS;
-  const view = document.getElementById('view');
-  const shown = TL.items.map((it, i) => ({ ...it, el: document.getElementById('it' + i) })).filter(x => x.el);
-  let targets = null;
+  const { hook, ease } = CHAOS;
+  const VIEW_BOTTOM = 880;   // where the newest line's box ends
+  let bottoms = null;
   hook(t => {
-    if (!targets) targets = shown.map(x => {
+    if (!bottoms) bottoms = shown.map(x => {
       let top = 0, e = x.el; while (e && e !== list) { top += e.offsetTop; e = e.offsetParent; }
-      return Math.max(0, top + x.el.offsetHeight + 40 - view.clientHeight);
+      return top + x.el.offsetHeight;
     });
     let k = -1;
     shown.forEach((x, i) => { const on = t >= x.at; x.el.style.visibility = on ? 'visible' : 'hidden'; if (on) k = i; });
-    const prev = k > 0 ? targets[k - 1] : 0, cur = k >= 0 ? targets[k] : 0;
-    const off = prev + (cur - prev) * ease.out(k >= 0 ? (t - shown[k].at) / 0.22 : 0);
-    list.style.transform = `translateY(${(-off).toFixed(1)}px)`;
+    // Each new message pushes the chat up over ~0.3s, like the original.
+    const kPrev = shown.findLastIndex((x, i) => i < k && x.at < shown[k].at);
+    const cur = bottoms[k], prev = kPrev >= 0 ? bottoms[kPrev] : cur;
+    const p = shown[k].at > 0 ? ease.out(Math.min(1, (t - shown[k].at) / 0.3)) : 1;
+    list.style.transform = `translateY(${(VIEW_BOTTOM - (prev + (cur - prev) * p)).toFixed(1)}px)`;
+
     const typ = TL.items.find(x => x.kind === 'typing' && t >= x.at && t < x.at + x.len);
-    const tp = document.getElementById('typing');
-    tp.style.opacity = typ ? 1 : 0;
-    if (typ) tp.innerHTML = `<b>${TL.users[typ.who].name}</b> بيكتب… <i style="transform:translateY(${(Math.sin(t*12)*5).toFixed(1)}px)"></i><i style="transform:translateY(${(Math.sin(t*12-1.2)*5).toFixed(1)}px)"></i><i style="transform:translateY(${(Math.sin(t*12-2.4)*5).toFixed(1)}px)"></i>`;
-    const join = TL.items.find(x => x.kind === 'join');
-    document.getElementById('cta').style.opacity = clamp((t - join.at - 0.6) / 0.3).toFixed(2);
+    document.getElementById('typing').style.opacity = typ ? 1 : 0;
+    if (typ) {
+      document.getElementById('typer').textContent = `${TL.users[typ.who].name} is typing...`;
+      document.querySelectorAll('.typing .dots b').forEach((b, i) => { b.style.opacity = (0.35 + 0.65 * (0.5 + 0.5 * Math.sin(t * 9 - i * 1.1))).toFixed(2); });
+    }
+    const caret = document.getElementById('caret');
+    caret.style.left = t >= TL.focus ? '152px' : '684px';
+    caret.style.opacity = Math.floor(t / 0.53) % 2 ? 0 : 1;
   });
 </script>
 </body>

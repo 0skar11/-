@@ -65,6 +65,9 @@ for (const name of pages) {
   const url = pathToFileURL(html).href + '?render=1' + (invite ? '&invite=' + encodeURIComponent(invite) : '');
   await page.goto(url, { waitUntil: 'networkidle' });
   await page.evaluate(() => window.CHAOS.ready);
+  // A page can ask for another frame size with <body data-w data-h> (default 1080×1920).
+  const size = await page.evaluate(() => ({ width: +document.body.dataset.w || 1080, height: +document.body.dataset.h || 1920 }));
+  if (size.width !== 1080 || size.height !== 1920) await page.setViewportSize(size);
   const { duration, cover } = await page.evaluate(() => ({ duration: +document.body.dataset.duration, cover: +document.body.dataset.cover || 0 }));
 
   const ff = spawn(ffmpeg, [
