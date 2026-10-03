@@ -1,6 +1,8 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
-import { handleGamesBotOutsideChannel } from '../src/services/cc/gamesBotChannel.js';
+import { handleGamesBotOutsideChannel, TRADER_GAME_IDLE_MS } from '../src/services/cc/gamesBotChannel.js';
+import { HOME_GUILD_ID } from '../src/config/homeGuild.js';
+import { traderRoleSettings } from '../src/config/store/ccStoreItems.js';
 import { CLOVER_BOT_ID, GAMES_BOTS_CHANNEL_ID } from '../src/config/games.js';
 import { investReceiptEmbed, sellReceiptEmbed } from '../src/services/cc/bourseUi.js';
 import { ccProfileEmbed } from '../src/commands/Games/cc.js';
@@ -38,6 +40,56 @@ describe('games bots channel (report #121)', () => {
     assert.equal(await handleGamesBotOutsideChannel(botMessage(GAMES_BOTS_CHANNEL_ID)), false);
     assert.equal(await handleGamesBotOutsideChannel(botMessage('222222222222222222', { parentId: GAMES_BOTS_CHANNEL_ID })), false);
     assert.equal(await handleGamesBotOutsideChannel(botMessage('111111111111111111', { authorId: '300000000000000009' })), false);
+  });
+});
+
+describe('the trader role opens bot games anywhere (report #182)', () => {
+  const TRADER_ROLE = '400000000000000001';
+  const TRADER = '200000000000000011';
+  const MEMBER = '200000000000000012';
+  const client = { db: { get: async (key, fallback) => fallback, set: async () => true } };
+  const roles = new Map([[TRADER_ROLE, { id: TRADER_ROLE, name: traderRoleSettings.name, managed: false }]]);
+  const members = new Map([
+    [TRADER, { id: TRADER, roles: { cache: new Map([[TRADER_ROLE, {}]]) } }],
+    [MEMBER, { id: MEMBER, roles: { cache: new Map() } }],
+  ]);
+  const homeMessage = (channelId, options = {}) => Object.assign(botMessage(channelId, options), {
+    client,
+    guild: { id: HOME_GUILD_ID, roles: { cache: roles, fetch: async (id) => roles.get(id) || null }, members: { cache: members, fetch: async (id) => members.get(id) || null } },
+  });
+
+  test('a trader\'s game stays in the chat while it goes on; a member\'s is still removed', async () => {
+    const start = 5_000_000;
+    const member = homeMessage('333333333333333333', { userId: MEMBER });
+    assert.equal(await handleGamesBotOutsideChannel(member, { now: start }), true);
+    assert.equal(member.deleted, true);
+    assert.match(member.sent[0].content, /رول التاجر/u);
+
+    const trader = homeMessage('333333333333333333', { userId: TRADER });
+    assert.equal(await handleGamesBotOutsideChannel(trader, { now: start + 1000 }), false);
+    assert.equal(trader.deleted, false);
+
+    // The rest of the game (no slash command on these messages) stays while the game goes on.
+    const round = homeMessage('333333333333333333', { userId: null });
+    round.interactionMetadata = null;
+    assert.equal(await handleGamesBotOutsideChannel(round, { now: start + 4 * 60_000 }), false);
+    const later = homeMessage('333333333333333333', { userId: null });
+    later.interactionMetadata = null;
+    assert.equal(await handleGamesBotOutsideChannel(later, { now: start + 4 * 60_000 + TRADER_GAME_IDLE_MS + 1 }), true);
+  });
+
+  test('a reply to a trader\'s typed command counts too', async () => {
+    const message = homeMessage('444444444444444444', { userId: null });
+    message.interactionMetadata = null;
+    message.reference = { messageId: '1' };
+    message.fetchReference = async () => ({ author: { id: TRADER, bot: false } });
+    assert.equal(await handleGamesBotOutsideChannel(message, { now: 9_000_000 }), false);
+  });
+
+  test('another server: a trader\'s game outside the channel is still removed', async () => {
+    const message = Object.assign(homeMessage('555555555555555555', { userId: TRADER }), { guild: { id: '100000000000000099', members: { cache: members } } });
+    assert.equal(await handleGamesBotOutsideChannel(message, { now: 9_500_000 }), true);
+    assert.doesNotMatch(message.sent[0].content, /رول التاجر/u);
   });
 });
 

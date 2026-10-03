@@ -268,6 +268,24 @@ describe('games bot (Clover) wins', async () => {
         }
     });
 
+    test('our server pays 500 for a group win and 50 for an answer; another server keeps 50 and 10', async () => {
+        const { HOME_GUILD_ID } = await import('../src/config/homeGuild.js');
+        const { gamesBotReward } = await import('../src/config/cc.js');
+        assert.equal(gamesBotReward('group', HOME_GUILD_ID), 500);
+        assert.equal(gamesBotReward('answer', HOME_GUILD_ID), 50);
+        assert.equal(gamesBotReward('group', GUILD), 50);
+        assert.equal(gamesBotReward('answer', GUILD), 10);
+
+        const client = { db: memoryDb() };
+        const home = (content) => ({ ...winMessage(content), guild: { id: HOME_GUILD_ID } });
+        await handleGamesBotWin(home(`👑 | <@${A}>`), client);
+        assert.equal((await getProfile(client, HOME_GUILD_ID, A)).cc, 500);
+        const answer = home(`✅ | قام <@${A}> بكتابة الاجابة الصحيحة خلال 2 ثانية`);
+        await handleGamesBotWin(answer, client);
+        assert.equal((await getProfile(client, HOME_GUILD_ID, A)).cc, 550);
+        assert.match(answer.replies[0].content, /\+\*\*50\*\*/u);
+    });
+
     test('reads a win shown in an embed or a components v2 box, like Clover does', async () => {
         const { parseWinMessage } = await import('../src/services/cc/gamesBotWins.js');
         const text = `✅ | قام <@${A}> بكتابة الاجابة الصحيحة خلال **5.61** ثانية`;

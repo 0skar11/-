@@ -265,3 +265,7 @@ export function getLegacyVariantsForCanonical(canonicalKey) {
 
     return variants;
 }
+
+export function getVoteKickBlocksKey(guildId) {
+    return `guild:${guildId}:votekickblocks`;
+}

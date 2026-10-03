@@ -16,6 +16,7 @@ import { startStoreChannel } from "../services/cc/storeChannel.js";
 import { startInviteRewards } from "../services/inviteRewardService.js";
 import { ensureTraderRole } from "../services/cc/traderRoleService.js";
 import { startCustomRoles } from "../services/cc/customRoleService.js";
+import { startVoteKickSweeps } from "../services/voice/voteKickService.js";
 import { isHomeGuild } from "../config/homeGuild.js";
 
 export default {
@@ -64,6 +65,12 @@ export default {
         startupLog(`Custom roles: ${customRoles.status}`);
       } catch (error) {
         logger.error("Failed to start custom roles:", error);
+      }
+      try {
+        // Lifts vote kick blocks when they run out (our server only, the sweep checks).
+        startupLog(`Vote kick: ${startVoteKickSweeps(client).status}`);
+      } catch (error) {
+        logger.error("Failed to start vote kick:", error);
       }
       try {
         const inviteRewards = await startInviteRewards(client);

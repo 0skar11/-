@@ -2,7 +2,7 @@
 //
 // When a Clover group game ends it posts the winner as `👑 | @winner` (with a winner card image), and
 // a solo answer game posts `✅ | قام @member بكتابة الاجابة الصحيحة خلال 4.12 ثانية`. This reads those
-// messages and pays the winner CC.gamesBot.win or CC.gamesBot.answer, capped per day only while the CC event runs (config/cc.js). Only
+// messages and pays the winner (gamesBotReward in config/cc.js: more in our server), capped per day only while the CC event runs (config/cc.js). Only
 // messages from the games bot IDs count (config/games.js), so members can't fake a win by typing
 // the same text, and each message pays once.
 
