@@ -1,7 +1,7 @@
 // voteKickService.js — vote kick in a voice channel (reports #183, #185), in our server only.
 //
 // From a voice channel's own text chat, a member in that channel types `فوت كيك @member [reason]`
-// (or `/votekick`). The bot mentions everyone in the channel and asks them to vote with a button.
+// (or `/votekick`). The bot mentions everyone in the channel and asks them to vote with ✅ / ❌.
 // The one who started counts as the first vote. When enough members in the channel vote within
 // VOTE_KICK.durationMs, the member is disconnected and can't join that channel again: the channel gets a
 // Connect deny for them, and joining anyway (an admin, or the deny failed) disconnects them again.
@@ -71,6 +71,7 @@ export function startVoteKick({ guild, channel, starter, target, reason = null, 
         reason: reason ? String(reason).slice(0, 200) : null,
         required: votesRequired(present.length),
         yes: new Set([starter.id]),
+        no: new Set(),
         endsAt: now + VOTE_KICK.durationMs,
         done: false,
         mentions: present.map((member) => member.id),
@@ -83,47 +84,61 @@ export function getVote(voteId) {
     return votes.get(voteId) || null;
 }
 
-/** The vote message: everyone in the channel mentioned, the target, the count and the button. */
+/**
+ * The vote message, laid out like the Among Us bot's (the owner's screenshot): everyone in the channel
+ * mentioned, the question, the votes needed, the end time and the reason, with a green ✅ and a red ❌
+ * button that show their counts.
+ */
 export function voteKickPayload(vote, { ended = null } = {}) {
-    const count = `${vote.yes.size}/${vote.required}`;
     const lines = [
-        `🗳️ **عايزين تطردوا <@${vote.targetId}> من 🔊 ${vote.channelName}؟**`,
+        `**عايزين تطردوا <@${vote.targetId}> من 🔊 ${vote.channelName}؟**`,
         '',
-        `✅ الأصوات: **${count}**`,
-        ended ? `⏱️ ${ended}` : `⏱️ التصويت بيخلص <t:${Math.floor(vote.endsAt / 1000)}:R>`,
-        `📝 السبب: ${vote.reason || 'من غير سبب'}`,
-        `👤 بدأه: <@${vote.starterId}>`,
+        `⬆️ **الأصوات المطلوبة:** \`${vote.required}\``,
+        ended ? `🕒 **التصويت:** ${ended}` : `🕒 **التصويت بيخلص:** <t:${Math.floor(vote.endsAt / 1000)}:R>`,
+        `📝 **السبب:** \`${vote.reason || 'من غير سبب'}\``,
     ];
+    const closed = Boolean(ended) || vote.done;
     const row = new ActionRowBuilder().addComponents(
         new ButtonBuilder()
             .setCustomId(`${VOTE_KICK_BUTTON_PREFIX}:yes:${vote.id}`)
-            .setLabel(`اطرده (${count})`)
-            .setEmoji('👢')
+            .setLabel(`${vote.yes.size} / ${vote.required}`)
+            .setEmoji('✅')
+            .setStyle(ButtonStyle.Success)
+            .setDisabled(closed),
+        new ButtonBuilder()
+            .setCustomId(`${VOTE_KICK_BUTTON_PREFIX}:no:${vote.id}`)
+            .setLabel(`${vote.no.size} / ${vote.required}`)
+            .setEmoji('❌')
             .setStyle(ButtonStyle.Danger)
-            .setDisabled(Boolean(ended) || vote.done),
+            .setDisabled(closed),
     );
     return {
         content: ended ? '' : vote.mentions.map((id) => `<@${id}>`).join(' '),
-        embeds: [{ color: 0xe67e22, title: '👢 فوت كيك', description: lines.join('\n') }],
+        embeds: [{ color: 0x5865f2, description: lines.join('\n'), footer: { text: 'فوت كيك' } }],
         components: [row],
         allowedMentions: ended ? { parse: [] } : { users: vote.mentions },
     };
 }
 
 /**
- * A vote from `voter`. Returns `{ ok: true, vote, passed }` or `{ ok: false, reason }` with reason one of:
+ * A ✅ (`choice` 'yes') or ❌ ('no') vote from `voter`; a member can change their vote. The vote ends when
+ * either side reaches `required`: `passed` (kick) or `failed` (nobody is kicked).
+ * Returns `{ ok: true, vote, passed, failed }` or `{ ok: false, reason }` with reason one of:
  * ended, not_in_channel, target, already.
  */
-export function castVote(voteId, voter, now = Date.now()) {
+export function castVote(voteId, voter, choice = 'yes', now = Date.now()) {
     const vote = votes.get(voteId);
     if (!vote || vote.done || now > vote.endsAt) return { ok: false, reason: 'ended' };
     if (voter?.voice?.channelId !== vote.channelId) return { ok: false, reason: 'not_in_channel' };
     if (voter.id === vote.targetId) return { ok: false, reason: 'target' };
-    if (vote.yes.has(voter.id)) return { ok: false, reason: 'already' };
-    vote.yes.add(voter.id);
+    const [mine, other] = choice === 'no' ? [vote.no, vote.yes] : [vote.yes, vote.no];
+    if (mine.has(voter.id)) return { ok: false, reason: 'already' };
+    other.delete(voter.id);
+    mine.add(voter.id);
     const passed = vote.yes.size >= vote.required;
-    if (passed) vote.done = true;
-    return { ok: true, vote, passed };
+    const failed = !passed && vote.no.size >= vote.required;
+    if (passed || failed) vote.done = true;
+    return { ok: true, vote, passed, failed };
 }
 
 /** Ends a vote that ran out of time. Returns the vote when it was still open. */
