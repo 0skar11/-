@@ -286,3 +286,64 @@ describe('bourse words', () => {
         assert.equal(applyWordAliases('اسعار', ['الدهب'], false), null);
     });
 });
+
+describe('top cc and other members\' holdings (reports #188, #189)', () => {
+    test('in our server top cc ranks CC plus holdings at their sell price; another server shows CC only', async () => {
+        const { HOME_GUILD_ID } = await import('../src/config/homeGuild.js');
+        const { getWealthLeaderboard } = await import('../src/services/cc/bourseService.js');
+        const { ccTopEmbed } = await import('../src/commands/Games/cctop.js');
+        for (const guildId of [HOME_GUILD_ID, GUILD]) {
+            const client = fakeClient();
+            await adjustCC(client, guildId, A, 5000);
+            await adjustCC(client, guildId, B, 3000);
+            assert.equal((await invest(client, guildId, A, 'motorcycle', 3, { now: NOW, rng: seeded(3) })).ok, true);
+            const { cc } = await getProfile(client, guildId, A);
+            const { totalIfSold } = await getHoldings(client, guildId, A, { now: NOW, rng: seeded(3) });
+            const board = await getWealthLeaderboard(client, guildId, { now: NOW, rng: seeded(3) });
+            assert.deepEqual(board.find((row) => row.userId === A), { userId: A, cc, holdings: totalIfSold, total: cc + totalIfSold, earned: 0 });
+
+            const text = (await ccTopEmbed(client, { id: guildId, name: 'Chaos' }, A)).description;
+            if (guildId === HOME_GUILD_ID) {
+                assert.match(text, new RegExp(`<@${A}> — \\*\\*[\\d,]+\\*\\* CC \\(🌀 ${cc.toLocaleString('en-US')} \\+ 📈 [\\d,]+\\)`, 'u'));
+                assert.match(text, /بعد الضريبة/u);
+            } else {
+                assert.doesNotMatch(text, /📈/u);
+                assert.match(text, new RegExp(`<@${A}> — \\*\\*${cc.toLocaleString('en-US')}\\*\\* CC`, 'u'));
+            }
+        }
+    });
+
+    test('`ممتلكات @member` shows that member\'s holdings in our server; elsewhere your own', async () => {
+        const { HOME_GUILD_ID } = await import('../src/config/homeGuild.js');
+        const { GAMES_BOTS_CHANNEL_ID } = await import('../src/config/games.js');
+        const { default: bourse } = await import('../src/commands/Games/bourse.js');
+        const { holdingsEmbed } = await import('../src/services/cc/bourseUi.js');
+        assert.ok(bourse.data.toJSON().options.find((sub) => sub.name === 'holdings').options.some((option) => option.name === 'user'));
+        assert.deepEqual(applyWordAliases('ممتلكات', [`<@${B}>`], false), { commandName: 'bourse', args: ['holdings', `<@${B}>`] });
+        const other = holdingsEmbed({ username: 'bee', toString: () => `<@${B}>` }, { rows: [], totalValue: 0, totalPaid: 0, totalIfSold: 0 }, { balance: 7, own: false });
+        assert.equal(other.title, '💼 ممتلكات bee');
+        assert.equal(other.fields[0].name, '💰 رصيده');
+
+        for (const guildId of [HOME_GUILD_ID, GUILD]) {
+            const client = fakeClient();
+            await adjustCC(client, guildId, B, 4000);
+            await invest(client, guildId, B, 'motorcycle', 1);
+            const replies = [];
+            const interaction = {
+                id: '1', guildId, channelId: GAMES_BOTS_CHANNEL_ID, channel: { id: GAMES_BOTS_CHANNEL_ID },
+                user: { id: A, username: 'ay', toString: () => `<@${A}>` },
+                options: { getSubcommand: () => 'holdings', getUser: () => ({ id: B, username: 'bee', toString: () => `<@${B}>` }) },
+                reply: async (payload) => { replies.push(payload); },
+            };
+            await bourse.execute(interaction, {}, client);
+            const embed = replies[0].embeds[0];
+            if (guildId === HOME_GUILD_ID) {
+                assert.equal(embed.title, '💼 ممتلكات bee');
+                assert.match(embed.description, /× 1/u);
+            } else {
+                assert.equal(embed.title, '💼 ممتلكاتي');
+                assert.match(embed.description, new RegExp(`<@${A}>`, 'u'));
+            }
+        }
+    });
+});

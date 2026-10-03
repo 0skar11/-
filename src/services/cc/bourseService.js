@@ -16,10 +16,10 @@
 import { bourseAssets, bourseSettings, findAsset } from '../../config/store/bourse.js';
 
 export { findAsset };
-import { getBourseKey, getEconomyKey } from '../../utils/database/keys.js';
+import { getBourseKey, getEconomyKey, getEconomyPrefix } from '../../utils/database/keys.js';
 import { Mutex } from '../../utils/mutex.js';
 import { logger } from '../../utils/logger.js';
-import { updateCCState } from './ccService.js';
+import { updateCCState, readCC } from './ccService.js';
 import { isHomeGuild } from '../../config/homeGuild.js';
 
 export const HOUR_MS = 60 * 60 * 1000;
@@ -372,4 +372,33 @@ export async function getHoldings(client, guildId, userId, options = {}) {
         totalPaid: rows.reduce((sum, row) => sum + row.paid, 0),
         totalIfSold: rows.reduce((sum, row) => sum + row.ifSold, 0),
     };
+}
+
+/** What `holdings` (readHoldings) would sell for at `prices` (assetId -> price), after the sell fee on each asset. */
+export function holdingsSellValue(holdings, prices) {
+    let total = 0;
+    for (const [assetId, held] of Object.entries(holdings)) {
+        const value = (prices.get(assetId) || 0) * held.qty;
+        total += value - sellFee(value);
+    }
+    return total;
+}
+
+/**
+ * `top cc` in our server (report #189): every member's CC plus what their bourse holdings would sell
+ * for right now, ranked by the total. Rows are `{ userId, cc, holdings, total, earned }`.
+ */
+export async function getWealthLeaderboard(client, guildId, options = {}) {
+    const { quotes } = await getMarket(client, guildId, options);
+    const prices = new Map(quotes.map(({ asset, price }) => [asset.id, price]));
+    const prefix = getEconomyPrefix(guildId);
+    const keys = await client.db.list(prefix);
+    const rows = [];
+    for (const key of Array.isArray(keys) ? keys : []) {
+        const record = await client.db.get(key, null) || {};
+        const { cc, stats } = readCC(record);
+        const holdings = holdingsSellValue(readHoldings(record), prices);
+        if (cc + holdings > 0) rows.push({ userId: key.slice(prefix.length), cc, holdings, total: cc + holdings, earned: stats.earned });
+    }
+    return rows.sort((a, b) => b.total - a.total || b.earned - a.earned);
 }
