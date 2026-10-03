@@ -73,13 +73,13 @@ describe('vote kick in a voice channel (reports #183, #185)', () => {
     assert.match(payload.embeds[0].description, /Among Us - 27/u);
     assert.match(payload.embeds[0].description, /بيخرب اللعبة/u);
 
-    assert.equal(castVote(vote.id, target, 2_000).reason, 'target');
-    assert.equal(castVote(vote.id, starter, 2_000).reason, 'already');
+    assert.equal(castVote(vote.id, target, 'yes', 2_000).reason, 'target');
+    assert.equal(castVote(vote.id, starter, 'yes', 2_000).reason, 'already');
     const outsider = { id: '299999999999999999', voice: { channelId: null } };
-    assert.equal(castVote(vote.id, outsider, 2_000).reason, 'not_in_channel');
-    const passed = castVote(vote.id, voter, 2_000);
+    assert.equal(castVote(vote.id, outsider, 'yes', 2_000).reason, 'not_in_channel');
+    const passed = castVote(vote.id, voter, 'yes', 2_000);
     assert.equal(passed.passed, true);
-    assert.equal(castVote(vote.id, other, 2_000).reason, 'ended');
+    assert.equal(castVote(vote.id, other, 'yes', 2_000).reason, 'ended');
 
     const kicked = await kickFromVoice(client, guild, channel, target.id, { now: 3_000 });
     assert.deepEqual(kicked, { disconnected: true, denied: true });
@@ -101,6 +101,30 @@ describe('vote kick in a voice channel (reports #183, #185)', () => {
     assert.equal(await sweepVoteKickBlocks(client, guild, 6_000), 1);
     assert.equal(overwrites.has(target.id), false);
     assert.equal(await handleVoteKickVoiceState(client, { guild, channelId: null, channel: null }, rejoin, 7_000), false);
+  });
+
+  test('looks like the Among Us bot: ✅ and ❌ with their counts; ❌ reaching the count ends it, and a vote can change', () => {
+    const { guild, channel, people } = setup({ count: 7 });
+    const [starter, a, b, c, d, target] = people;
+    const { vote } = startVoteKick({ guild, channel, starter, target, now: 100_000 });
+    assert.equal(vote.required, 3);
+    const buttons = () => voteKickPayload(vote).components[0].toJSON().components;
+    assert.deepEqual(buttons().map((button) => [button.emoji.name, button.label, button.style]), [['✅', '1 / 3', 3], ['❌', '0 / 3', 4]]);
+    const text = voteKickPayload(vote).embeds[0].description;
+    assert.match(text, /الأصوات المطلوبة:\*\* `3`/u);
+    assert.match(text, /السبب:\*\* `من غير سبب`/u);
+
+    assert.equal(castVote(vote.id, a, 'no', 101_000).ok, true);
+    assert.equal(castVote(vote.id, a, 'no', 101_000).reason, 'already');
+    // Changing a vote moves it.
+    assert.equal(castVote(vote.id, a, 'yes', 101_000).ok, true);
+    assert.deepEqual([vote.yes.size, vote.no.size], [2, 0]);
+    castVote(vote.id, a, 'no', 101_000);
+    castVote(vote.id, b, 'no', 101_000);
+    const failed = castVote(vote.id, c, 'no', 101_000);
+    assert.deepEqual([failed.passed, failed.failed], [false, true]);
+    assert.equal(castVote(vote.id, d, 'yes', 101_000).reason, 'ended');
+    assert.ok(buttons().every((button) => button.disabled));
   });
 
   test('a block runs out after an hour at most', async () => {

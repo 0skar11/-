@@ -37,7 +37,7 @@ export default {
         if (!interaction._sourceMessage) await reply('✅ التصويت بدأ.');
         setTimeout(async () => {
             const expired = expireVote(vote.id);
-            if (expired) await message.edit(voteKickPayload(expired, { ended: 'خلص الوقت ومكملش العدد، محدش اتطرد.' })).catch(() => {});
+            if (expired) await message.edit(voteKickPayload(expired, { ended: '⏱️ خلص الوقت ومكملش العدد، محدش اتطرد.' })).catch(() => {});
         }, VOTE_KICK.durationMs).unref?.();
     },
 };
