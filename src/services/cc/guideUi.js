@@ -2,7 +2,7 @@
 // (src/commands/Games/guide.js). Every number comes from the config, so the guide never goes stale.
 // Plain embed objects so the emojis stay.
 
-import { CC, ccEmbed, ccBoostLine } from '../../config/cc.js';
+import { CC, ccEmbed, ccBoostLine, gamesBotReward } from '../../config/cc.js';
 import { bourseSettings } from '../../config/store/bourse.js';
 import { INVITE_REWARDS } from '../../config/inviteRewards.js';
 import { GAMES_BOTS_CHANNEL_ID } from '../../config/games.js';
@@ -13,7 +13,7 @@ const n = (value) => Number(value || 0).toLocaleString('en-US');
 // `guildId`: our server's guide also explains the custom roles (`رولي`), sold there only.
 export function buildGuideEmbeds({ boostLine = ccBoostLine(), guildId = null } = {}) {
     const { demand } = bourseSettings;
-    const { transfer, gamesBot, levelUp } = CC;
+    const { transfer, levelUp } = CC;
     return [
         ccEmbed(`${CC.emoji} شرح ${CC.short} والمتجر والبورصة`, [
             `**${CC.short}** هي فلوس السيرفر. بتجمعها وتصرفها في المتجر أو تستثمرها في البورصة.`,
@@ -23,7 +23,7 @@ export function buildGuideEmbeds({ boostLine = ccBoostLine(), guildId = null } =
             ...(boostLine ? ['', boostLine] : []),
         ].join('\n')),
         ccEmbed('💡 تكسب CC ازاي؟', [
-            `🎮 **الألعاب** في <#${GAMES_BOTS_CHANNEL_ID}>: الفوز في لعبة جماعية **${n(gamesBot.win)}**، وأول واحد يكتب الإجابة **${n(gamesBot.answer)}**`,
+            `🎮 **الألعاب** في <#${GAMES_BOTS_CHANNEL_ID}>: الفوز في لعبة جماعية **${n(gamesBotReward('group', guildId))}**، وأول واحد يكتب الإجابة **${n(gamesBotReward('answer', guildId))}**`,
             `⭐ **اللفل**: كل لفل جديد بيديك (رقم اللفل × ${n(levelUp.perLevel)})، يعني لفل 10 = ${n(levelUp.perLevel * 10)}`,
             `📨 **الدعوات**: **${n(INVITE_REWARDS.reward)}** لكل حد تدعوه ويوصل لفل ${INVITE_REWARDS.level} ويكتب ${INVITE_REWARDS.minMessages} رسالة ويقعد ${INVITE_REWARDS.minStayDays} أيام`,
             '🔁 **التحويل**: صحابك يقدروا يحوّلولك',

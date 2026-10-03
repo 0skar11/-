@@ -5,6 +5,7 @@ import guide from '../src/commands/Games/guide.js';
 import { commandAliases, standaloneOnlyAliases } from '../src/config/commands/commandAliases.js';
 import { bourseSettings } from '../src/config/store/bourse.js';
 import { CC } from '../src/config/cc.js';
+import { HOME_GUILD_ID } from '../src/config/homeGuild.js';
 
 describe('شرح: the CC / store / bourse guide in DM', () => {
   test('covers CC, earning, the store, the bourse and transfers with the real numbers', () => {
@@ -16,6 +17,8 @@ describe('شرح: the CC / store / bourse guide in DM', () => {
     assert.ok(text.includes(`${bourseSettings.maxMovePercent}%`));
     assert.ok(text.includes(`${bourseSettings.demand.guaranteedRiseUnits} قطعة`));
     assert.ok(text.includes(`**${CC.gamesBot.win}**`));
+    // Our server's guide shows its own game rewards (report #181).
+    assert.ok(JSON.stringify(buildGuideEmbeds({ boostLine: '', guildId: HOME_GUILD_ID })).includes(`**${CC.gamesBot.home.win}**`));
     assert.ok(embeds.length <= 10 && text.length < 6000);
   });
 

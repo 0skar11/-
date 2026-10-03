@@ -6,6 +6,7 @@
 // takes a tax that grows when someone sends a lot in a week (`transfer` below).
 
 import { getColor } from './bot.js';
+import { isHomeGuild } from './homeGuild.js';
 
 export const CC = {
     name: 'Chaos Credits',
@@ -33,9 +34,11 @@ export const CC = {
     // - a group game win, `👑 | @winner`, pays `win`;
     // - a solo win, `✅ | قام @member بكتابة الاجابة الصحيحة خلال ... ثانية` (first to type the answer), pays `answer`.
     // Its messages don't say how many played, so a win pays a fixed amount (times the CC event multiplier).
+    // `win` / `answer` are for other servers (unchanged); our server pays `home` (report #181).
     gamesBot: {
         win: 50,
         answer: 10,
+        home: { win: 500, answer: 50 },
         // Most CC a member can get from games bot wins per day (UTC), both kinds together: `boostDailyCap`
         // while the CC event runs (a flat amount, not multiplied), `dailyCap` after it (null = no cap).
         boostDailyCap: 5000,
@@ -86,6 +89,12 @@ export function soloDailyCap(now = Date.now()) {
 /** `1,500 CC` for a daily cap, or `no cap` when there is none. */
 export function capText(cap) {
     return Number.isFinite(cap) ? `${cap.toLocaleString('en-US')} ${CC.short}` : 'no cap';
+}
+
+/** CC for a games bot win in `guildId` before the event multiplier: `kind` 'group' (👑) or 'answer'. */
+export function gamesBotReward(kind, guildId = null) {
+    const amounts = isHomeGuild(guildId) ? CC.gamesBot.home : CC.gamesBot;
+    return kind === 'answer' ? amounts.answer : amounts.win;
 }
 
 /** Today's cap on CC from games bot wins: `boostDailyCap` during the CC event, otherwise `dailyCap` (Infinity when null). */
