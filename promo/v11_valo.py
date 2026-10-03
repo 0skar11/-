@@ -1,14 +1,16 @@
-"""v11: Valorant edit ("ايديت فالو") of two of ØSKAR's clips, cut to a phonk beat.
+"""v11: Valorant edit ("ايديت فالو") of four of ØSKAR's clips, cut to a phonk beat.
 
     python3 v11_valo.py                 # writes out/v11-valo.mp4 (and out/v11-valo-nomusic.mp4)
+    python3 v11_valo.py --plan          # print the cut list (output times, kills on beats)
     python3 v11_valo.py --preview 4.5   # one frame at t=4.5s -> out/v11-preview.png
 
-Inputs (gitignored): vo/v11/clip1.mp4 (clutch), vo/v11/clip2.mp4 (ace), vo/v11/phonk.mp3 (ElevenLabs
-music, 130 BPM, drop at 22.125s, a silent break at 43.35-43.75s and the slam back at 44.28s).
+Inputs (gitignored): vo/v11/clip1..4.mp4 and vo/v11/phonk.mp3 (ElevenLabs music, 130 BPM, drop at
+22.125s, a silent break at 43.35-43.75s and the slam back at 44.28s).
 
-Each clip plays through a time map: (output second, source second) keyframes, linear in between.
-The keyframes pin every kill onto a beat, so the speed ramps fall out of the map by themselves. Kill
-frames were found from the kill banner popping under the crosshair.
+Everything plays at normal speed: the dead time is cut out, not sped up. Each cut's in-point is nudged
+(by less than half a beat) so the first kill after it lands on a beat, and the last cut is placed so
+the final kill of the ace hits the slam after the beat's silent break. Kill times (source seconds)
+were found from the kill banner popping under the crosshair.
 """
 import subprocess
 import sys
@@ -25,23 +27,68 @@ OUT = here / 'out'
 FF = imageio_ffmpeg.get_ffmpeg_exe()
 W, H, FPS = 1080, 1920, 30
 
-MUSIC_START = 20.125          # music second at output 0, so the drop (22.125) lands at 2.0
 BEAT = 60 / 130.02
-def beat(k): return 2.0 + k * BEAT
+MUSIC_DROP, MUSIC_SLAM = 22.125, 44.28
+HOOK = 1.0                           # the hook runs until the drop
+MUSIC_START = MUSIC_DROP - HOOK      # music second at output 0
+SLAM = MUSIC_SLAM - MUSIC_START      # output second of the slam back after the silent break
+def on_beat(t): return HOOK + round((t - HOOK) / BEAT) * BEAT
 
-# (clip, [(out, src), ...]) — consecutive segments; the first is the hook (the ACE, slowed, in grey).
-SEGMENTS = [
-    ('clip2', [(0.0, 19.85), (2.0, 20.85)]),
-    ('clip1', [(2.0, 7.20), (beat(2), 8.30), (beat(3), 8.88), (beat(4), 9.20), (beat(8), 11.48),
-               (beat(11), 12.20), (beat(13), 12.90)]),
-    ('clip2', [(beat(13), 5.40), (beat(15), 6.10), (beat(19), 7.80), (beat(23), 9.70), (beat(27), 12.30),
-               (beat(31), 14.80), (beat(41), 18.40), (beat(44), 19.30), (23.225, 20.20), (beat(48), 20.30),
-               (beat(49), 20.67), (26.0, 22.05)]),
+KILLS = {   # source seconds
+    'clip1': [8.30, 8.88, 9.20, 11.48],
+    'clip2': [6.10, 7.80, 18.40, 19.30, 20.30],
+    'clip3': [10.05, 12.30, 14.25],
+    'clip4': [8.55, 13.10, 15.70, 17.75],
+}
+TITLES = [('clip1', 12.20, 'clutch'), ('clip4', 17.75, 'ace'), ('clip2', 20.30, 'ace')]
+
+# (clip, src in, src out). The hook is the ace, in grey; then clutch, clip3, clip4's ace, clip2's ace.
+CUTS = [
+    ('clip1', 7.70, 9.70), ('clip1', 11.00, 12.95),
+    ('clip3', 9.30, 10.90), ('clip3', 11.70, 12.90), ('clip3', 13.60, 14.90), ('clip3', 16.70, 17.90),
+    ('clip4', 7.40, 9.40), ('clip4', 12.40, 13.80), ('clip4', 15.10, 16.30), ('clip4', 17.10, 19.40),
+    ('clip2', 5.30, 6.70), ('clip2', 7.20, 8.40),
 ]
-KILLS = [beat(2), beat(3), beat(4), beat(8), beat(15), beat(19), beat(41), beat(44), beat(48)]
-CLUTCH_AT, ACE_AT = beat(11), beat(48)
-SILENCE = (23.225, beat(48))  # the beat drops out here: everything freezes and zooms in
-END_AT, DURATION = 26.0, 29.5
+FINAL = ('clip2', 17.80, 22.00)      # its kill at 20.30 lands on the slam
+FLEX = len(CUTS) - 1                 # this cut's out-point stretches/shrinks to meet FINAL
+
+
+def plan():
+    """-> list of (out start, out end, clip, src at out start), the hook first."""
+    segs = [(0.0, HOOK, 'clip2', 20.20)]
+    t = HOOK
+    for clip, a, b in CUTS:
+        kills = [k for k in KILLS[clip] if a <= k <= b]
+        if kills:  # shift the in-point so the first kill lands on the nearest beat
+            a = kills[0] - (on_beat(t + kills[0] - a) - t)
+        segs.append([t, t + b - a, clip, a])
+        t += b - a
+    clip, a, b = FINAL
+    start = SLAM - (20.30 - a)
+    segs[FLEX + 1][1] = start                                   # stretch/shrink the cut before it
+    segs.append((start, start + b - a, clip, a))
+    return [tuple(s) for s in segs]
+
+
+SEGS = plan()
+END_AT = SEGS[-1][1]
+DURATION = END_AT + 2.8
+
+
+def segment_at(t):
+    for s in SEGS:
+        if t < s[1]:
+            return s
+    return SEGS[-1]
+
+
+def out_times(clip, src):
+    return [s0 + src - a for s0, s1, c, a in SEGS[1:] if c == clip and s0 <= s0 + src - a < s1]
+
+
+KILL_OUT = sorted(t for c, ks in KILLS.items() for k in ks for t in out_times(c, k))
+TITLE_OUT = [(t, name) for c, src, name in TITLES for t in out_times(c, src)]
+CUT_OUT = [s[0] for s in SEGS[1:]] + [END_AT]
 
 # Gameplay panel: a 810×720 crop around the crosshair, scaled to 1080×960, in the middle of the frame.
 CROP_W, CROP_H = 810, 720
@@ -70,29 +117,13 @@ def build_layers():
         'title': text_layer([('ØSKAR', anton(130), (255, 255, 255, 255), 250),
                              ('CHAOS  •  VALORANT', anton(46), (255, 70, 85, 255), 360),
                              ('CHAOS ON TOP', anton(90), (255, 255, 255, 230), 1600)], stroke=6),
-        'clutch': text_layer([('CLUTCH', anton(250), (255, 255, 255, 255), PANEL_Y + PANEL_H // 2)], stroke=14),
-        'ace': text_layer([('ACE', anton(380), (255, 210, 60, 255), PANEL_Y + PANEL_H // 2)], stroke=16),
+        'clutch': text_layer([('CLUTCH', anton(230), (255, 255, 255, 255), PANEL_Y + PANEL_H // 2)], stroke=12),
+        'ace': text_layer([('ACE', anton(340), (255, 210, 60, 255), PANEL_Y + PANEL_H // 2)], stroke=14),
         'end': text_layer([('CHAOS', anton(260), (255, 255, 255, 255), 700),
                            ('عايز تلعب فالو مع ناس جامدة؟', lal(78), (255, 255, 255, 255), 960),
                            ('تعالى CHAOS', lal(110), (255, 70, 85, 255), 1110),
                            ('لينك الديسكورد في البايو', lal(66), (255, 210, 60, 255), 1400)]),
     }
-
-
-def src_time(points, t):
-    xs, ys = zip(*points)
-    return float(np.interp(t, xs, ys))
-
-
-def segment_at(t):
-    for i, (clip, pts) in enumerate(SEGMENTS):
-        if t < pts[-1][0] or i == len(SEGMENTS) - 1:
-            return i, clip, pts
-    raise ValueError(t)
-
-
-def speed_at(pts, t, dt=1 / FPS):
-    return (src_time(pts, t + dt) - src_time(pts, t)) / dt
 
 
 def decay(t, at, length):
@@ -103,49 +134,29 @@ def decay(t, at, length):
 
 def grade(img):
     hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV).astype(np.float32)
-    hsv[..., 1] = np.clip(hsv[..., 1] * 1.25, 0, 255)
+    hsv[..., 1] = np.clip(hsv[..., 1] * 1.15, 0, 255)
     img = cv2.cvtColor(hsv.astype(np.uint8), cv2.COLOR_HSV2BGR).astype(np.float32)
-    return np.clip((img - 128) * 1.08 + 124, 0, 255).astype(np.uint8)
+    return np.clip((img - 128) * 1.05 + 126, 0, 255).astype(np.uint8)
 
 
-def rgb_split(img, px):
-    if px < 1:
-        return img
-    out = img.copy()
-    out[..., 2] = np.roll(img[..., 2], px, axis=1)
-    out[..., 0] = np.roll(img[..., 0], -px, axis=1)
-    return out
-
-
-def over(base, layer, alpha=1.0, dx=0, dy=0, scale=1.0):
-    """Alpha-blend an RGBA full-frame layer onto the BGR frame."""
+def over(base, layer, alpha=1.0, scale=1.0):
+    """Alpha-blend an RGBA full-frame layer onto the BGR frame (scaled around its own center)."""
     if alpha <= 0:
         return base
     if scale != 1.0:
         M = cv2.getRotationMatrix2D((W / 2, (layer[..., 3] > 0).any(1).nonzero()[0].mean()), 0, scale)
-        M[0, 2] += dx; M[1, 2] += dy
         layer = cv2.warpAffine(layer, M, (W, H))
-    elif dx or dy:
-        layer = np.roll(layer, (dy, dx), axis=(0, 1))
     a = layer[..., 3:4].astype(np.float32) / 255 * alpha
     rgb = layer[..., 2::-1].astype(np.float32)
     return (base * (1 - a) + rgb * a).astype(np.uint8)
 
 
-def compose(t, frame, layers, last_frame=None):
+def compose(t, frame, layers):
     """frame: the 1280×720 BGR source frame for output time t."""
-    _, clip, pts = segment_at(t)
-    hook = t < 2.0
-    ending = t >= END_AT
-    if ending:
-        frame = last_frame
-
-    kick = sum(decay(t, k, 0.28) for k in KILLS)
-    on_beat = 0.0 if hook or ending else decay(t, beat(round((t - 2.0) / BEAT)), 0.18) * 0.35
-    zoom = 1.0 + 0.16 * kick + 0.04 * on_beat
-    if SILENCE[0] <= t < SILENCE[1]:  # slow push-in through the silent break
-        zoom += 0.35 * (t - SILENCE[0]) / (SILENCE[1] - SILENCE[0])
-    shake = 26 * kick
+    hook, ending = t < HOOK, t >= END_AT
+    kick = sum(decay(t, k, 0.22) for k in KILL_OUT)
+    zoom = 1.0 + 0.07 * kick
+    shake = 8 * kick
     rng = np.random.default_rng(int(t * FPS))
     sx, sy = (rng.uniform(-1, 1, 2) * shake).astype(int)
 
@@ -156,46 +167,38 @@ def compose(t, frame, layers, last_frame=None):
     bg = cv2.GaussianBlur(bg[:, x0:x0 + W], (0, 0), 18)
     out = (bg.astype(np.float32) * 0.42).astype(np.uint8)
 
-    # Gameplay panel with zoom punch + shake.
+    # Gameplay panel with a light zoom punch + shake on kills.
     cw, ch = CROP_W / zoom, CROP_H / zoom
-    cx, cy = 640 + sx * 0.3, 360 + sy * 0.3
-    x1, y1 = int(cx - cw / 2), int(cy - ch / 2)
-    x1 = min(max(x1, 0), 1280 - int(cw)); y1 = min(max(y1, 0), 720 - int(ch))
-    panel = cv2.resize(frame[y1:y1 + int(ch), x1:x1 + int(cw)], (PANEL_W, PANEL_H), interpolation=cv2.INTER_CUBIC)
-    panel = grade(panel)
-    panel = rgb_split(panel, int(14 * kick))
-    if hook or SILENCE[0] <= t < SILENCE[1]:
-        grey = cv2.cvtColor(cv2.cvtColor(panel, cv2.COLOR_BGR2GRAY), cv2.COLOR_GRAY2BGR)
-        panel = grey if hook else cv2.addWeighted(panel, 0.35, grey, 0.65, 0)
-    py = PANEL_Y + sy
-    out[max(py, 0):py + PANEL_H, :] = panel[max(0, -py):PANEL_H - max(0, py + PANEL_H - H), :]
+    x1 = min(max(int(640 + sx - cw / 2), 0), 1280 - int(cw)); y1 = min(max(int(360 + sy - ch / 2), 0), 720 - int(ch))
+    panel = grade(cv2.resize(frame[y1:y1 + int(ch), x1:x1 + int(cw)], (PANEL_W, PANEL_H), interpolation=cv2.INTER_CUBIC))
+    if hook:
+        panel = cv2.cvtColor(cv2.cvtColor(panel, cv2.COLOR_BGR2GRAY), cv2.COLOR_GRAY2BGR)
+    out[PANEL_Y:PANEL_Y + PANEL_H] = panel
     if not hook and not ending:
-        cv2.rectangle(out, (0, py), (W - 1, py + PANEL_H - 1), (85, 70, 255), 4)
+        cv2.rectangle(out, (0, PANEL_Y), (W - 1, PANEL_Y + PANEL_H - 1), (85, 70, 255), 4)
 
     if ending:
         e = min(1.0, (t - END_AT) / 0.35)
         out = (out.astype(np.float32) * (1 - 0.45 * e)).astype(np.uint8)
-        out = over(out, layers['end'], e, scale=1.0 + 0.25 * (1 - e) + 0.03 * decay(t, beat(round((t - 2) / BEAT)), 0.2))
+        out = over(out, layers['end'], e, scale=1.0 + 0.2 * (1 - e))
     elif hook:
-        out = over(out, layers['hook'], min(1.0, t / 0.2))
+        out = over(out, layers['hook'], min(1.0, t / 0.15))
     else:
         out = over(out, layers['title'])
-        if CLUTCH_AT <= t < SEGMENTS[1][1][-1][0]:
-            k = decay(t, CLUTCH_AT, 0.25)
-            out = over(out, layers['clutch'], 1.0, dx=int(rng.uniform(-8, 8) * (1 + 3 * k)), scale=1.0 + 0.6 * k)
-        if ACE_AT <= t < END_AT:
-            k = decay(t, ACE_AT, 0.3)
-            out = over(out, layers['ace'], min(1.0, (t - ACE_AT) / 0.08), scale=1.0 + 0.8 * k)
+        for at, name in TITLE_OUT:
+            seg_end = segment_at(at)[1]
+            if at <= t < seg_end:
+                out = over(out, layers[name], min(1.0, (t - at) / 0.08), scale=1.0 + 0.3 * decay(t, at, 0.25))
 
-    # White flash on kills and on the cuts.
-    flash = max(0.55 * decay(t, k, 0.14) for k in KILLS + [2.0, SEGMENTS[2][1][0][0], END_AT])
+    # A soft white flash on kills and on the bigger cuts.
+    flash = max([0.3 * decay(t, k, 0.1) for k in KILL_OUT] + [0.35 * decay(t, c, 0.1) for c in (HOOK, END_AT)])
     if flash > 0:
         out = (out.astype(np.float32) * (1 - flash) + 255 * flash).astype(np.uint8)
     return out
 
 
 class Clip:
-    """Sequential reader with a small cache, since the requests per clip are mostly ascending."""
+    """Sequential reader with a small cache, since the requests per clip are ascending."""
     def __init__(self, path):
         self.path = path
         cap = cv2.VideoCapture(str(path))
@@ -208,54 +211,51 @@ class Clip:
             return self.cache[i]
         if self.cap is None or i < self.idx:
             self.cap = cv2.VideoCapture(str(self.path)); self.idx = -1; self.cache = {}
-        frame = None
         while self.idx < i:
             ok, f = self.cap.read()
             if not ok:
                 break
-            self.idx += 1; frame = f
+            self.idx += 1
             self.cache[self.idx] = f
             for k in [k for k in self.cache if k < self.idx - 3]:
                 del self.cache[k]
-        return self.cache.get(i, frame if frame is not None else self.cache[max(self.cache)])
+        return self.cache.get(i, self.cache[max(self.cache)])
 
-    def at(self, s, blend):
-        x = s * self.fps
-        i = int(x)
-        if not blend:
-            return self.get(int(round(x)))
-        a, b = self.get(i), self.get(i + 1)
-        return cv2.addWeighted(a, 1 - (x - i), b, x - i, 0)
+    def at(self, s):
+        return self.get(int(round(s * self.fps)))
+
+
+def source(t):
+    s0, _, clip, a = segment_at(min(t, END_AT - 1e-3))
+    return clip, a + min(t, END_AT - 1e-3) - s0
 
 
 def main():
+    if '--plan' in sys.argv:
+        for s0, s1, clip, a in SEGS:
+            print(f'{s0:6.2f}-{s1:6.2f}  {clip}  src {a:6.2f}-{a + s1 - s0:6.2f}')
+        print('kills', [round(k, 2) for k in KILL_OUT], '\ntitles', [(round(t, 2), n) for t, n in TITLE_OUT],
+              f'\nslam {SLAM:.2f}, end card {END_AT:.2f}-{DURATION:.2f}')
+        return
     layers = build_layers()
-    clips = {k: Clip(V / f'{k}.mp4') for k in ('clip1', 'clip2')}
-    last = clips['clip2'].at(SEGMENTS[-1][1][-1][1], False)
+    clips = {k: Clip(V / f'{k}.mp4') for k in KILLS}
     if '--preview' in sys.argv:
         t = float(sys.argv[sys.argv.index('--preview') + 1])
-        _, clip, pts = segment_at(t)
-        f = clips[clip].at(src_time(pts, t), True)
-        cv2.imwrite(str(OUT / 'v11-preview.png'), compose(t, f, layers, last))
+        clip, s = source(t)
+        cv2.imwrite(str(OUT / 'v11-preview.png'), compose(t, clips[clip].at(s), layers))
         return
     # Decode in source order (grouped per clip), keep the composited frames as JPEG, then write in order.
     n = int(DURATION * FPS)
-    reqs = []
-    for i in range(n):
-        t = i / FPS
-        if t >= END_AT:
-            continue
-        _, clip, pts = segment_at(t)
-        reqs.append((clip, src_time(pts, t), i, abs(speed_at(pts, t)) < 0.8))
+    reqs = [(*source(i / FPS), i) for i in range(n)]
     done = {}
-    for clip, s, i, blend in sorted(reqs, key=lambda r: (r[0], r[1])):
-        done[i] = cv2.imencode('.jpg', compose(i / FPS, clips[clip].at(s, blend), layers, last), [cv2.IMWRITE_JPEG_QUALITY, 95])[1]
+    for clip, s, i in sorted(reqs, key=lambda r: (r[0], r[1])):
+        done[i] = cv2.imencode('.jpg', compose(i / FPS, clips[clip].at(s), layers), [cv2.IMWRITE_JPEG_QUALITY, 95])[1]
     video = OUT / 'v11-valo.video.mp4'
     ff = subprocess.Popen([FF, '-y', '-loglevel', 'error', '-f', 'image2pipe', '-framerate', str(FPS), '-c:v', 'mjpeg', '-i', '-',
                            '-c:v', 'libx264', '-pix_fmt', 'yuv420p', '-preset', 'slow', '-crf', '18', '-movflags', '+faststart', str(video)],
                           stdin=subprocess.PIPE)
     for i in range(n):
-        ff.stdin.write(done[i].tobytes() if i in done else cv2.imencode('.jpg', compose(i / FPS, last, layers, last))[1].tobytes())
+        ff.stdin.write(done[i].tobytes())
     ff.stdin.close(); ff.wait()
     fade = DURATION - 0.9
     subprocess.run([FF, '-y', '-loglevel', 'error', '-i', str(video), '-ss', str(MUSIC_START), '-t', str(DURATION), '-i', str(V / 'phonk.mp3'),
