@@ -1,10 +1,13 @@
-"""v11: Valorant edit ("ايديت فالو") of four of ØSKAR's clips, cut to a phonk beat.
+"""v11: Valorant edit ("ايديت فالو") of six of ØSKAR's clips, cut to a phonk beat, in two versions:
 
-    python3 v11_valo.py                 # writes out/v11-valo.mp4 (and out/v11-valo-nomusic.mp4)
-    python3 v11_valo.py --plan          # print the cut list (output times, kills on beats)
-    python3 v11_valo.py --preview 4.5   # one frame at t=4.5s -> out/v11-preview.png
+  post  out/v11-valo-post.mp4   1080×1920 for TikTok: hook text, ØSKAR / CHAOS titles, CLUTCH, CHAOS end card
+  edit  out/v11-valo-edit.mp4   1920×1080 plain edit: full-frame gameplay and the beat, no text
 
-Inputs (gitignored): vo/v11/clip1..4.mp4 and vo/v11/phonk.mp3 (ElevenLabs music, 130 BPM, drop at
+    python3 v11_valo.py [post|edit]          # both when no version is given
+    python3 v11_valo.py --plan               # print the cut list (output times, kills on beats)
+    python3 v11_valo.py post --preview 4.5   # one frame at t=4.5s -> out/v11-preview.png
+
+Inputs (gitignored): vo/v11/clip1..6.mp4 and vo/v11/phonk.mp3 (ElevenLabs music, 130 BPM, drop at
 22.125s, a silent break at 43.35-43.75s and the slam back at 44.28s).
 
 Everything plays at normal speed: the dead time is cut out, not sped up. Each cut's in-point is nudged
@@ -39,15 +42,20 @@ KILLS = {   # source seconds
     'clip2': [6.10, 7.80, 18.40, 19.30, 20.30],
     'clip3': [10.05, 12.30, 14.25],
     'clip4': [8.55, 13.10, 15.70, 17.75],
+    'clip5': [10.60, 11.50, 13.45, 14.95],
+    'clip6': [4.92, 5.76, 6.84],
 }
-TITLES = [('clip1', 12.20, 'clutch'), ('clip4', 17.75, 'ace'), ('clip2', 20.30, 'ace')]
+TITLES = [('clip1', 12.20, 'clutch')]
 
-# (clip, src in, src out). The hook is the ace, in grey; then clutch, clip3, clip4's ace, clip2's ace.
+# (clip, src in, src out). The hook is the ace, in grey; then the clutch, clips 3, 5 and 6, clip4's ace,
+# and clip2's ace last. Only the moments around the kills are kept (no deaths, no walking around).
 CUTS = [
-    ('clip1', 7.70, 9.70), ('clip1', 11.00, 12.95),
-    ('clip3', 9.30, 10.90), ('clip3', 11.70, 12.90), ('clip3', 13.60, 14.90), ('clip3', 16.70, 17.90),
-    ('clip4', 7.40, 9.40), ('clip4', 12.40, 13.80), ('clip4', 15.10, 16.30), ('clip4', 17.10, 19.40),
-    ('clip2', 5.30, 6.70), ('clip2', 7.20, 8.40),
+    ('clip1', 7.70, 9.60), ('clip1', 11.10, 12.80),
+    ('clip3', 9.40, 10.70), ('clip3', 11.90, 12.80), ('clip3', 13.80, 14.70),
+    ('clip5', 10.20, 12.00), ('clip5', 13.00, 13.90), ('clip5', 14.60, 15.50),
+    ('clip6', 4.50, 7.30),
+    ('clip4', 8.00, 9.20), ('clip4', 12.60, 13.60), ('clip4', 15.30, 16.10), ('clip4', 17.30, 19.00),
+    ('clip2', 5.60, 6.60), ('clip2', 7.40, 8.30),
 ]
 FINAL = ('clip2', 17.80, 22.00)      # its kill at 20.30 lands on the slam
 FLEX = len(CUTS) - 1                 # this cut's out-point stretches/shrinks to meet FINAL
@@ -72,7 +80,6 @@ def plan():
 
 SEGS = plan()
 END_AT = SEGS[-1][1]
-DURATION = END_AT + 2.8
 
 
 def segment_at(t):
@@ -118,7 +125,6 @@ def build_layers():
                              ('CHAOS  •  VALORANT', anton(46), (255, 70, 85, 255), 360),
                              ('CHAOS ON TOP', anton(90), (255, 255, 255, 230), 1600)], stroke=6),
         'clutch': text_layer([('CLUTCH', anton(230), (255, 255, 255, 255), PANEL_Y + PANEL_H // 2)], stroke=12),
-        'ace': text_layer([('ACE', anton(340), (255, 210, 60, 255), PANEL_Y + PANEL_H // 2)], stroke=14),
         'end': text_layer([('CHAOS', anton(260), (255, 255, 255, 255), 700),
                            ('عايز تلعب فالو مع ناس جامدة؟', lal(78), (255, 255, 255, 255), 960),
                            ('تعالى CHAOS', lal(110), (255, 70, 85, 255), 1110),
@@ -151,8 +157,25 @@ def over(base, layer, alpha=1.0, scale=1.0):
     return (base * (1 - a) + rgb * a).astype(np.uint8)
 
 
+def compose_edit(t, frame, layers=None):
+    """The plain version: full-frame 1920×1080 gameplay, a light zoom punch on kills, no text."""
+    kick = sum(decay(t, k, 0.22) for k in KILL_OUT)
+    zoom = 1.0 + 0.06 * kick
+    rng = np.random.default_rng(int(t * FPS))
+    sx, sy = (rng.uniform(-1, 1, 2) * 6 * kick).astype(int)
+    cw, ch = 1280 / zoom, 720 / zoom
+    x1 = min(max(int(640 + sx - cw / 2), 0), 1280 - int(cw)); y1 = min(max(int(360 + sy - ch / 2), 0), 720 - int(ch))
+    out = grade(cv2.resize(frame[y1:y1 + int(ch), x1:x1 + int(cw)], (1920, 1080), interpolation=cv2.INTER_CUBIC))
+    if t < HOOK:
+        out = cv2.cvtColor(cv2.cvtColor(out, cv2.COLOR_BGR2GRAY), cv2.COLOR_GRAY2BGR)
+    flash = max([0.25 * decay(t, k, 0.1) for k in KILL_OUT] + [0.35 * decay(t, HOOK, 0.1)])
+    fade = min(1.0, max(0.0, (t - END_AT) / 1.0))  # fade to black after the last ace
+    out = out.astype(np.float32) * (1 - flash) + 255 * flash
+    return (out * (1 - fade)).astype(np.uint8)
+
+
 def compose(t, frame, layers):
-    """frame: the 1280×720 BGR source frame for output time t."""
+    """The post version. frame: the 1280×720 BGR source frame for output time t."""
     hook, ending = t < HOOK, t >= END_AT
     kick = sum(decay(t, k, 0.22) for k in KILL_OUT)
     zoom = 1.0 + 0.07 * kick
@@ -230,41 +253,52 @@ def source(t):
     return clip, a + min(t, END_AT - 1e-3) - s0
 
 
-def main():
-    if '--plan' in sys.argv:
-        for s0, s1, clip, a in SEGS:
-            print(f'{s0:6.2f}-{s1:6.2f}  {clip}  src {a:6.2f}-{a + s1 - s0:6.2f}')
-        print('kills', [round(k, 2) for k in KILL_OUT], '\ntitles', [(round(t, 2), n) for t, n in TITLE_OUT],
-              f'\nslam {SLAM:.2f}, end card {END_AT:.2f}-{DURATION:.2f}')
-        return
-    layers = build_layers()
-    clips = {k: Clip(V / f'{k}.mp4') for k in KILLS}
-    if '--preview' in sys.argv:
-        t = float(sys.argv[sys.argv.index('--preview') + 1])
-        clip, s = source(t)
-        cv2.imwrite(str(OUT / 'v11-preview.png'), compose(t, clips[clip].at(s), layers))
-        return
+VERSIONS = {  # name -> (compose, size, seconds after the last ace)
+    'post': (compose, (W, H), 2.8),
+    'edit': (compose_edit, (1920, 1080), 1.2),
+}
+
+
+def render(name, layers, clips):
+    comp, (w, h), tail = VERSIONS[name]
+    duration = END_AT + tail
+    n = int(duration * FPS)
     # Decode in source order (grouped per clip), keep the composited frames as JPEG, then write in order.
-    n = int(DURATION * FPS)
-    reqs = [(*source(i / FPS), i) for i in range(n)]
     done = {}
-    for clip, s, i in sorted(reqs, key=lambda r: (r[0], r[1])):
-        done[i] = cv2.imencode('.jpg', compose(i / FPS, clips[clip].at(s), layers), [cv2.IMWRITE_JPEG_QUALITY, 95])[1]
-    video = OUT / 'v11-valo.video.mp4'
+    for clip, s, i in sorted(((*source(i / FPS), i) for i in range(n)), key=lambda r: (r[0], r[1])):
+        done[i] = cv2.imencode('.jpg', comp(i / FPS, clips[clip].at(s), layers), [cv2.IMWRITE_JPEG_QUALITY, 95])[1]
+    video = OUT / f'v11-valo-{name}.video.mp4'
     ff = subprocess.Popen([FF, '-y', '-loglevel', 'error', '-f', 'image2pipe', '-framerate', str(FPS), '-c:v', 'mjpeg', '-i', '-',
                            '-c:v', 'libx264', '-pix_fmt', 'yuv420p', '-preset', 'slow', '-crf', '18', '-movflags', '+faststart', str(video)],
                           stdin=subprocess.PIPE)
     for i in range(n):
         ff.stdin.write(done[i].tobytes())
     ff.stdin.close(); ff.wait()
-    fade = DURATION - 0.9
-    subprocess.run([FF, '-y', '-loglevel', 'error', '-i', str(video), '-ss', str(MUSIC_START), '-t', str(DURATION), '-i', str(V / 'phonk.mp3'),
+    fade = duration - 1.0
+    subprocess.run([FF, '-y', '-loglevel', 'error', '-i', str(video), '-ss', str(MUSIC_START), '-t', str(duration), '-i', str(V / 'phonk.mp3'),
                     '-map', '0:v', '-map', '1:a', '-c:v', 'copy',
-                    '-af', f'afade=t=out:st={fade}:d=0.9,loudnorm=I=-14:TP=-1.5:LRA=11', '-ar', '44100', '-c:a', 'aac', '-b:a', '192k',
-                    '-shortest', '-movflags', '+faststart', str(OUT / 'v11-valo.mp4')], check=True)
-    subprocess.run([FF, '-y', '-loglevel', 'error', '-i', str(video), '-f', 'lavfi', '-i', 'anullsrc=r=44100:cl=stereo', '-map', '0:v', '-map', '1:a',
-                    '-c:v', 'copy', '-c:a', 'aac', '-shortest', '-movflags', '+faststart', str(OUT / 'v11-valo-nomusic.mp4')], check=True)
-    print('-> out/v11-valo.mp4, out/v11-valo-nomusic.mp4')
+                    '-af', f'afade=t=out:st={fade}:d=1.0,loudnorm=I=-14:TP=-1.5:LRA=11', '-ar', '44100', '-c:a', 'aac', '-b:a', '192k',
+                    '-shortest', '-movflags', '+faststart', str(OUT / f'v11-valo-{name}.mp4')], check=True)
+    print(f'-> out/v11-valo-{name}.mp4 ({duration:.1f}s)')
+
+
+def main():
+    if '--plan' in sys.argv:
+        for s0, s1, clip, a in SEGS:
+            print(f'{s0:6.2f}-{s1:6.2f}  {clip}  src {a:6.2f}-{a + s1 - s0:6.2f}')
+        print('kills', [round(k, 2) for k in KILL_OUT], '\ntitles', [(round(t, 2), n) for t, n in TITLE_OUT],
+              f'\nslam {SLAM:.2f}, last ace ends {END_AT:.2f}')
+        return
+    names = [a for a in sys.argv[1:] if a in VERSIONS] or list(VERSIONS)
+    layers = build_layers()
+    clips = {k: Clip(V / f'{k}.mp4') for k in KILLS}
+    if '--preview' in sys.argv:
+        t = float(sys.argv[sys.argv.index('--preview') + 1])
+        clip, s = source(t)
+        cv2.imwrite(str(OUT / 'v11-preview.png'), VERSIONS[names[0]][0](t, clips[clip].at(s), layers))
+        return
+    for name in names:
+        render(name, layers, clips)
 
 
 if __name__ == '__main__':
