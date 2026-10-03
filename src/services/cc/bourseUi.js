@@ -55,22 +55,26 @@ export function pricesEmbed({ quotes, nextChangeAt }, { balance = null } = {}) {
 }
 
 /** `ممتلكاتي`: what the member owns, what they paid and what they'd get selling now. */
-export function holdingsEmbed(user, { rows, totalValue, totalPaid, totalIfSold }, { balance = null } = {}) {
+export function holdingsEmbed(user, { rows, totalValue, totalPaid, totalIfSold }, { balance = null, own = true } = {}) {
+    // Another member's holdings (`ممتلكات @member`, report #188) are worded about them.
+    const words = own
+        ? { title: '💼 ممتلكاتي', balance: '💰 رصيدك', empty: 'معندكش حاجة لسه. اكتب `اسعار` وشوف تشتري إيه 📈', paid: 'دفعت', sold: 'لو بعت', soldAll: 'لو بعت كله' }
+        : { title: `💼 ممتلكات ${user.displayName || user.username || ''}`.trim(), balance: '💰 رصيده', empty: 'معندوش حاجة في البورصة لسه.', paid: 'دفع', sold: 'لو باع', soldAll: 'لو باع كله' };
     // The member's CC balance (report #174), when given.
-    const balanceField = balance === null ? [] : [{ name: '💰 رصيدك', value: formatCC(balance), inline: true }];
+    const balanceField = balance === null ? [] : [{ name: words.balance, value: formatCC(balance), inline: true }];
     if (!rows.length) {
-        return ccEmbed('💼 ممتلكاتي', `${user}\n\nمعندكش حاجة لسه. اكتب \`اسعار\` وشوف تشتري إيه 📈`, { fields: balanceField });
+        return ccEmbed(words.title, `${user}\n\n${words.empty}`, { fields: balanceField });
     }
     const lines = rows.map((row) => [
         `${row.asset.emoji} **${row.asset.name}** × ${row.qty}`,
-        `> دفعت: ${formatCC(row.paid)} ・ قيمتها دلوقتي: ${formatCC(row.value)}`,
-        `> لو بعت: ${formatCC(row.ifSold)} ・ ${signedCC(row.profit)}`,
+        `> ${words.paid}: ${formatCC(row.paid)} ・ قيمتها دلوقتي: ${formatCC(row.value)}`,
+        `> ${words.sold}: ${formatCC(row.ifSold)} ・ ${signedCC(row.profit)}`,
     ].join('\n'));
-    return ccEmbed('💼 ممتلكاتي', [`${user}`, '', lines.join('\n\n')].join('\n'), {
+    return ccEmbed(words.title, [`${user}`, '', lines.join('\n\n')].join('\n'), {
         fields: [
-            { name: '💵 دفعت', value: formatCC(totalPaid), inline: true },
+            { name: `💵 ${words.paid}`, value: formatCC(totalPaid), inline: true },
             { name: '📊 قيمتها', value: formatCC(totalValue), inline: true },
-            { name: '🧾 لو بعت كله', value: `${formatCC(totalIfSold)}\n${signedCC(totalIfSold - totalPaid)}`, inline: true },
+            { name: `🧾 ${words.soldAll}`, value: `${formatCC(totalIfSold)}\n${signedCC(totalIfSold - totalPaid)}`, inline: true },
             ...balanceField,
         ],
         thumbnail: user.displayAvatarURL?.() || null,

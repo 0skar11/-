@@ -10,7 +10,7 @@ import { InteractionHelper } from '../../utils/interactionHelper.js';
 import { isHomeGuild } from '../../config/homeGuild.js';
 
 // The CC bourse: `اسعار` (prices of the hour), `شراء عربية` / `استثمار عربية` / `شراء 3 2` (buy), `بيع عربية` /
-// `بيع 3 2` (sell) and `ممتلكاتي` (holdings). Buying and selling are confirmed with a button
+// `بيع 3 2` (sell) and `ممتلكاتي` / `ممتلكات @member` (holdings; another member's in our server only). Buying and selling are confirmed with a button
 // (src/interactions/buttons/store/bourse.js). The rules are src/config/store/bourse.js.
 const assetOption = (option) => option.setName('asset').setDescription('Asset number or name (see /bourse prices)').setRequired(true);
 const quantityOption = (option) => option
@@ -42,7 +42,8 @@ export default {
         .addSubcommand((sub) => sub.setName('prices').setDescription('Prices of the hour'))
         .addSubcommand((sub) => sub.setName('invest').setDescription('Buy an asset at the price of the hour').addStringOption(assetOption).addIntegerOption(quantityOption))
         .addSubcommand((sub) => sub.setName('sell').setDescription('Sell an asset at the price of the hour').addStringOption(assetOption).addIntegerOption(quantityOption))
-        .addSubcommand((sub) => sub.setName('holdings').setDescription('What you own and what it is worth')),
+        .addSubcommand((sub) => sub.setName('holdings').setDescription('What you (or another member) own and what it is worth')
+            .addUserOption((option) => option.setName('user').setDescription('Whose holdings to see (default: yours)'))),
 
     // `بورصة` alone shows the prices, and so do `استثمار` / `بيع` without an asset. A name of several
     // words (`بيع سبيكة دهب 2`) is kept together as the asset.
@@ -66,8 +67,12 @@ export default {
             return reply({ embeds: [pricesEmbed(await getMarket(client, guildId), { balance })] });
         }
         if (sub === 'holdings') {
-            const balance = isHomeGuild(guildId) ? (await getProfile(client, guildId, user.id)).cc : null;
-            return reply({ embeds: [holdingsEmbed(user, await getHoldings(client, guildId, user.id), { balance })] });
+            // `ممتلكات @member`: anyone's holdings, in our server only (report #188).
+            const other = interaction.options.getUser('user');
+            const whose = other && other.id !== user.id && isHomeGuild(guildId) ? other : user;
+            if (whose.bot) return reply({ content: '🤖 البوتات مالهاش ممتلكات.' });
+            const balance = isHomeGuild(guildId) ? (await getProfile(client, guildId, whose.id)).cc : null;
+            return reply({ embeds: [holdingsEmbed(whose, await getHoldings(client, guildId, whose.id), { balance, own: whose.id === user.id })] });
         }
 
         const asset = findAsset(interaction.options.getString('asset'));
