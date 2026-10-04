@@ -17,7 +17,7 @@ async function execute(interaction, client, [action, userId]) {
         return interaction.reply({ content: FAILURE_TEXT[result.reason], flags: MessageFlags.Ephemeral }).catch(() => {});
     }
     await interaction.deferUpdate().catch(() => {});
-    await logRejoinDecision(interaction.guild, userId, interaction.user.id, result.approved ? result.given : result.asked, result.approved);
+    await logRejoinDecision(interaction.guild, userId, interaction.user.id, result.approved ? result.given : result.asked, result.approved, result.skipped);
     await interaction.message?.delete().catch(() => {});
 }
 

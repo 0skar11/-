@@ -95,6 +95,24 @@ describe('a member who comes back gets their things back (owner\'s request)', ()
     assert.match(sent.log[0].embeds[0].title, /اترفض/u);
   });
 
+  test('a staff role above the bot\'s role is still asked about, marked ⚠️, and the log says it wasn\'t given', async () => {
+    const { guild, member, sent } = setup();
+    const high = { ...role('400000000000000009', ROLE_DEFINITIONS[2].name, PermissionsBitField.Flags.Administrator), editable: false };
+    guild.roles.cache.set(high.id, high);
+    await saveLeavingMember(member([high, STAFF]));
+    const back = member([]);
+    const result = await restoreRejoiningMember(back);
+    assert.deepEqual(result.pending, [high.id, STAFF.id]);
+    assert.equal(sent.approval.length, 1);
+    assert.match(sent.approval[0].embeds[0].description, new RegExp(`<@&${high.id}> ⚠️`));
+    assert.match(sent.approval[0].embeds[0].description, /فوق رول البوت/u);
+
+    const interaction = { inGuild: () => true, guild, user: { id: TRUSTED }, message: { delete: async () => {} }, deferUpdate: async () => {}, reply: async () => {} };
+    await rejoinButtons.execute(interaction, guild.client, ['approve', MEMBER]);
+    assert.deepEqual(back.given, [STAFF.id]);
+    assert.match(sent.log[0].embeds[0].description, new RegExp(`مرجعتش \\(فوق رول البوت\\): <@&${high.id}>`));
+  });
+
   test('another server: nothing is saved or given back', async () => {
     const { member, store } = setup('100000000000000099');
     assert.equal(await saveLeavingMember(member([NORMAL, STAFF])), null);
