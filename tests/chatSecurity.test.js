@@ -6,6 +6,8 @@ import { trackMessage, handleOwnerMentionSpam, handleSpam, FLOOD_MESSAGES, OWNER
 import { purgeInvites, untrust } from '../src/services/securityCleanupService.js';
 import { SERVER_OWNER_IDS } from '../src/config/serverOwners.js';
 import { MAIN_INVITE_CODE } from '../src/config/security.js';
+import { HOME_GUILD_ID } from '../src/config/homeGuild.js';
+import { ROLE_DEFINITIONS } from '../src/services/staffRoleHierarchyService.js';
 
 describe('chat filter (reports #146, #147, #151)', () => {
   const cases = {
@@ -123,6 +125,48 @@ describe('anti spam (#144) and owner mentions (#148)', () => {
     assert.equal(await ping('g', 2), false);
     assert.equal(await handleOwnerMentionSpam(message('هاي', { userId: 'g' }), { now: 3 }), false);
     assert.equal(await ping('g', 4), false);
+  });
+});
+
+describe('staff may mention the owner in our server (report #196)', () => {
+  const homeMessage = (userId, member, { guildId = HOME_GUILD_ID } = {}) => ({
+    id: String(Math.random()), content: `<@${OWNER_PING_ID}>`, channelId: 'c',
+    guild: {
+      id: guildId, ownerId: '1', channels: { cache: new Map() },
+      client: { db: { get: async (key, fallback) => (key.includes('config') ? { antiNukeTrustedUsers: ['300000000000000077'] } : fallback), set: async () => true } },
+      members: { me: null, fetch: async () => member },
+    },
+    author: { id: userId, bot: false }, member,
+    mentions: { users: new Map([[OWNER_PING_ID, {}]]) },
+    client: { user: { id: 'bot' } },
+    channel: { send: async () => ({ delete: async () => {} }) },
+    delete: async () => {},
+  });
+  const plain = (id, roles = []) => ({ id, permissions: new PermissionsBitField(0n), roles: { cache: new Map(roles.map((role) => [role.id, role])) } });
+
+  test('staff roles, Manage Messages and the trusted list mention freely; members still get the warning', async () => {
+    const staffRole = { id: '400000000000000001', name: ROLE_DEFINITIONS.find((definition) => definition.name.includes('Support')).name };
+    const cases = [
+      ['300000000000000071', plain('300000000000000071', [staffRole])],
+      ['300000000000000072', { ...plain('300000000000000072'), permissions: new PermissionsBitField(PermissionsBitField.Flags.ManageMessages) }],
+      ['300000000000000077', plain('300000000000000077')],
+    ];
+    for (const [userId, member] of cases) {
+      for (let i = 1; i <= 5; i += 1) assert.equal(await handleOwnerMentionSpam(homeMessage(userId, member), { now: i }), false, userId);
+    }
+    const member = plain('300000000000000073');
+    assert.equal(await handleOwnerMentionSpam(homeMessage(member.id, member), { now: 1 }), false);
+    assert.equal(await handleOwnerMentionSpam(homeMessage(member.id, member), { now: 2 }), false);
+    assert.equal(await handleOwnerMentionSpam(homeMessage(member.id, member), { now: 3 }), true);
+  });
+
+  test('another server: staff are still counted like before', async () => {
+    const staffRole = { id: '400000000000000001', name: ROLE_DEFINITIONS[6].name };
+    const member = plain('300000000000000074', [staffRole]);
+    const ping = (now) => handleOwnerMentionSpam(homeMessage(member.id, member, { guildId: '100000000000000099' }), { now });
+    assert.equal(await ping(1), false);
+    assert.equal(await ping(2), false);
+    assert.equal(await ping(3), true);
   });
 });
 

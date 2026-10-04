@@ -7,12 +7,16 @@
 // Owner mentions: mentioning the owner (OWNER_PING_ID, typed in the message; replies to the owner don't
 // count) in OWNER_MENTION_LIMIT messages in a row
 // (each within OWNER_MENTION_WINDOW_MS of the last) deletes the last one and gives a warning.
-// A message without the mention starts the count again. Only the owners may do it freely.
+// A message without the mention starts the count again. Only the owners may do it freely, and in our
+// server the staff too (report #196: staff roles, Manage Messages, or the Anti-Nuke trusted list).
 
 import { PermissionFlagsBits } from 'discord.js';
 import { isServerOwner } from '../../config/serverOwners.js';
 import { issueWarning } from './warnEscalation.js';
 import { sendModerationActionLog } from './moderationActionLogService.js';
+import { canLiftHardBan } from './hardBanService.js';
+import { isStaffMember } from '../staffRoleHierarchyService.js';
+import { isHomeGuild } from '../../config/homeGuild.js';
 import { logger } from '../../utils/logger.js';
 
 export const FLOOD_MESSAGES = 6;
@@ -90,6 +94,13 @@ export async function handleSpam(message, { now = Date.now() } = {}) {
     return true;
 }
 
+/** Staff may mention the owner as much as they like in our server (report #196). */
+async function isStaffMentioner(message) {
+    const member = message.member || await message.guild.members?.fetch?.(message.author.id).catch(() => null);
+    if (await isStaffMember(member).catch(() => false)) return true;
+    return canLiftHardBan(message.guild, message.author.id).catch(() => false);
+}
+
 /** Counts messages in a row that mention the owner; the one that reaches the limit is deleted and warned. */
 export async function handleOwnerMentionSpam(message, { now = Date.now() } = {}) {
     if (!message.guild || message.author?.bot || isServerOwner(message.author?.id)) return false;
@@ -100,6 +111,7 @@ export async function handleOwnerMentionSpam(message, { now = Date.now() } = {})
         ownerMentions.delete(key);
         return false;
     }
+    if (isHomeGuild(message.guild.id) && await isStaffMentioner(message)) return false;
 
     const previous = ownerMentions.get(key);
     const count = previous && now - previous.at < OWNER_MENTION_WINDOW_MS ? previous.count + 1 : 1;
