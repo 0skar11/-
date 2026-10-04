@@ -148,6 +148,13 @@ async function savedStaffRoleIds(guild) {
   return { ...(config?.[STAFF_ROLE_IDS_KEY] || {}) };
 }
 
+/** The staff roles among `roles` (by saved ID or name). */
+export async function filterStaffRoles(guild, roles) {
+  const staffIds = new Set(Object.values(await savedStaffRoleIds(guild || {})));
+  const staffNames = new Set(ROLE_DEFINITIONS.map((definition) => definition.name));
+  return [...roles].filter((role) => staffIds.has(role.id) || (staffNames.has(role.name) && !role.managed));
+}
+
 /** Whether `member` is staff: one of the staff roles (by saved ID or name), or Manage Messages. */
 export async function isStaffMember(member) {
   if (!member) return false;
