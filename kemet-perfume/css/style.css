@@ -15,6 +15,7 @@
   --font-serif: "Cormorant Garamond", "Amiri", serif;
   --font-body: "Tajawal", "Segoe UI", system-ui, sans-serif;
 
+  color-scheme: dark;
   --gold-grad: linear-gradient(135deg, #f7e2a0 0%, #d4a63a 45%, #9a6f24 100%);
   --zigzag: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='28' height='14' viewBox='0 0 28 14'%3E%3Cpath d='M0 12 7 2l7 10 7-10 7 10' fill='none' stroke='%23d4a63a' stroke-width='1.4' stroke-linejoin='round'/%3E%3C/svg%3E");
 }
@@ -52,7 +53,7 @@ p { margin: 0 0 1em; }
 
 /* ---------- header ---------- */
 .site-header {
-  position: sticky; top: 0; z-index: 50;
+  position: sticky; top: env(safe-area-inset-top, 0px); z-index: 50;
   transition: background .3s, box-shadow .3s;
   background: linear-gradient(to bottom, rgba(10,8,6,.9), rgba(10,8,6,0));
 }
@@ -198,13 +199,9 @@ h2 { font-size: clamp(30px, 4vw, 46px); }
 .wa-float:hover { transform: scale(1.08); }
 .wa-float .icon { width: 30px; height: 30px; }
 
-/* ---------- reveal ---------- */
-.reveal { opacity: 0; transform: translateY(24px); transition: opacity .7s ease, transform .7s ease; }
-.reveal.in { opacity: 1; transform: none; }
-.card.reveal.in:hover { transform: translateY(-6px); }
 @media (prefers-reduced-motion: reduce) {
   html { scroll-behavior: auto; }
-  .reveal { opacity: 1; transform: none; transition: none; }
+  * { transition: none !important; }
 }
 
 /* ---------- responsive ---------- */

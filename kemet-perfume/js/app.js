@@ -64,7 +64,7 @@
 
   function renderCard(p) {
     var name = pick(p.name);
-    var card = el("article", "card reveal" + (name ? "" : " is-empty"));
+    var card = el("article", "card" + (name ? "" : " is-empty"));
 
     var media = el("div", "card-media");
     if (p.image) {
@@ -121,7 +121,6 @@
     K.perfumes.forEach(function (p) {
       grid.appendChild(renderCard(p));
     });
-    observeReveals();
   }
 
   function applyLang() {
@@ -135,27 +134,6 @@
     });
     document.getElementById("phoneText").textContent = K.whatsapp.display;
     renderGrid();
-  }
-
-  // Scroll reveal
-  var io = null;
-  function observeReveals() {
-    var items = document.querySelectorAll(".reveal:not(.in)");
-    if (!("IntersectionObserver" in window)) {
-      items.forEach(function (n) { n.classList.add("in"); });
-      return;
-    }
-    if (!io) {
-      io = new IntersectionObserver(function (entries) {
-        entries.forEach(function (entry) {
-          if (entry.isIntersecting) {
-            entry.target.classList.add("in");
-            io.unobserve(entry.target);
-          }
-        });
-      }, { threshold: 0.12 });
-    }
-    items.forEach(function (n) { io.observe(n); });
   }
 
   // Language switch
