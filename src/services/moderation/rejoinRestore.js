@@ -53,10 +53,13 @@ function needsApproval(role, staffIds) {
 }
 
 export function approvalPayload(userId, roles) {
+    // A role at or above the bot's highest role can't be given until the bot's role is moved above it.
+    const above = roles.filter((role) => role.editable === false);
     const lines = [
         `<@${userId}> رجع السيرفر وكان معاه رولات إدارة:`,
-        roles.map((role) => `• <@&${role.id}>`).join('\n') || '—',
+        roles.map((role) => `• <@&${role.id}>${role.editable === false ? ' ⚠️' : ''}`).join('\n') || '—',
         '',
+        ...(above.length ? ['⚠️ = فوق رول البوت، ومش هترجع غير لما رول البوت تبقى فوقها.', ''] : []),
         'ترجعله؟ الموافقة لصاحب السيرفر أو أي حد تراستد.',
     ];
     const row = new ActionRowBuilder().addComponents(
@@ -77,10 +80,12 @@ export async function restoreRejoiningMember(member) {
     const record = await guild.client.db.get(key, null);
     if (!record?.roles) return null;
 
-    const saved = record.roles.map((id) => guild.roles.cache.get(id)).filter((role) => role && !role.managed && role.editable !== false);
+    // Staff roles usually sit above the bot's role, so they are asked about even when the bot can't give
+    // them yet (the request says so); other roles come back only when the bot can give them.
+    const saved = record.roles.map((id) => guild.roles.cache.get(id)).filter((role) => role && !role.managed);
     const staffIds = new Set((await filterStaffRoles(guild, saved)).map((role) => role.id));
     const pending = saved.filter((role) => needsApproval(role, staffIds));
-    const normal = saved.filter((role) => !needsApproval(role, staffIds) && !member.roles.cache.has(role.id));
+    const normal = saved.filter((role) => !needsApproval(role, staffIds) && role.editable !== false && !member.roles.cache.has(role.id));
 
     if (normal.length) {
         await member.roles.add(normal.map((role) => role.id), 'رجع السيرفر: رجوع رولاته').catch((error) => {
@@ -102,8 +107,9 @@ export async function restoreRejoiningMember(member) {
 }
 
 /**
- * ✅ / ❌ on the approval message, by `userId`. Returns `{ ok: true, approved, given }` or
- * `{ ok: false, reason }` with reason one of: not_trusted, nothing, left.
+ * ✅ / ❌ on the approval message, by `userId`. Returns `{ ok: true, approved, given, skipped, asked }`
+ * (`skipped`: roles the bot couldn't give, above its own role) or `{ ok: false, reason }` with reason one
+ * of: not_trusted, nothing, left.
  */
 export async function decideRejoinRoles(guild, deciderId, memberId, approve) {
     const config = await getGuildConfig(guild.client, guild.id).catch(() => null);
@@ -112,7 +118,7 @@ export async function decideRejoinRoles(guild, deciderId, memberId, approve) {
     const record = await guild.client.db.get(key, null);
     if (!record?.pending?.length) return { ok: false, reason: 'nothing' };
     await guild.client.db.set(key, { ...record, pending: [] });
-    if (!approve) return { ok: true, approved: false, given: [], asked: record.pending };
+    if (!approve) return { ok: true, approved: false, given: [], skipped: [], asked: record.pending };
 
     const member = await guild.members.fetch(memberId).catch(() => null);
     if (!member) {
@@ -120,19 +126,29 @@ export async function decideRejoinRoles(guild, deciderId, memberId, approve) {
         await guild.client.db.set(key, { ...record, roles: [...(record.roles || []), ...record.pending], pending: [] });
         return { ok: false, reason: 'left' };
     }
-    const roles = record.pending.filter((id) => guild.roles.cache.has(id));
-    await member.roles.add(roles, `رجوع رولات الإدارة بموافقة ${deciderId}`);
-    return { ok: true, approved: true, given: roles, asked: record.pending };
+    const roles = record.pending.map((id) => guild.roles.cache.get(id)).filter(Boolean);
+    const canGive = roles.filter((role) => role.editable !== false).map((role) => role.id);
+    let skipped = roles.filter((role) => role.editable === false).map((role) => role.id);
+    let given = canGive;
+    if (canGive.length) {
+        await member.roles.add(canGive, `رجوع رولات الإدارة بموافقة ${deciderId}`).catch((error) => {
+            logger.warn(`[REJOIN] Could not give staff roles back to ${memberId}: ${error.message}`);
+            skipped = [...skipped, ...canGive];
+            given = [];
+        });
+    }
+    return { ok: true, approved: true, given, skipped, asked: record.pending };
 }
 
 /** The line posted in REJOIN_LOG_CHANNEL_ID once a request is decided. */
-export function decisionLog(memberId, deciderId, roleIds, approved) {
+export function decisionLog(memberId, deciderId, roleIds, approved, skipped = []) {
     const roles = roleIds.map((id) => `<@&${id}>`).join('، ') || '—';
+    const notGiven = skipped.length ? [`⚠️ مرجعتش (فوق رول البوت): ${skipped.map((id) => `<@&${id}>`).join('، ')}`] : [];
     return {
         embeds: [{
             color: approved ? 0x2ecc71 : 0xe74c3c,
             title: approved ? '✅ تمت الموافقة على رجوع رولات الإدارة' : '❌ اترفض رجوع رولات الإدارة',
-            description: [`👤 العضو: <@${memberId}>`, `🛡️ الرولات: ${roles}`, `${approved ? '✅ وافق' : '❌ رفض'}: <@${deciderId}>`].join('\n'),
+            description: [`👤 العضو: <@${memberId}>`, `🛡️ الرولات: ${roles}`, ...notGiven, `${approved ? '✅ وافق' : '❌ رفض'}: <@${deciderId}>`].join('\n'),
             timestamp: new Date().toISOString(),
         }],
         allowedMentions: { parse: [] },
@@ -140,9 +156,9 @@ export function decisionLog(memberId, deciderId, roleIds, approved) {
 }
 
 /** Posts the decision in REJOIN_LOG_CHANNEL_ID. Returns true when it was posted. */
-export async function logRejoinDecision(guild, memberId, deciderId, roleIds, approved) {
+export async function logRejoinDecision(guild, memberId, deciderId, roleIds, approved, skipped = []) {
     const channel = guild.channels.cache.get(REJOIN_LOG_CHANNEL_ID)
         || await guild.channels.fetch(REJOIN_LOG_CHANNEL_ID).catch(() => null);
     if (!channel?.send) return false;
-    return channel.send(decisionLog(memberId, deciderId, roleIds, approved)).then(() => true).catch(() => false);
+    return channel.send(decisionLog(memberId, deciderId, roleIds, approved, skipped)).then(() => true).catch(() => false);
 }
