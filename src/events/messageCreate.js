@@ -30,6 +30,7 @@ import { handleStoreChannelMessage } from '../services/cc/storeChannel.js';
 import { handleMessageXp } from '../services/leveling/messageXp.js';
 import { countMessage } from '../services/leveling/chatCounter.js';
 import { handleAfkMessage } from '../services/afkService.js';
+import { handleSalam } from '../services/chat/salamReply.js';
 
 const AFK_COMMAND = /^\s*[^\p{L}\p{N}\s]{0,3}(?:afk|افك|أفك)(?:\s|$)/iu;
 
@@ -68,6 +69,8 @@ export default {
       await handleAfkMessage(message, client, { isAfkCommand: AFK_COMMAND.test(message.content || '') });
       // In the games channel only game commands run (the rest there is game answers).
       const gamesOnly = isGamesOnlyFor(message);
+      // "السلام عليكم" gets "عليكم السلام" (our server only); the message still goes on to the commands.
+      if (!gamesOnly) await handleSalam(message);
       if (!gamesOnly && await handleArabicUtilityShortcuts(message)) return;
       if (!gamesOnly && await handleMessageDeleteShortcut(message)) return;
       if (await handleCountingGame(message, client)) return;
