@@ -2,10 +2,13 @@
 //
 // A message that starts with the greeting counts, in its common spellings ("السلام عليكم",
 // "سلام عليكم ورحمة الله", "سلامو عليكو", "السلااام عليكم", "salam alaikum", "slm 3likom"); a reply
-// to it ("وعليكم السلام") doesn't. Each member gets one answer every SALAM_COOLDOWN_MS so greeting
-// over and over doesn't make the bot spam.
+// to it ("وعليكم السلام") doesn't. The answer is a reply that pings the member. Each member gets one
+// answer every SALAM_COOLDOWN_MS so greeting over and over doesn't make the bot spam; owners and the
+// trusted staff (the Anti-Nuke trusted list, members or roles) have no cooldown.
 
 import { isHomeGuild } from '../../config/homeGuild.js';
+import { isServerOwner } from '../../config/serverOwners.js';
+import { canLiftHardBan } from '../moderation/hardBanService.js';
 
 export const SALAM_REPLY = 'عليكم السلام 👋';
 export const SALAM_COOLDOWN_MS = 2 * 60_000;
@@ -32,12 +35,13 @@ export function isSalam(text) {
 }
 
 /** Answers the greeting. Returns true when it did. */
-export async function handleSalam(message, { now = Date.now() } = {}) {
+export async function handleSalam(message, { now = Date.now(), isTrusted = canLiftHardBan } = {}) {
     if (!message.guild || message.author?.bot || !isHomeGuild(message.guild.id)) return false;
     if (!isSalam(message.content)) return false;
     const key = `${message.guild.id}:${message.author.id}`;
-    if (now - (lastReply.get(key) ?? -Infinity) < SALAM_COOLDOWN_MS) return false;
+    const waiting = now - (lastReply.get(key) ?? -Infinity) < SALAM_COOLDOWN_MS;
+    if (waiting && !isServerOwner(message.author.id) && !(await isTrusted(message.guild, message.author.id).catch(() => false))) return false;
     lastReply.set(key, now);
-    await message.reply({ content: SALAM_REPLY, allowedMentions: { repliedUser: false } }).catch(() => {});
+    await message.reply({ content: SALAM_REPLY, allowedMentions: { repliedUser: true } }).catch(() => {});
     return true;
 }

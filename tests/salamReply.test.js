@@ -18,15 +18,25 @@ describe('السلام عليكم → عليكم السلام (report #191)', ()
     }
   });
 
-  test('answers once per member every two minutes', async () => {
+  test('replies with a ping, once per member every two minutes', async () => {
+    const isTrusted = async () => false;
     const first = message('السلام عليكم', { authorId: '200000000000000011' });
-    assert.equal(await handleSalam(first, { now: 1_000 }), true);
-    assert.deepEqual(first.replies, [{ content: SALAM_REPLY, allowedMentions: { repliedUser: false } }]);
+    assert.equal(await handleSalam(first, { now: 1_000, isTrusted }), true);
+    assert.deepEqual(first.replies, [{ content: SALAM_REPLY, allowedMentions: { repliedUser: true } }]);
     const again = message('السلام عليكم', { authorId: '200000000000000011' });
-    assert.equal(await handleSalam(again, { now: 2_000 }), false);
-    assert.equal(await handleSalam(message('سلام عليكم', { authorId: '200000000000000011' }), { now: 1_000 + SALAM_COOLDOWN_MS }), true);
-    assert.equal(await handleSalam(message('السلام عليكم', { authorId: '200000000000000012' }), { now: 2_000 }), true);
-    assert.equal(await handleSalam(message('السلام عليكم', { bot: true }), { now: 3_000 }), false);
+    assert.equal(await handleSalam(again, { now: 2_000, isTrusted }), false);
+    assert.equal(await handleSalam(message('سلام عليكم', { authorId: '200000000000000011' }), { now: 1_000 + SALAM_COOLDOWN_MS, isTrusted }), true);
+    assert.equal(await handleSalam(message('السلام عليكم', { authorId: '200000000000000012' }), { now: 2_000, isTrusted }), true);
+    assert.equal(await handleSalam(message('السلام عليكم', { bot: true }), { now: 3_000, isTrusted }), false);
+  });
+
+  test('trusted staff and the owner have no cooldown', async () => {
+    const trusted = '200000000000000021';
+    const isTrusted = async (guild, userId) => userId === trusted;
+    for (const now of [1_000, 2_000, 3_000]) {
+      assert.equal(await handleSalam(message('السلام عليكم', { authorId: trusted }), { now, isTrusted }), true);
+      assert.equal(await handleSalam(message('السلام عليكم', { authorId: '1159601661392715906' }), { now, isTrusted }), true);
+    }
   });
 
   test('another server: no answer', async () => {
