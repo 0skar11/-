@@ -102,3 +102,24 @@ describe('a member who comes back gets their things back (owner\'s request)', ()
     assert.equal(await restoreRejoiningMember(member([])), null);
   });
 });
+
+describe('the level comes back too', () => {
+  test('in our server leaving keeps the level; another server still deletes it', async () => {
+    const { default: guildMemberRemove } = await import('../src/events/guildMemberRemove.js');
+    const { getUserLevelKey } = await import('../src/utils/database/keys.js');
+    for (const guildId of [HOME_GUILD_ID, '100000000000000099']) {
+      const store = new Map([[getUserLevelKey(guildId, MEMBER), { xp: 5000, level: 12 }]]);
+      const db = {
+        get: async (key, fallback) => (store.has(key) ? store.get(key) : fallback),
+        set: async (key, value) => { store.set(key, value); return true; },
+        delete: async (key) => store.delete(key),
+        list: async () => [],
+      };
+      const client = { db, guilds: { cache: new Map(), fetch: async () => null }, user: { id: 'bot' } };
+      const guild = { id: guildId, client, memberCount: 10, channels: { cache: new Map() }, roles: { cache: new Map() }, members: { me: null } };
+      const member = { id: MEMBER, guild, client, user: { id: MEMBER, tag: 'm', bot: false, toString: () => `<@${MEMBER}>`, displayAvatarURL: () => '' }, roles: { cache: new Map() }, nickname: null, joinedTimestamp: Date.now() };
+      await guildMemberRemove.execute(member);
+      assert.equal(store.has(getUserLevelKey(guildId, MEMBER)), guildId === HOME_GUILD_ID, guildId);
+    }
+  });
+});
