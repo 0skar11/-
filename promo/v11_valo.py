@@ -30,8 +30,19 @@ OUT = here / 'out'
 FF = imageio_ffmpeg.get_ffmpeg_exe()
 W, H, FPS = 1080, 1920, 30
 
-BEAT = 60 / 130.02
-MUSIC_DROP, MUSIC_SLAM = 22.125, 44.28
+# Songs (files in vo/v11, gitignored), measured from their onsets: tempo, the drop, and the hit right
+# after a silent break (the slam), where the final kill goes.
+SONGS = {
+    # ElevenLabs phonk: drop at 22.125, silent break 43.35-43.75, slam at 44.28.
+    'phonk': {'file': 'phonk.mp3', 'bpm': 130.02, 'drop': 22.125, 'slam': 44.28},
+    # The user's TikTok sound ("... to WIN / WINNING / I DREAM / BLOOD / REGRET / GUILTY / SACRIFICE MYSELF"),
+    # 35.4s: quiet intro, first drop on "WIN" at 4.615, build from ~17s, silence 21.0-21.5, second drop
+    # on "WIN" at 22.315, full energy to ~34.4. 74.25 BPM (0.808s beat; half beats work for fast cuts).
+    'win': {'file': 'song2.wav', 'bpm': 74.25, 'drop': 4.615, 'slam': 22.315},
+}
+SONG = SONGS['phonk']
+BEAT = 60 / SONG['bpm']
+MUSIC_DROP, MUSIC_SLAM = SONG['drop'], SONG['slam']
 HOOK = 1.0                           # the hook runs until the drop
 MUSIC_START = MUSIC_DROP - HOOK      # music second at output 0
 SLAM = MUSIC_SLAM - MUSIC_START      # output second of the slam back after the silent break
@@ -275,7 +286,7 @@ def render(name, layers, clips):
         ff.stdin.write(done[i].tobytes())
     ff.stdin.close(); ff.wait()
     fade = duration - 1.0
-    subprocess.run([FF, '-y', '-loglevel', 'error', '-i', str(video), '-ss', str(MUSIC_START), '-t', str(duration), '-i', str(V / 'phonk.mp3'),
+    subprocess.run([FF, '-y', '-loglevel', 'error', '-i', str(video), '-ss', str(MUSIC_START), '-t', str(duration), '-i', str(V / SONG['file']),
                     '-map', '0:v', '-map', '1:a', '-c:v', 'copy',
                     '-af', f'afade=t=out:st={fade}:d=1.0,loudnorm=I=-14:TP=-1.5:LRA=11', '-ar', '44100', '-c:a', 'aac', '-b:a', '192k',
                     '-shortest', '-movflags', '+faststart', str(OUT / f'v11-valo-{name}.mp4')], check=True)
