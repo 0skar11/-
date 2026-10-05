@@ -3,12 +3,11 @@
 // On startup the bot makes (once) a "🎫 التكتات" category with:
 //   • 📩・افتح-تكت — everyone can read it, nobody can write; a panel with two buttons, one per section
 //   • 📁・سجل-التكتات — staff only; each closed ticket's transcript is posted here
-// and the 🎀 بنت موثقة role if it's missing (given when a girl is verified; no permissions).
 //
 // Sections (each with the team role the owner chose, mentioned when a ticket opens: SECTION_ROLE_IDS):
 //   • 🛠️ مشكلة       — a problem or a report; its role and the staff roles (staffRoleHierarchyService.js) see it
 //   • 🎀 توثيق بنات  — girls' verification; only its role sees it, and its ✅ button gives the opener
-//                     the 🎀 بنت موثقة role
+//                     the verified girl role (VERIFIED_ROLE_ID)
 // A ticket is a private room in the category (`🛠・مشكلة-0007`), seen by its opener and that section's
 // team. One open ticket per member per section. In it: 🙋 استلام (staff), 🔒 قفل (the opener or staff:
 // the transcript goes to the log room and the room is deleted), and ✅ توثيق for verification.
@@ -28,8 +27,9 @@ export const TICKET_NAMES = {
     category: '🎫 التكتات',
     panel: '📩・افتح-تكت',
     log: '📁・سجل-التكتات',
-    verifiedRole: '🎀 بنت موثقة',
 };
+// The verified girl role, given by ✅ in a verification ticket.
+export const VERIFIED_ROLE_ID = '1551151228833234985';
 // The role mentioned (and given access) when a ticket of each section opens.
 export const SECTION_ROLE_IDS = {
     problem: '1552756864712708275',
@@ -55,7 +55,7 @@ export const SECTIONS = {
         channelEmoji: '🎀',
         label: 'توثيق بنات',
         title: '🎀 تكت توثيق',
-        panelLine: '🎀 **توثيق بنات** — للبنات بس، عشان تاخدي رول 🎀 بنت موثقة',
+        panelLine: `🎀 **توثيق بنات** — للبنات بس، عشان تاخدي رول <@&${VERIFIED_ROLE_ID}>`,
         intro: 'أهلاً بيكي 🎀 المسؤولة عن التوثيق هتكلمك هنا وتقولك تعملي إيه. محدش غير المسؤولين عن التوثيق يقدر يشوف التكت ده.',
         style: ButtonStyle.Secondary,
     },
@@ -102,15 +102,6 @@ function panelPayload() {
 
 const isPanel = (message) => message.embeds?.[0]?.footer?.text === 'تكتات السيرفر';
 
-async function ensureRole(guild, name, reason) {
-    const existing = guild.roles.cache.find((role) => role.name === name && !role.managed);
-    if (existing) return existing;
-    return guild.roles.create({ name, permissions: [], mentionable: false, reason }).catch((error) => {
-        logger.warn(`[TICKETS] Could not create the ${name} role: ${error.message}`);
-        return null;
-    });
-}
-
 /** The roles that see problem tickets: the staff roles and the trusted roles. */
 async function staffRoleIds(guild) {
     const staff = await filterStaffRoles(guild, guild.roles.cache.values());
@@ -143,8 +134,6 @@ export async function setupHomeTickets(guild) {
     const state = await readState(client, guild.id);
     const me = guild.members.me;
 
-    const verified = await ensureRole(guild, TICKET_NAMES.verifiedRole, 'Tickets: verified girls');
-    state.verifiedRoleId = verified?.id || state.verifiedRoleId || null;
 
     let category = state.categoryId && guild.channels.cache.get(state.categoryId);
     if (!category) {
@@ -287,7 +276,7 @@ export async function verifyTicket(channel, member) {
     const ticket = state.open[channel.id];
     if (!ticket || ticket.type !== 'verify') return { ok: false, reason: 'not_ticket' };
     if (!(await canHandle(member, 'verify', state))) return { ok: false, reason: 'not_team' };
-    const role = state.verifiedRoleId && guild.roles.cache.get(state.verifiedRoleId);
+    const role = guild.roles.cache.get(VERIFIED_ROLE_ID);
     const owner = await guild.members.fetch(ticket.ownerId).catch(() => null);
     if (!role || !owner) return { ok: false, reason: 'no_role' };
     const added = await owner.roles.add(role, `Verified by ${member.id}`).then(() => true).catch(() => false);
@@ -351,7 +340,7 @@ export const TICKET_FAILURE_TEXT = {
     not_ticket: 'ℹ️ التكت ده اتقفل خلاص.',
     not_team: '❌ الزرار ده للإدارة المسؤولة عن التكت ده بس.',
     claimed: 'ℹ️ التكت ده حد استلمه خلاص.',
-    no_role: '❌ مقدرتش أدي الرول، اتأكد إن رول البوت فوق رول 🎀 بنت موثقة.',
+    no_role: `❌ مقدرتش أدي الرول، اتأكد إن رول البوت فوق <@&${VERIFIED_ROLE_ID}>.`,
 };
 
 /** Startup: sets up the tickets in our server. */

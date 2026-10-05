@@ -4,7 +4,7 @@ import { PermissionFlagsBits } from 'discord.js';
 import { HOME_GUILD_ID } from '../src/config/homeGuild.js';
 import { ROLE_DEFINITIONS } from '../src/services/staffRoleHierarchyService.js';
 import {
-  setupHomeTickets, openTicket, claimTicket, verifyTicket, closeTicket, SECTION_ROLE_IDS, TICKET_NAMES,
+  setupHomeTickets, openTicket, claimTicket, verifyTicket, closeTicket, SECTION_ROLE_IDS, TICKET_NAMES, VERIFIED_ROLE_ID,
 } from '../src/services/tickets/homeTickets.js';
 
 const MEMBER = '200000000000000001';
@@ -17,6 +17,7 @@ function setup(guildId = HOME_GUILD_ID) {
     [SECTION_ROLE_IDS.problem, { id: SECTION_ROLE_IDS.problem, name: 'Support team', managed: false }],
     [SECTION_ROLE_IDS.verify, { id: SECTION_ROLE_IDS.verify, name: 'Girls team', managed: false }],
     [STAFF_ROLE.id, STAFF_ROLE],
+    [VERIFIED_ROLE_ID, { id: VERIFIED_ROLE_ID, name: 'Verified girl', managed: false }],
   ]);
   const channels = new Map();
   const created = [];
@@ -56,14 +57,15 @@ function setup(guildId = HOME_GUILD_ID) {
 }
 
 describe('our server\'s tickets (owner\'s request)', () => {
-  test('makes the category, the panel and log rooms and the verified role once, with a two-button panel', async () => {
+  test('makes the category, the panel and log rooms once, with a two-button panel, and no new role', async () => {
     const { guild, created, roles } = setup();
     const result = await setupHomeTickets(guild);
     assert.deepEqual(created.map((channel) => channel.name), [TICKET_NAMES.category, TICKET_NAMES.panel, TICKET_NAMES.log]);
     const panel = created[1];
     const buttons = panel.sent[0].components[0].toJSON().components;
     assert.deepEqual(buttons.map((button) => button.custom_id), ['hticket:open:problem', 'hticket:open:verify']);
-    assert.ok([...roles.values()].some((role) => role.name === TICKET_NAMES.verifiedRole));
+    assert.equal(roles.size, 4);
+    assert.match(panel.sent[0].embeds[0].description, new RegExp(`<@&${VERIFIED_ROLE_ID}>`));
     // Everyone reads the panel, nobody writes.
     const everyone = panel.options.permissionOverwrites.find((overwrite) => overwrite.id === HOME_GUILD_ID);
     assert.ok(everyone.deny.includes(PermissionFlagsBits.SendMessages));
@@ -95,8 +97,8 @@ describe('our server\'s tickets (owner\'s request)', () => {
     assert.match(log.sent[0].embeds[0].description, new RegExp(`استلمه: <@200000000000000009>`));
   });
 
-  test('a verification ticket is seen only by its role, pings it, and ✅ gives the verified role', async () => {
-    const { guild, created, member, roles } = setup();
+  test('a verification ticket is seen only by its role, pings it, and ✅ gives the verified girl role', async () => {
+    const { guild, created, member } = setup();
     await setupHomeTickets(guild);
     const girl = member(GIRL);
     assert.equal((await openTicket(girl, 'verify', { now: 5_000_000 })).ok, true);
@@ -110,8 +112,8 @@ describe('our server\'s tickets (owner\'s request)', () => {
     const verifier = member('200000000000000010', [SECTION_ROLE_IDS.verify]);
     const verified = await verifyTicket(ticket, verifier);
     assert.equal(verified.ok, true);
-    const verifiedRole = [...roles.values()].find((role) => role.name === TICKET_NAMES.verifiedRole);
-    assert.ok(girl.roles.cache.has(verifiedRole.id));
+    assert.equal(verified.roleId, VERIFIED_ROLE_ID);
+    assert.ok(girl.roles.cache.has(VERIFIED_ROLE_ID));
   });
 
   test('another server: nothing is made and no ticket opens', async () => {
