@@ -2,15 +2,15 @@ import { SlashCommandBuilder, MessageFlags } from 'discord.js';
 import { GAMES_BOTS_CHANNEL_ID } from '../../config/games.js';
 import { isGamesBotsChannel } from '../../services/cc/gamesBotChannel.js';
 import { CC } from '../../config/cc.js';
-import { bourseSettings } from '../../config/store/bourse.js';
+import { bourseSettings, isSellAllWord } from '../../config/store/bourse.js';
 import { getProfile } from '../../services/cc/ccService.js';
-import { findAsset, getMarket, getHoldings } from '../../services/cc/bourseService.js';
-import { pricesEmbed, holdingsEmbed, confirmInvestPayload, confirmSellPayload, bourseFailureText } from '../../services/cc/bourseUi.js';
+import { findAsset, getMarket, getHoldings, hourOf } from '../../services/cc/bourseService.js';
+import { pricesEmbed, holdingsEmbed, confirmInvestPayload, confirmSellPayload, confirmSellAllPayload, bourseFailureText } from '../../services/cc/bourseUi.js';
 import { InteractionHelper } from '../../utils/interactionHelper.js';
 import { isHomeGuild } from '../../config/homeGuild.js';
 
 // The CC bourse: `اسعار` (prices of the hour), `شراء عربية` / `استثمار عربية` / `شراء 3 2` (buy), `بيع عربية` /
-// `بيع 3 2` (sell) and `ممتلكاتي` / `ممتلكات @member` (holdings; another member's in our server only). Buying and selling are confirmed with a button
+// `بيع 3 2` (sell), `بيع كلو` / `بيع عربية كلو` (sell everything / all of one asset, our server only) and `ممتلكاتي` / `ممتلكات @member` (holdings; another member's in our server only). Buying and selling are confirmed with a button
 // (src/interactions/buttons/store/bourse.js). The rules are src/config/store/bourse.js.
 const assetOption = (option) => option.setName('asset').setDescription('Asset number or name (see /bourse prices)').setRequired(true);
 const quantityOption = (option) => option
@@ -42,6 +42,8 @@ export default {
         .addSubcommand((sub) => sub.setName('prices').setDescription('Prices of the hour'))
         .addSubcommand((sub) => sub.setName('invest').setDescription('Buy an asset at the price of the hour').addStringOption(assetOption).addIntegerOption(quantityOption))
         .addSubcommand((sub) => sub.setName('sell').setDescription('Sell an asset at the price of the hour').addStringOption(assetOption).addIntegerOption(quantityOption))
+        .addSubcommand((sub) => sub.setName('sellall').setDescription('Sell everything you own, or all of one asset')
+            .addStringOption((option) => option.setName('asset').setDescription('Only this asset (default: everything)')))
         .addSubcommand((sub) => sub.setName('holdings').setDescription('What you (or another member) own and what it is worth')
             .addUserOption((option) => option.setName('user').setDescription('Whose holdings to see (default: yours)'))),
 
@@ -50,6 +52,8 @@ export default {
     normalizePrefixArgs(args) {
         const [sub, ...rest] = args;
         if (!args.length || ((sub === 'invest' || sub === 'sell') && !rest.length)) return ['prices'];
+        // `بيع كلو` sells everything, `بيع عربية كلو` all of one asset.
+        if (sub === 'sell' && isSellAllWord(rest[rest.length - 1])) return ['sellall', ...(rest.length > 1 ? [rest.slice(0, -1).join(' ')] : [])];
         if (sub !== 'invest' && sub !== 'sell') return args;
         const quantity = rest.length > 1 && /^\d+$/u.test(rest[rest.length - 1]) ? [rest.pop()] : [];
         return [sub, rest.join(' '), ...quantity];
@@ -73,6 +77,22 @@ export default {
             if (whose.bot) return reply({ content: '🤖 البوتات مالهاش ممتلكات.' });
             const balance = isHomeGuild(guildId) ? (await getProfile(client, guildId, whose.id)).cc : null;
             return reply({ embeds: [holdingsEmbed(whose, await getHoldings(client, guildId, whose.id), { balance, own: whose.id === user.id })] });
+        }
+
+        if (sub === 'sellall') {
+            if (!isHomeGuild(guildId)) return reply({ content: '❌ الأمر ده مش متاح هنا.' });
+            const { rows, quotes } = await getHoldings(client, guildId, user.id);
+            const query = interaction.options.getString('asset');
+            if (query) {
+                const one = findAsset(query);
+                if (!one) return reply({ content: bourseFailureText({ reason: 'not_found' }) });
+                const row = rows.find((entry) => entry.asset.id === one.id);
+                if (!row) return reply({ content: bourseFailureText({ reason: 'not_owned', asset: one, owned: 0 }) });
+                const { price } = quotes.find((entry) => entry.asset.id === one.id);
+                return reply(confirmSellPayload(one, row.qty, price, user.id, { owned: row.qty, paid: row.paid }));
+            }
+            if (!rows.length) return reply({ content: '💼 معندكش حاجة تبيعها. اكتب `اسعار` وشوف تشتري إيه 📈' });
+            return reply(confirmSellAllPayload(rows, user.id, hourOf()));
         }
 
         const asset = findAsset(interaction.options.getString('asset'));
