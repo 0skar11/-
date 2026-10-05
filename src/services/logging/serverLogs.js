@@ -10,10 +10,10 @@
 //   • join / leave    — members joining and leaving
 // (voice and invites are posted by dedicatedVoiceAuditLog.js and inviteTrackerService.js.)
 
-import { AuditLogEvent, PermissionsBitField } from 'discord.js';
+import { AuditLogEvent, PermissionFlagsBits, PermissionsBitField } from 'discord.js';
 import { isHomeGuild } from '../../config/homeGuild.js';
 import { getGuildConfig } from '../config/guildConfig.js';
-import { getAuditLogChannelId } from '../auditLogChannelsService.js';
+import { getAuditLogChannelId, AUDIT_LOG_CATEGORY_ID, LOG_CHANNELS } from '../auditLogChannelsService.js';
 import { findRecentAuditEntry } from '../../utils/antiNukeLogging.js';
 import { logger } from '../../utils/logger.js';
 
@@ -41,14 +41,28 @@ function embed({ color, title, lines, thumbnail = null }) {
 }
 
 /** Posts `payload` (an embed) in the Logs channel `key` (moderation, timeout, ban, message, roles, join, leave). */
-export async function postServerLog(guild, key, payload) {
-    if (!guild || !isHomeGuild(guild.id)) return false;
+/**
+ * The Logs room for `key`: found by its name inside the Logs category (so it works even when the saved
+ * IDs in the config are missing or old), else by the ID saved by ensureAuditLogChannels.
+ */
+export async function findLogChannel(guild, key) {
+    const name = LOG_CHANNELS[key];
+    const byName = name && guild.channels.cache.find?.((channel) => channel.parentId === AUDIT_LOG_CATEGORY_ID && channel.name === name && channel.send);
+    if (byName) return byName;
     const config = await getGuildConfig(guild.client, guild.id).catch(() => null);
     const channelId = getAuditLogChannelId(config, key);
-    if (!channelId) return false;
-    const channel = guild.channels.cache.get(channelId) || await guild.channels.fetch(channelId).catch(() => null);
-    if (!channel?.send) return false;
-    return channel.send({ embeds: [payload], allowedMentions: { parse: [] } }).then(() => true).catch((error) => {
+    if (!channelId) return null;
+    return guild.channels.cache.get(channelId) || await guild.channels.fetch(channelId).catch(() => null);
+}
+
+export async function postServerLog(guild, key, payload, files = []) {
+    if (!guild || !isHomeGuild(guild.id)) return false;
+    const channel = await findLogChannel(guild, key);
+    if (!channel?.send) {
+        logger.warn(`[SERVER_LOGS] The ${LOG_CHANNELS[key] || key} log room was not found`);
+        return false;
+    }
+    return channel.send({ embeds: [payload], files, allowedMentions: { parse: [] } }).then(() => true).catch((error) => {
         logger.warn(`[SERVER_LOGS] Could not post in ${key}: ${error.message}`);
         return false;
     });
@@ -66,28 +80,102 @@ const byLine = (entry) => (entry?.executor ? `👮 بواسطة: ${userLine(entr
 const reasonLine = (entry) => (entry?.reason ? `📝 السبب: ${cut(entry.reason, 500)}` : null);
 const isBot = (guild, entry) => Boolean(entry?.executor?.id && entry.executor.id === guild.client?.user?.id);
 
-/** A deleted message (not a bot's, and not one the bot itself cleaned up). */
-export async function logMessageDelete(message) {
+// Discord removes a message's images once it is deleted, so images sent in our server are kept in memory
+// for a while, to be posted with the delete log.
+export const IMAGE_CACHE = { maxFileBytes: 8 * 1024 * 1024, maxTotalBytes: 64 * 1024 * 1024, ttlMs: 6 * 60 * 60 * 1000 };
+const imageCache = new Map(); // messageId -> { at, bytes, files: [{ name, attachment }] }
+let cachedBytes = 0;
+
+const isImage = (file) => (file.contentType || '').startsWith('image/') || /\.(png|jpe?g|gif|webp)$/iu.test(file.name || '');
+
+function forgetImages(messageId) {
+    const entry = imageCache.get(messageId);
+    if (!entry) return null;
+    imageCache.delete(messageId);
+    cachedBytes -= entry.bytes;
+    return entry;
+}
+
+function pruneImages(now) {
+    for (const [messageId, entry] of imageCache) {
+        if (now - entry.at <= IMAGE_CACHE.ttlMs && cachedBytes <= IMAGE_CACHE.maxTotalBytes) break;
+        forgetImages(messageId);
+    }
+}
+
+async function download(file, fetchImpl) {
+    for (const url of [file.url, file.proxyURL].filter(Boolean)) {
+        const response = await fetchImpl(url).catch(() => null);
+        if (response?.ok) return Buffer.from(await response.arrayBuffer());
+    }
+    return null;
+}
+
+const imageFiles = (message) => [...(message.attachments?.values?.() || [])]
+    .filter((file) => isImage(file) && (file.size || 0) <= IMAGE_CACHE.maxFileBytes)
+    .slice(0, 10);
+
+/** Keeps a copy of the images of a member's message (our server only). Returns how many were kept. */
+export async function rememberImages(message, { fetchImpl = fetch, now = Date.now() } = {}) {
+    if (!message?.guild || !isHomeGuild(message.guild.id) || message.author?.bot || message.webhookId) return 0;
+    const wanted = imageFiles(message);
+    if (!wanted.length) return 0;
+    const files = [];
+    let bytes = 0;
+    for (const [index, file] of wanted.entries()) {
+        const data = await download(file, fetchImpl);
+        if (!data) continue;
+        files.push({ name: `${index + 1}-${file.name || 'image.png'}`, attachment: data });
+        bytes += data.length;
+    }
+    if (!files.length) return 0;
+    imageCache.set(message.id, { at: now, bytes, files });
+    cachedBytes += bytes;
+    pruneImages(now);
+    return files.length;
+}
+
+/** The images of a deleted message: the kept copy, else a last try to download them. */
+async function deletedImages(message, fetchImpl) {
+    const kept = forgetImages(message.id);
+    if (kept) return kept.files;
+    const files = [];
+    for (const [index, file] of imageFiles(message).entries()) {
+        const data = await download(file, fetchImpl);
+        if (data) files.push({ name: `${index + 1}-${file.name || 'image.png'}`, attachment: data });
+    }
+    return files;
+}
+
+/** A deleted message (not a bot's, and not one the bot itself cleaned up), with its images. */
+export async function logMessageDelete(message, { fetchImpl = fetch } = {}) {
     const guild = message?.guild;
     if (!guild || !isHomeGuild(guild.id) || !message.author || message.author.bot || message.webhookId) return false;
     const entry = await auditEntry(guild, AuditLogEvent.MessageDelete, message.author.id,
         (item) => !item.extra?.channel?.id || item.extra.channel.id === message.channelId);
     // The bot's own cleanups (games room, filters, spam) are logged where they belong.
     if (isBot(guild, entry)) return false;
-    const attachments = [...(message.attachments?.values?.() || [])].map((file) => `[${file.name}](${file.url})`);
-    return postServerLog(guild, 'message', embed({
+    // Discord deleted the files too: images are posted from the kept copy, other files only by name.
+    const images = await deletedImages(message, fetchImpl);
+    const otherFiles = [...(message.attachments?.values?.() || [])].filter((file) => !isImage(file)).map((file) => file.name);
+    const missingImages = imageFiles(message).length - images.length;
+    const payload = embed({
         color: COLORS.red,
         title: '🗑️ رسالة اتمسحت',
         lines: [
             `👤 صاحبها: ${userLine(message.author)}`,
             `📍 الروم: <#${message.channelId}>`,
-            entry ? byLine(entry) : '👮 مسحها: صاحبها (أو مش معروف)',
+            entry ? byLine(entry) : '👮 مسحها: صاحبها',
             message.createdTimestamp ? `🕒 اتبعتت: ${time(message.createdTimestamp)}` : null,
             '',
             message.content ? `>>> ${cut(message.content)}` : '*(من غير كلام)*',
-            attachments.length ? `\n📎 ${attachments.join('، ')}` : null,
+            images.length ? `\n🖼️ الصور تحت (${images.length})` : null,
+            missingImages > 0 ? `⚠️ ${missingImages} صورة مقدرتش أجيبها` : null,
+            otherFiles.length ? `📎 ملفات: ${otherFiles.join('، ')}` : null,
         ],
-    }));
+    });
+    if (images.length) payload.image = { url: `attachment://${images[0].name}` };
+    return postServerLog(guild, 'message', payload, images);
 }
 
 /** Several messages deleted at once (a purge). */
@@ -258,4 +346,59 @@ export async function logRoleUpdate(oldRole, newRole) {
     if (!lines.length) return false;
     const entry = await auditEntry(newRole.guild, AuditLogEvent.RoleUpdate, newRole.id);
     return postServerLog(newRole.guild, 'roles', embed({ color: COLORS.purple, title: '🛠️ رول اتعدلت', lines: [`🎭 الرول: <@&${newRole.id}>`, ...lines, byLine(entry)] }));
+}
+
+// What each room gets, for the one-time "this log works" message.
+const ROOM_PURPOSE = {
+    moderation: 'الوارنات والكيك',
+    timeout: 'التايم أوت وفكه',
+    ban: 'البان وفك البان',
+    message: 'الرسايل اللي بتتمسح ومسح الرسايل بالجملة',
+    roles: 'الرولات اللي بتتضاف وتتشال من الأعضاء، والرولات اللي بتتعمل أو تتمسح أو تتعدل',
+    join: 'الأعضاء اللي بيدخلوا',
+    leave: 'الأعضاء اللي بيطلعوا أو بيتطردوا',
+};
+const NEEDED = [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.EmbedLinks];
+
+/**
+ * Startup, our server only: loads the members (Discord only sends member updates and leaves for members
+ * the bot knows), makes sure the bot can post in each Logs room, and posts a one-time "this log works"
+ * message in each. Returns `{ ready, missing, noAccess, auditLog }`.
+ */
+export async function startServerLogs(client) {
+    const summary = { ready: [], missing: [], noAccess: [], auditLog: true };
+    for (const guild of client.guilds.cache.values()) {
+        if (!isHomeGuild(guild.id)) continue;
+        await guild.members.fetch().catch((error) => logger.warn(`[SERVER_LOGS] Could not load the members: ${error.message}`));
+        const me = guild.members.me;
+        summary.auditLog = Boolean(me?.permissions?.has?.(PermissionFlagsBits.ViewAuditLog));
+        const helloKey = `guild:${guild.id}:serverlogs:hello`;
+        const greeted = new Set(await client.db.get(helloKey, []) || []);
+        for (const key of Object.keys(ROOM_PURPOSE)) {
+            const channel = await findLogChannel(guild, key);
+            if (!channel) {
+                summary.missing.push(LOG_CHANNELS[key]);
+                continue;
+            }
+            if (me && channel.permissionsFor && !channel.permissionsFor(me)?.has(NEEDED)) {
+                await channel.permissionOverwrites?.edit(me.id, { ViewChannel: true, SendMessages: true, EmbedLinks: true }, { reason: 'Logs room' }).catch(() => {});
+                if (!channel.permissionsFor(me)?.has(NEEDED)) {
+                    summary.noAccess.push(LOG_CHANNELS[key]);
+                    continue;
+                }
+            }
+            summary.ready.push(LOG_CHANNELS[key]);
+            if (greeted.has(key)) continue;
+            const sent = await channel.send({
+                embeds: [embed({ color: COLORS.green, title: '✅ اللوج ده شغال', lines: [`هنا هيتبعت: ${ROOM_PURPOSE[key]}.`] })],
+                allowedMentions: { parse: [] },
+            }).then(() => true).catch(() => false);
+            if (sent) greeted.add(key);
+        }
+        await client.db.set(helloKey, [...greeted]);
+    }
+    if (summary.missing.length) logger.warn(`[SERVER_LOGS] Log rooms not found: ${summary.missing.join(', ')}`);
+    if (summary.noAccess.length) logger.warn(`[SERVER_LOGS] The bot can't post in: ${summary.noAccess.join(', ')}`);
+    if (!summary.auditLog) logger.warn('[SERVER_LOGS] The bot has no View Audit Log permission: logs won\'t say who did it');
+    return summary;
 }
