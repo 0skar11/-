@@ -8,6 +8,7 @@ import { findLevelTierRoles } from "../services/leveling/levelTierRoles.js";
 import { initRiffyAfterReady } from "../services/music/riffySetup.js";
 import { ensureAuditLogChannels } from "../services/auditLogChannelsService.js";
 import { startServerLogs } from "../services/logging/serverLogs.js";
+import { startHomeTickets } from "../services/tickets/homeTickets.js";
 import { publishArabicModerationCommands } from "../services/moderationCommandsBoardService.js";
 import { publishTrustedBoard } from "../services/trustedBoardService.js";
 import { publishSavedIdeasBoard } from "../services/savedIdeasBoardService.js";
@@ -91,6 +92,13 @@ export default {
         await ensureAuditLogChannels(client);
       } catch (error) {
         logger.error("Failed to prepare the log rooms:", error);
+      }
+      try {
+        // Our server's tickets: category, panel room, log room and the panel (services/tickets/homeTickets.js).
+        const tickets = await startHomeTickets(client);
+        startupLog(`Tickets: ${tickets.status}`);
+      } catch (error) {
+        logger.error("Failed to set up the tickets:", error);
       }
       try {
         const logs = await startServerLogs(client);
