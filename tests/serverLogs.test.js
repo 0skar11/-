@@ -4,7 +4,7 @@ import { AuditLogEvent, PermissionsBitField } from 'discord.js';
 import { HOME_GUILD_ID } from '../src/config/homeGuild.js';
 import {
   SERVER_LOG_SETTINGS, logMessageDelete, logBulkDelete, logMemberRoles, logTimeout, logBan, logUnban, logJoin, logLeave,
-  logRoleUpdate, logWarning, startServerLogs,
+  logRoleUpdate, logWarning, startServerLogs, rememberImages,
 } from '../src/services/logging/serverLogs.js';
 import { AUDIT_LOG_CATEGORY_ID, LOG_CHANNELS } from '../src/services/auditLogChannelsService.js';
 
@@ -116,6 +116,26 @@ describe('the Logs category channels (owner\'s request)', () => {
 
     const other = { db: guild.client.db, guilds: { cache: new Map([['100000000000000099', { ...guild, id: '100000000000000099' }]]) } };
     assert.deepEqual((await startServerLogs(other)).ready, []);
+  });
+
+  test('a deleted message\'s image is posted with the log, from the copy kept when it was sent', async () => {
+    const posts = [];
+    const { guild } = setup();
+    guild.channels.cache.get('700000000000000003').send = async (payload) => { posts.push(payload); return {}; };
+    const image = { name: 'pic.png', contentType: 'image/png', size: 4, url: 'https://cdn/pic.png' };
+    const message = { id: '900000000000000077', guild, author: user(MEMBER), channelId: 'c1', content: '', createdTimestamp: Date.now(), attachments: new Map([['a', image]]) };
+    const fetchImpl = async () => ({ ok: true, arrayBuffer: async () => new Uint8Array([1, 2, 3, 4]).buffer });
+    assert.equal(await rememberImages(message, { fetchImpl }), 1);
+    // After the delete Discord's link is gone; the kept copy is used.
+    assert.equal(await logMessageDelete(message, { fetchImpl: async () => ({ ok: false }) }), true);
+    assert.equal(posts[0].files.length, 1);
+    assert.equal(posts[0].embeds[0].image.url, `attachment://${posts[0].files[0].name}`);
+    assert.match(posts[0].embeds[0].description, /👮 مسحها: صاحبها/u);
+    assert.doesNotMatch(posts[0].embeds[0].description, /مش معروف/u);
+
+    // Another server: nothing is kept.
+    const other = { ...message, guild: { id: '100000000000000099' } };
+    assert.equal(await rememberImages(other, { fetchImpl }), 0);
   });
 
   test('another server gets nothing', async () => {
