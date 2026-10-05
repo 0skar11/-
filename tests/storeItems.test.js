@@ -45,8 +45,9 @@ describe('store catalog', () => {
     test('has the owner\'s seven items at their prices, and all of them are valid', () => {
         // By price, cheapest first, with the two custom roles at the bottom (the owner's order).
         assert.deepEqual(ccStoreItems.map((item) => [item.id, item.price]), [
-            ['xp_boost', 1000], ['luck_box', 1500], ['level_boost', 1500], ['trader_role', 2500],
-            ['bourse_forecast', 6500], ['custom_role', 7500], ['friends_role', 25000],
+            // 20% up at the owner's request (report #205).
+            ['xp_boost', 1200], ['luck_box', 1800], ['level_boost', 1800], ['trader_role', 3000],
+            ['bourse_forecast', 7800], ['custom_role', 9000], ['friends_role', 30000],
         ]);
         assert.equal(listStoreItems().length, ccStoreItems.length);
         assert.equal(byId('friends_role').maxMembers, 16);
@@ -146,24 +147,26 @@ describe('luck box', () => {
         const result = await buyItem(client, fakeMember(), 'luck_box', 1, { settings: OPEN, rng: () => 0.765 });
         assert.equal(result.ok, true);
         assert.equal(result.prize.cc, 7500);
-        assert.equal((await getProfile(client, GUILD_ID, MEMBER)).cc, 2000 - 1500 + 7500);
+        assert.equal((await getProfile(client, GUILD_ID, MEMBER)).cc, 2000 - byId('luck_box').price + 7500);
     });
 
     test('the trader role prize gives the role, or its price in CC to a member who has it', async () => {
         const client = fakeClient();
-        client.store.set(`guild:${GUILD_ID}:economy:${MEMBER}`, { cc: 3000 });
+        const box = byId('luck_box').price;
+        client.store.set(`guild:${GUILD_ID}:economy:${MEMBER}`, { cc: 4000 });
         const roles = new Map([['400000000000000001', { id: '400000000000000001', name: traderRoleSettings.name, managed: false }]]);
         const member = fakeMember(roles);
         const won = await buyItem(client, member, 'luck_box', 1, { settings: OPEN, rng: () => 0.95 });
         assert.equal(won.prize.role, 'trader_role');
         assert.deepEqual(member.given, ['400000000000000001']);
-        assert.equal((await getProfile(client, GUILD_ID, MEMBER)).cc, 1500);
+        assert.equal((await getProfile(client, GUILD_ID, MEMBER)).cc, 4000 - box);
 
         member.roles.cache.set('400000000000000001', roles.get('400000000000000001'));
         const again = await buyItem(client, member, 'luck_box', 1, { settings: OPEN, rng: () => 0.95 });
         assert.equal(again.prize.hadRole, true);
         assert.equal(member.given.length, 1);
-        assert.equal((await getProfile(client, GUILD_ID, MEMBER)).cc, 1500 - 1500 + 2500);
+        // The fallback is the trader role's price.
+        assert.equal((await getProfile(client, GUILD_ID, MEMBER)).cc, 4000 - box - box + byId('trader_role').price);
     });
 
     test('a free box prize opens a second box, never another free box', async () => {
@@ -173,7 +176,7 @@ describe('luck box', () => {
         const result = await buyItem(client, fakeMember(), 'luck_box', 1, { settings: OPEN, rng: () => draws.shift() });
         assert.equal(result.prize.extraBox, true);
         assert.equal(result.bonusPrize.cc, 500);
-        assert.equal((await getProfile(client, GUILD_ID, MEMBER)).cc, 2000 - 1500 + 500);
+        assert.equal((await getProfile(client, GUILD_ID, MEMBER)).cc, 2000 - byId('luck_box').price + 500);
         // Whatever the second draw is, it's never another free box.
         for (let i = 0; i < 100; i += 1) {
             client.store.set(`guild:${GUILD_ID}:economy:${MEMBER}`, { cc: 2000 });
@@ -213,7 +216,7 @@ describe('luck box', () => {
         const result = await buyItem(client, fakeMember(), 'luck_box', 1, { settings: OPEN, rng: () => 0.997 });
         assert.equal(result.prize.customRole, 'custom_role');
         const profile = await getProfile(client, GUILD_ID, MEMBER);
-        assert.equal(profile.cc, 500);
+        assert.equal(profile.cc, 2000 - byId('luck_box').price);
         assert.equal(profile.inventory[CUSTOM_ROLE_VOUCHER.id], 1);
 
         const confirm = confirmPurchasePayload(byId('custom_role'), 1, MEMBER, profile.cc, 'open', { vouchers: 1 });
@@ -258,7 +261,7 @@ describe('XP boosts', () => {
 
         await buyItem(client, fakeMember(), 'level_boost', 1, { settings: OPEN });
         assert.equal(await xpBoostMultiplier(client, GUILD_ID, MEMBER, 'voice'), 2);
-        assert.equal((await getProfile(client, GUILD_ID, MEMBER)).cc, 5000 - 1000 - 1500);
+        assert.equal((await getProfile(client, GUILD_ID, MEMBER)).cc, 5000 - byId('xp_boost').price - byId('level_boost').price);
 
         // Saved, so a restart keeps it.
         clearXpBoostCache();
@@ -329,7 +332,7 @@ describe('bourse forecast', () => {
         const { purchase } = await import('../src/services/cc/storeUi.js');
         for (const dmOpen of [true, false]) {
             const client = fakeClient();
-            client.store.set(`guild:${GUILD_ID}:economy:${MEMBER}`, { cc: 7000 });
+            client.store.set(`guild:${GUILD_ID}:economy:${MEMBER}`, { cc: 8300 });
             const dms = [];
             const member = { ...fakeMember(), user: { id: MEMBER, toString: () => `<@${MEMBER}>`, send: async (payload) => { if (!dmOpen) throw new Error('closed'); dms.push(payload); } } };
             const { ok, payload, privatePayload } = await purchase(client, member, 'bourse_forecast', 1);
@@ -342,11 +345,11 @@ describe('bourse forecast', () => {
 
     test('an open store sells it and returns the forecast of every asset', async () => {
         const client = fakeClient();
-        client.store.set(`guild:${GUILD_ID}:economy:${MEMBER}`, { cc: 7000 });
+        client.store.set(`guild:${GUILD_ID}:economy:${MEMBER}`, { cc: 8300 });
         const result = await buyItem(client, fakeMember(), 'bourse_forecast', 1, { settings: OPEN });
         assert.equal(result.ok, true);
         assert.equal(result.forecast.forecasts.length, bourseAssets.length);
-        assert.equal((await getProfile(client, GUILD_ID, MEMBER)).cc, 500);
+        assert.equal((await getProfile(client, GUILD_ID, MEMBER)).cc, 8300 - byId('bourse_forecast').price);
     });
 });
 
@@ -454,7 +457,7 @@ describe('custom roles', () => {
 
     test('a trial purchase opens the form instead of buying (buyItem only previews it)', async () => {
         const client = fakeClient();
-        client.store.set(`guild:${GUILD_ID}:economy:${MEMBER}`, { cc: 8000 });
+        client.store.set(`guild:${GUILD_ID}:economy:${MEMBER}`, { cc: 10_000 });
         const result = await buyItem(client, fakeMember(), 'custom_role', 1, { settings: { open: false, trial: true, maxQuantity: 10 } });
         assert.equal(result.trial, true);
         assert.equal((await buyItem(client, fakeMember(), 'custom_role', 1, { settings: OPEN })).reason, 'use_form');
@@ -463,7 +466,7 @@ describe('custom roles', () => {
     test('buying one takes the first month, makes the role without permissions and renews it every 30 days', async () => {
         const client = fakeClient();
         client.users = { fetch: async () => ({ send: async () => {} }) };
-        client.store.set(`guild:${GUILD_ID}:economy:${MEMBER}`, { cc: 30_000 });
+        client.store.set(`guild:${GUILD_ID}:economy:${MEMBER}`, { cc: 35_000 });
         const cache = new Map();
         const created = [];
         const guild = {
@@ -485,7 +488,7 @@ describe('custom roles', () => {
         const item = byId('friends_role');
 
         assert.equal((await buyCustomRole(client, member, item, { name: 'Admins' })).reason, 'staff_name');
-        assert.equal((await getProfile(client, GUILD_ID, MEMBER)).cc, 30_000);
+        assert.equal((await getProfile(client, GUILD_ID, MEMBER)).cc, 35_000);
 
         const now = Date.now();
         const bought = await buyCustomRole(client, member, item, { name: 'Legends', color: 'ذهبي' }, { now });

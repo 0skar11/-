@@ -21,14 +21,16 @@
 
 // Shown in the store by price, cheapest first, with the custom roles always at the bottom
 // (ccStoreService.js sorts them; this list is kept in the same order).
+// Prices raised 20% at the owner's request (report #205); custom roles bought before keep renewing at
+// the price they were bought at.
 export const ccStoreItems = [
-    { id: 'xp_boost', name: 'بوست XP ×2', emoji: '⚡', description: 'ضعف XP الشات لمدة ساعة', price: 1000, type: 'boost', sources: ['chat'], minutes: 60 },
-    { id: 'luck_box', name: 'صندوق حظ', emoji: '🎁', description: 'جواه جايزة عشوائية: CC (لحد 50,000)، بوست، تنبؤ بورصة، رول تاجر، صندوق تاني ببلاش، أو نادراً شهر ببلاش لرول مميزة', price: 1500, type: 'luckbox' },
-    { id: 'level_boost', name: 'لفل ×2', emoji: '🚀', description: 'ضعف XP الشات والفويس لمدة ساعة', price: 1500, type: 'boost', sources: ['chat', 'voice'], minutes: 60 },
-    { id: 'trader_role', name: 'رول تاجر', emoji: '💼', description: 'رول التاجر، فوق رول Level 100', price: 2500, type: 'role', roleKey: 'trader' },
-    { id: 'bourse_forecast', name: 'تنبؤ البورصة', emoji: '🔮', description: 'تعرف سعر كل أصل في البورصة الساعة الجاية بالظبط، بيوصلك في الخاص', price: 6500, type: 'forecast' },
-    { id: 'custom_role', name: 'رول مميزة باسمك', emoji: '🎨', description: 'رول ليك لوحدك، بتختار اسمها ولونها وأيقونتها ・ في الشهر', price: 7500, type: 'custom_role', kind: 'personal', maxMembers: 1 },
-    { id: 'friends_role', name: 'رول ليك ولصحابك', emoji: '👥', description: 'رول ليك و15 من صحابك وإنت المسؤول، بتبعتلهم `رولي انفايت` ・ في الشهر', price: 25000, type: 'custom_role', kind: 'friends', maxMembers: 16 },
+    { id: 'xp_boost', name: 'بوست XP ×2', emoji: '⚡', description: 'ضعف XP الشات لمدة ساعة', price: 1200, type: 'boost', sources: ['chat'], minutes: 60 },
+    { id: 'luck_box', name: 'صندوق حظ', emoji: '🎁', description: 'جواه جايزة عشوائية: CC (لحد 50,000)، بوست، تنبؤ بورصة، رول تاجر، صندوق تاني ببلاش، أو نادراً شهر ببلاش لرول مميزة', price: 1800, type: 'luckbox' },
+    { id: 'level_boost', name: 'لفل ×2', emoji: '🚀', description: 'ضعف XP الشات والفويس لمدة ساعة', price: 1800, type: 'boost', sources: ['chat', 'voice'], minutes: 60 },
+    { id: 'trader_role', name: 'رول تاجر', emoji: '💼', description: 'رول التاجر، فوق رول Level 100', price: 3000, type: 'role', roleKey: 'trader' },
+    { id: 'bourse_forecast', name: 'تنبؤ البورصة', emoji: '🔮', description: 'تعرف سعر كل أصل في البورصة الساعة الجاية بالظبط، بيوصلك في الخاص', price: 7800, type: 'forecast' },
+    { id: 'custom_role', name: 'رول مميزة باسمك', emoji: '🎨', description: 'رول ليك لوحدك، بتختار اسمها ولونها وأيقونتها ・ في الشهر', price: 9000, type: 'custom_role', kind: 'personal', maxMembers: 1 },
+    { id: 'friends_role', name: 'رول ليك ولصحابك', emoji: '👥', description: 'رول ليك و15 من صحابك وإنت المسؤول، بتبعتلهم `رولي انفايت` ・ في الشهر', price: 30000, type: 'custom_role', kind: 'friends', maxMembers: 16 },
 ];
 
 // Other servers (not HOME_GUILD_ID in src/config/homeGuild.js) keep the store as it was before these
@@ -42,7 +44,7 @@ export const ccStoreDemoItems = [
 
 // The luck box: one prize is drawn by `weight` (the chance is weight / total, here out of 1,000).
 // Rebalanced at the owner's request (report #179), then given more kinds of prizes. On average it gives
-// back about 1,300 CC (counting the trader role fallback and the free second box), less than its 1,500
+// back about 1,300 CC (counting the trader role fallback and the free second box), less than its 1,800
 // price, so buying boxes doesn't create CC. A prize is one of:
 //   { cc }                        that much CC
 //   { boost: <'boost' item id> }  that boost, as if bought
@@ -64,7 +66,7 @@ export const luckBoxPrizes = [
     { cc: 50000, weight: 1 },
     { boost: 'xp_boost', weight: 100 },
     { boost: 'level_boost', weight: 60 },
-    { role: 'trader_role', fallbackCC: 2500, weight: 20 },
+    { role: 'trader_role', fallbackCC: 3000, weight: 20 },
     { extraBox: true, weight: 19 },
     { forecast: true, weight: 15 },
     { customRole: 'custom_role', weight: 4 },
