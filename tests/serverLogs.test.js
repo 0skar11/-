@@ -4,8 +4,9 @@ import { AuditLogEvent, PermissionsBitField } from 'discord.js';
 import { HOME_GUILD_ID } from '../src/config/homeGuild.js';
 import {
   SERVER_LOG_SETTINGS, logMessageDelete, logBulkDelete, logMemberRoles, logTimeout, logBan, logUnban, logJoin, logLeave,
-  logRoleUpdate, logWarning,
+  logRoleUpdate, logWarning, startServerLogs,
 } from '../src/services/logging/serverLogs.js';
+import { AUDIT_LOG_CATEGORY_ID, LOG_CHANNELS } from '../src/services/auditLogChannelsService.js';
 
 const MOD = '200000000000000009';
 const MEMBER = '200000000000000001';
@@ -87,6 +88,34 @@ describe('the Logs category channels (owner\'s request)', () => {
     assert.match(sent.roles[0].description, /Helpers\*\* ← \*\*Mods/u);
     assert.match(sent.roles[0].description, /BanMembers/u);
     assert.equal(await logRoleUpdate(oldRole, { ...oldRole, position: 9 }), false);
+  });
+
+  test('rooms are found by name in the Logs category even with no saved IDs; one "it works" message each, once', async () => {
+    const sent = {};
+    const channels = new Map(Object.entries(LOG_CHANNELS).map(([key, name], index) => {
+      sent[name] = [];
+      return [`80000000000000000${index}`, { id: `80000000000000000${index}`, name, parentId: AUDIT_LOG_CATEGORY_ID, permissionsFor: () => ({ has: () => true }), send: async (payload) => { sent[name].push(payload.embeds[0]); return {}; } }];
+    }));
+    const store = new Map();
+    const guild = {
+      id: HOME_GUILD_ID, memberCount: 3,
+      client: { user: { id: 'bot' }, db: { get: async (key, fallback) => (store.has(key) ? store.get(key) : fallback), set: async (key, value) => { store.set(key, value); return true; } } },
+      channels: { cache: Object.assign(channels, { find: (fn) => [...channels.values()].find(fn) }), fetch: async () => null },
+      members: { me: { id: 'bot', permissions: { has: () => true } }, fetch: async () => new Map() },
+      fetchAuditLogs: async () => ({ entries: [] }),
+    };
+    const client = { db: guild.client.db, guilds: { cache: new Map([[guild.id, guild]]) } };
+    const summary = await startServerLogs(client);
+    assert.deepEqual(summary.missing, []);
+    assert.equal(summary.ready.length, 7);
+    assert.match(sent.ban[0].title, /اللوج ده شغال/u);
+    await startServerLogs(client);
+    assert.equal(sent.ban.length, 1);
+    assert.equal(await logJoin({ guild, id: MEMBER, user: user(MEMBER) }), true);
+    assert.equal(sent.join.length, 2);
+
+    const other = { db: guild.client.db, guilds: { cache: new Map([['100000000000000099', { ...guild, id: '100000000000000099' }]]) } };
+    assert.deepEqual((await startServerLogs(other)).ready, []);
   });
 
   test('another server gets nothing', async () => {

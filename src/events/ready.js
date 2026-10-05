@@ -7,6 +7,7 @@ import { reconcileLevelRoles } from "../services/leveling/levelRoleSyncService.j
 import { findLevelTierRoles } from "../services/leveling/levelTierRoles.js";
 import { initRiffyAfterReady } from "../services/music/riffySetup.js";
 import { ensureAuditLogChannels } from "../services/auditLogChannelsService.js";
+import { startServerLogs } from "../services/logging/serverLogs.js";
 import { publishArabicModerationCommands } from "../services/moderationCommandsBoardService.js";
 import { publishTrustedBoard } from "../services/trustedBoardService.js";
 import { publishSavedIdeasBoard } from "../services/savedIdeasBoardService.js";
@@ -55,10 +56,18 @@ export default {
       } catch (error) {
         logger.error("Failed to publish saved ideas board:", error);
       }
-      const ccTopBoard = await startCCTopBoard(client);
-      startupLog(`Top CC board: ${ccTopBoard.status} (channel ${ccTopBoard.channelId})`);
-      for (const result of await startStoreChannel(client)) {
-        startupLog(`Store room: ${result.status} (channel ${result.channelId})`);
+      try {
+        const ccTopBoard = await startCCTopBoard(client);
+        startupLog(`Top CC board: ${ccTopBoard.status} (channel ${ccTopBoard.channelId})`);
+      } catch (error) {
+        logger.error("Failed to start the Top CC board:", error);
+      }
+      try {
+        for (const result of await startStoreChannel(client)) {
+          startupLog(`Store room: ${result.status} (channel ${result.channelId})`);
+        }
+      } catch (error) {
+        logger.error("Failed to start the store room:", error);
       }
       try {
         const customRoles = await startCustomRoles(client);
@@ -78,7 +87,17 @@ export default {
       } catch (error) {
         logger.error("Failed to start invite rewards:", error);
       }
-      await ensureAuditLogChannels(client);
+      try {
+        await ensureAuditLogChannels(client);
+      } catch (error) {
+        logger.error("Failed to prepare the log rooms:", error);
+      }
+      try {
+        const logs = await startServerLogs(client);
+        startupLog(`Logs rooms: ready ${logs.ready.length}, missing ${logs.missing.join(', ') || 'none'}, no access ${logs.noAccess.join(', ') || 'none'}, audit log ${logs.auditLog ? 'yes' : 'NO'}`);
+      } catch (error) {
+        logger.error("Failed to start the logs rooms:", error);
+      }
 
       if (client.config?.features?.music) initRiffyAfterReady(client);
       const reconciliationSummary = await reconcileReactionRoleMessages(client);

@@ -10,10 +10,10 @@
 //   • join / leave    — members joining and leaving
 // (voice and invites are posted by dedicatedVoiceAuditLog.js and inviteTrackerService.js.)
 
-import { AuditLogEvent, PermissionsBitField } from 'discord.js';
+import { AuditLogEvent, PermissionFlagsBits, PermissionsBitField } from 'discord.js';
 import { isHomeGuild } from '../../config/homeGuild.js';
 import { getGuildConfig } from '../config/guildConfig.js';
-import { getAuditLogChannelId } from '../auditLogChannelsService.js';
+import { getAuditLogChannelId, AUDIT_LOG_CATEGORY_ID, LOG_CHANNELS } from '../auditLogChannelsService.js';
 import { findRecentAuditEntry } from '../../utils/antiNukeLogging.js';
 import { logger } from '../../utils/logger.js';
 
@@ -41,13 +41,27 @@ function embed({ color, title, lines, thumbnail = null }) {
 }
 
 /** Posts `payload` (an embed) in the Logs channel `key` (moderation, timeout, ban, message, roles, join, leave). */
-export async function postServerLog(guild, key, payload) {
-    if (!guild || !isHomeGuild(guild.id)) return false;
+/**
+ * The Logs room for `key`: found by its name inside the Logs category (so it works even when the saved
+ * IDs in the config are missing or old), else by the ID saved by ensureAuditLogChannels.
+ */
+export async function findLogChannel(guild, key) {
+    const name = LOG_CHANNELS[key];
+    const byName = name && guild.channels.cache.find?.((channel) => channel.parentId === AUDIT_LOG_CATEGORY_ID && channel.name === name && channel.send);
+    if (byName) return byName;
     const config = await getGuildConfig(guild.client, guild.id).catch(() => null);
     const channelId = getAuditLogChannelId(config, key);
-    if (!channelId) return false;
-    const channel = guild.channels.cache.get(channelId) || await guild.channels.fetch(channelId).catch(() => null);
-    if (!channel?.send) return false;
+    if (!channelId) return null;
+    return guild.channels.cache.get(channelId) || await guild.channels.fetch(channelId).catch(() => null);
+}
+
+export async function postServerLog(guild, key, payload) {
+    if (!guild || !isHomeGuild(guild.id)) return false;
+    const channel = await findLogChannel(guild, key);
+    if (!channel?.send) {
+        logger.warn(`[SERVER_LOGS] The ${LOG_CHANNELS[key] || key} log room was not found`);
+        return false;
+    }
     return channel.send({ embeds: [payload], allowedMentions: { parse: [] } }).then(() => true).catch((error) => {
         logger.warn(`[SERVER_LOGS] Could not post in ${key}: ${error.message}`);
         return false;
@@ -258,4 +272,59 @@ export async function logRoleUpdate(oldRole, newRole) {
     if (!lines.length) return false;
     const entry = await auditEntry(newRole.guild, AuditLogEvent.RoleUpdate, newRole.id);
     return postServerLog(newRole.guild, 'roles', embed({ color: COLORS.purple, title: '🛠️ رول اتعدلت', lines: [`🎭 الرول: <@&${newRole.id}>`, ...lines, byLine(entry)] }));
+}
+
+// What each room gets, for the one-time "this log works" message.
+const ROOM_PURPOSE = {
+    moderation: 'الوارنات والكيك',
+    timeout: 'التايم أوت وفكه',
+    ban: 'البان وفك البان',
+    message: 'الرسايل اللي بتتمسح ومسح الرسايل بالجملة',
+    roles: 'الرولات اللي بتتضاف وتتشال من الأعضاء، والرولات اللي بتتعمل أو تتمسح أو تتعدل',
+    join: 'الأعضاء اللي بيدخلوا',
+    leave: 'الأعضاء اللي بيطلعوا أو بيتطردوا',
+};
+const NEEDED = [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.EmbedLinks];
+
+/**
+ * Startup, our server only: loads the members (Discord only sends member updates and leaves for members
+ * the bot knows), makes sure the bot can post in each Logs room, and posts a one-time "this log works"
+ * message in each. Returns `{ ready, missing, noAccess, auditLog }`.
+ */
+export async function startServerLogs(client) {
+    const summary = { ready: [], missing: [], noAccess: [], auditLog: true };
+    for (const guild of client.guilds.cache.values()) {
+        if (!isHomeGuild(guild.id)) continue;
+        await guild.members.fetch().catch((error) => logger.warn(`[SERVER_LOGS] Could not load the members: ${error.message}`));
+        const me = guild.members.me;
+        summary.auditLog = Boolean(me?.permissions?.has?.(PermissionFlagsBits.ViewAuditLog));
+        const helloKey = `guild:${guild.id}:serverlogs:hello`;
+        const greeted = new Set(await client.db.get(helloKey, []) || []);
+        for (const key of Object.keys(ROOM_PURPOSE)) {
+            const channel = await findLogChannel(guild, key);
+            if (!channel) {
+                summary.missing.push(LOG_CHANNELS[key]);
+                continue;
+            }
+            if (me && channel.permissionsFor && !channel.permissionsFor(me)?.has(NEEDED)) {
+                await channel.permissionOverwrites?.edit(me.id, { ViewChannel: true, SendMessages: true, EmbedLinks: true }, { reason: 'Logs room' }).catch(() => {});
+                if (!channel.permissionsFor(me)?.has(NEEDED)) {
+                    summary.noAccess.push(LOG_CHANNELS[key]);
+                    continue;
+                }
+            }
+            summary.ready.push(LOG_CHANNELS[key]);
+            if (greeted.has(key)) continue;
+            const sent = await channel.send({
+                embeds: [embed({ color: COLORS.green, title: '✅ اللوج ده شغال', lines: [`هنا هيتبعت: ${ROOM_PURPOSE[key]}.`] })],
+                allowedMentions: { parse: [] },
+            }).then(() => true).catch(() => false);
+            if (sent) greeted.add(key);
+        }
+        await client.db.set(helloKey, [...greeted]);
+    }
+    if (summary.missing.length) logger.warn(`[SERVER_LOGS] Log rooms not found: ${summary.missing.join(', ')}`);
+    if (summary.noAccess.length) logger.warn(`[SERVER_LOGS] The bot can't post in: ${summary.noAccess.join(', ')}`);
+    if (!summary.auditLog) logger.warn('[SERVER_LOGS] The bot has no View Audit Log permission: logs won\'t say who did it');
+    return summary;
 }
