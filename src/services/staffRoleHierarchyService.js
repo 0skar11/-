@@ -2,6 +2,7 @@ import { PermissionFlagsBits, PermissionsBitField } from 'discord.js';
 import { logger } from '../utils/logger.js';
 import { findBoardMessage, rememberBoardMessage } from '../utils/boardMessage.js';
 import { getGuildConfig, updateGuildConfig } from './config/guildConfig.js';
+import { isHomeGuild } from '../config/homeGuild.js';
 
 const ROLE_PERMISSIONS_CHANNEL_ID = '1550598605382099044';
 const PERMISSION_BOARD_FOOTER = 'Staff permissions • Anti-Raid / Anti-Nuke administration';
@@ -100,13 +101,14 @@ const SUPPORT_STAFF_PERMISSIONS = [
   PermissionFlagsBits.AddReactions,
 ];
 
-// Highest first. ⚔️ Senior Moderator and everything above it are Administrator.
+// Highest first. 🛡️ Admin and everything above it are Administrator; below it, the most a role gets is
+// every permission but Administrator (report #208).
 const ROLE_DEFINITIONS = [
   { name: '👑 Owner', color: '#f1c40f', permissions: [PermissionFlagsBits.Administrator] },
   { name: '⚡ Head Admin', color: '#e74c3c', permissions: [PermissionFlagsBits.Administrator] },
   { name: '🛡️ Admin', color: '#e67e22', permissions: [PermissionFlagsBits.Administrator] },
-  { name: '🎖️ Supervisor', color: '#9b59b6', permissions: [PermissionFlagsBits.Administrator] },
-  { name: '⚔️ Senior Moderator', color: '#16a085', permissions: [PermissionFlagsBits.Administrator] },
+  { name: '🎖️ Supervisor', color: '#9b59b6', permissions: [ALL_EXCEPT_ADMINISTRATOR], allButAdministrator: true },
+  { name: '⚔️ Senior Moderator', color: '#16a085', permissions: [ALL_EXCEPT_ADMINISTRATOR], allButAdministrator: true },
   // allButAdministrator: the board sums Moderator up in one line; ~50 permissions spelled out would not fit Discord's embed limits.
   { name: '🔨 Moderator', color: '#2ecc71', permissions: [ALL_EXCEPT_ADMINISTRATOR], allButAdministrator: true },
   { name: '💬 Chat Moderator', color: '#e84393', permissions: CHAT_MODERATOR_PERMISSIONS },
@@ -185,6 +187,37 @@ export async function rememberStaffRoles(guild) {
   }
   if (guild.client?.db) await updateGuildConfig(guild.client, guild.id, { [STAFF_ROLE_IDS_KEY]: savedIds }).catch(() => {});
   return { found };
+}
+
+// Report #208, done once (the bot doesn't keep editing roles: they are the owner's): every role below
+// 🛡️ Admin that has Administrator gets every permission except Administrator. Bump the version to run
+// it again on the next startup.
+const ADMIN_STRIP_VERSION = 1;
+const ADMIN_STRIP_KEY = 'adminStripVersion';
+
+export async function demoteAdministratorsBelowAdmin(guild) {
+  if (!isHomeGuild(guild?.id)) return { status: 'skipped' };
+  const config = await getGuildConfig(guild.client, guild.id).catch(() => null);
+  if ((config?.[ADMIN_STRIP_KEY] || 0) >= ADMIN_STRIP_VERSION) return { status: 'done-before', changed: [], failed: [] };
+  const roles = await guild.roles.fetch();
+  const admin = findStaffRole(roles, ROLE_DEFINITIONS.find((definition) => definition.name === '🛡️ Admin'), await savedStaffRoleIds(guild));
+  if (!admin) return { status: 'no-admin-role', changed: [], failed: [] };
+  const targets = [...roles.values()].filter((role) => role.position < admin.position && role.id !== guild.id && !role.managed
+    && role.permissions.has(PermissionFlagsBits.Administrator));
+  const changed = [];
+  const failed = [];
+  for (const role of targets) {
+    const done = await role.setPermissions(ALL_EXCEPT_ADMINISTRATOR, 'Report #208: below Admin, every permission but Administrator')
+      .then(() => true)
+      .catch((error) => {
+        logger.warn(`Could not take Administrator off ${role.name}: ${error.message}`);
+        return false;
+      });
+    (done ? changed : failed).push(role.name);
+  }
+  // A role the bot couldn't change (above the bot's role) is tried again on the next startup.
+  if (!failed.length) await updateGuildConfig(guild.client, guild.id, { [ADMIN_STRIP_KEY]: ADMIN_STRIP_VERSION }).catch(() => {});
+  return { status: 'done', changed, failed };
 }
 
 const BOARD_KEY = 'staffPermissions';

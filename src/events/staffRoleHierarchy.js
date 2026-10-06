@@ -1,6 +1,6 @@
 import { Events } from 'discord.js';
 import { logger, startupLog } from '../utils/logger.js';
-import { rememberStaffRoles, refreshStaffPermissionBoard } from '../services/staffRoleHierarchyService.js';
+import { rememberStaffRoles, refreshStaffPermissionBoard, demoteAdministratorsBelowAdmin } from '../services/staffRoleHierarchyService.js';
 
 export default {
   name: Events.ClientReady,
@@ -18,6 +18,13 @@ export default {
         found += (await rememberStaffRoles(guild)).found;
       } catch (error) {
         logger.error(`Failed to find the staff roles in ${guild.name}:`, error);
+      }
+      // Report #208, once: Administrator taken off the roles below 🛡️ Admin (our server only).
+      try {
+        const demoted = await demoteAdministratorsBelowAdmin(guild);
+        if (demoted.status === 'done') startupLog(`Administrator taken off below Admin: ${demoted.changed.join(', ') || 'none'}${demoted.failed.length ? ` (failed: ${demoted.failed.join(', ')})` : ''}`);
+      } catch (error) {
+        logger.error(`Failed to take Administrator off the roles below Admin in ${guild.name}:`, error);
       }
       try {
         const board = await refreshStaffPermissionBoard(guild);

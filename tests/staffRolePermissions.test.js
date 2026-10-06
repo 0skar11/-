@@ -2,7 +2,8 @@ import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import { PermissionFlagsBits, PermissionsBitField } from 'discord.js';
 import '../src/utils/embeds.js';
-import { ROLE_DEFINITIONS, rememberStaffRoles } from '../src/services/staffRoleHierarchyService.js';
+import { ROLE_DEFINITIONS, rememberStaffRoles, demoteAdministratorsBelowAdmin } from '../src/services/staffRoleHierarchyService.js';
+import { HOME_GUILD_ID } from '../src/config/homeGuild.js';
 import { memberHasModerationCommandAccess } from '../src/utils/permissionGuard.js';
 
 const permissionsOf = (name) => new PermissionsBitField(ROLE_DEFINITIONS.find((definition) => definition.name === name).permissions);
@@ -16,16 +17,56 @@ describe('staff role permissions', () => {
     ]);
   });
 
-  for (const name of ['👑 Owner', '⚡ Head Admin', '🛡️ Admin', '🎖️ Supervisor', '⚔️ Senior Moderator']) {
+  for (const name of ['👑 Owner', '⚡ Head Admin', '🛡️ Admin']) {
     test(`${name} is Administrator`, () => {
       assert.ok(permissionsOf(name).has(PermissionFlagsBits.Administrator, false));
     });
   }
 
-  test('Moderator has every permission except Administrator', () => {
-    const moderator = permissionsOf('🔨 Moderator');
-    assert.equal(moderator.has(PermissionFlagsBits.Administrator, false), false);
-    assert.equal(moderator.bitfield | PermissionFlagsBits.Administrator, PermissionsBitField.All);
+  // Report #208: below 🛡️ Admin, every permission but Administrator.
+  for (const name of ['🎖️ Supervisor', '⚔️ Senior Moderator', '🔨 Moderator']) {
+    test(`${name} has every permission except Administrator`, () => {
+      const permissions = permissionsOf(name);
+      assert.equal(permissions.has(PermissionFlagsBits.Administrator, false), false);
+      assert.equal(permissions.bitfield | PermissionFlagsBits.Administrator, PermissionsBitField.All);
+    });
+  }
+
+  test('once, in our server: roles below Admin with Administrator get every permission but it', async () => {
+    const make = (id, name, position, permissions, managed = false) => {
+      const role = { id, name, position, managed, permissions: new PermissionsBitField(permissions), setPermissions: async (bits) => { role.permissions = new PermissionsBitField(bits); return role; } };
+      return role;
+    };
+    const roles = [
+      make('1', '⚡ Head Admin', 9, PermissionFlagsBits.Administrator),
+      make('2', '🛡️ Admin', 8, PermissionFlagsBits.Administrator),
+      make('3', '🎖️ Supervisor', 7, PermissionFlagsBits.Administrator),
+      make('4', 'Old helpers', 3, PermissionFlagsBits.Administrator),
+      make('5', 'Members', 1, PermissionFlagsBits.SendMessages),
+      make('6', 'SomeBot', 5, PermissionFlagsBits.Administrator, true),
+    ];
+    const store = new Map();
+    const guild = (id) => ({
+      id,
+      client: { db: { get: async (key, fallback) => (store.has(key) ? store.get(key) : fallback), set: async (key, value) => { store.set(key, value); return true; } } },
+      roles: { fetch: async () => Object.assign(new Map(roles.map((role) => [role.id, role])), { find: (fn) => roles.find(fn) }) },
+    });
+    const result = await demoteAdministratorsBelowAdmin(guild(HOME_GUILD_ID));
+    assert.deepEqual(result.changed.sort(), ['Old helpers', '🎖️ Supervisor'].sort());
+    for (const id of ['3', '4']) {
+      const { permissions } = roles.find((role) => role.id === id);
+      assert.equal(permissions.has(PermissionFlagsBits.Administrator, false), false);
+      assert.ok(permissions.has(PermissionFlagsBits.BanMembers, false));
+    }
+    assert.ok(roles[0].permissions.has(PermissionFlagsBits.Administrator, false));
+    assert.ok(roles[1].permissions.has(PermissionFlagsBits.Administrator, false));
+    assert.ok(roles[5].permissions.has(PermissionFlagsBits.Administrator, false));
+
+    // Done once: if the owner gives Administrator back later, it stays.
+    roles[3].permissions = new PermissionsBitField(PermissionFlagsBits.Administrator);
+    assert.equal((await demoteAdministratorsBelowAdmin(guild(HOME_GUILD_ID))).status, 'done-before');
+    assert.ok(roles[3].permissions.has(PermissionFlagsBits.Administrator, false));
+    assert.equal((await demoteAdministratorsBelowAdmin(guild('100000000000000099'))).status, 'skipped');
   });
 
   test('Chat Moderator can timeout, warn and write notes but not kick or ban', () => {

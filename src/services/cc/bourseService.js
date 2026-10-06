@@ -33,8 +33,19 @@ export function nextChangeAt(now = Date.now()) {
     return (hourOf(now) + 1) * HOUR_MS;
 }
 
-/** The highest price an asset can reach right now: its `max`, lifted by demand. */
+/** The assets of a guild: the palace (homeOnly) is in our server only. */
+export function assetsFor(guildId) {
+    return bourseAssets.filter((asset) => !asset.homeOnly || isHomeGuild(guildId));
+}
+
+/** Most pieces of `asset` a member can own: its own `maxOwned`, else maxOwnedPerAsset. */
+export function maxOwnedOf(asset, settings = bourseSettings) {
+    return asset?.maxOwned ?? settings.maxOwnedPerAsset;
+}
+
+/** The highest price an asset can reach right now: its `max`, lifted by demand (none for the palace). */
 export function assetCeiling(asset, raise = 0) {
+    if (!Number.isFinite(asset.max)) return Infinity;
     return Math.round(asset.max * (1 + Math.max(0, raise) / 100));
 }
 
@@ -47,7 +58,7 @@ function clamp(value, low, high) {
  * random step (up to 2% of the range) inside it, so prices always look random (1,325, not 2,000).
  */
 export function keepInside(price, low, high, rng = Math.random) {
-    const step = Math.max(1, Math.round((high - low) * 0.02));
+    const step = Math.max(1, Math.round((Number.isFinite(high) ? high - low : low) * 0.02));
     if (price >= high) return high - 1 - Math.floor(rng() * step);
     if (price <= low) return low + 1 + Math.floor(rng() * step);
     return price;
@@ -126,6 +137,13 @@ export function guaranteedRise(flow, maxMove, demand = bourseSettings.demand) {
 export function tickAsset(asset, entry, { settings = bourseSettings, rng = Math.random } = {}) {
     const { min } = asset;
     const maxMove = settings.maxMovePercent / 100;
+    // The palace: fully random, no ceiling, demand ignored (a sold forecast's locked price still wins).
+    if (asset.wild) {
+        if (Number.isSafeInteger(entry.locked) && entry.locked > 0) return { price: entry.locked, previous: entry.price, raise: 0, roll: rng(), flow: {} };
+        const move = ((isRoll(entry.roll) ? entry.roll : rng()) * 2 - 1) * maxMove;
+        const price = keepInside(Math.round(entry.price * (1 + move)), min, Infinity, rng);
+        return { price, previous: entry.price, raise: 0, roll: rng(), flow: {} };
+    }
     // 20+ pieces bought in the hour: a sure rise that grows with the number of pieces, no random part.
     const sureRise = guaranteedRise(entry.flow, maxMove, settings.demand);
     const demand = sureRise || demandMove(entry.flow, settings.demand);
@@ -188,7 +206,7 @@ function stripRolls(market) {
  * Runs `change(market)` on the guild's market, moved to the current hour, one change per guild at a
  * time. The market is saved when anything changed.
  */
-async function withMarket(client, guildId, change, { now = Date.now(), rng = Math.random, assets = bourseAssets } = {}) {
+async function withMarket(client, guildId, change, { now = Date.now(), rng = Math.random, assets = assetsFor(guildId) } = {}) {
     if (!client?.db?.get) throw new Error('Database not available');
     return Mutex.runExclusive(`bourse:${guildId}`, async () => {
         const key = getBourseKey(guildId);
@@ -222,7 +240,7 @@ function quote(asset, entry) {
 
 /** The prices of the hour: `{ quotes: [{ asset, price, previous, changePercent, ceiling, raised }], nextChangeAt }`. */
 export async function getMarket(client, guildId, options = {}) {
-    const assets = options.assets || bourseAssets;
+    const assets = options.assets || assetsFor(guildId);
     const quotes = await withMarket(client, guildId, (market) => assets.map((asset) => quote(asset, market.assets[asset.id])), options);
     return { quotes, nextChangeAt: nextChangeAt(options.now) };
 }
@@ -233,7 +251,7 @@ export async function getMarket(client, guildId, options = {}) {
  * what the price will be; a second forecast in the same hour shows the same locked prices.
  */
 export async function forecastMarket(client, guildId, options = {}) {
-    const assets = options.assets || bourseAssets;
+    const assets = options.assets || assetsFor(guildId);
     const lock = isHomeGuild(guildId);
     const forecasts = await withMarket(client, guildId, (market) => assets.map((asset) => {
         const entry = market.assets[asset.id];
@@ -272,7 +290,7 @@ function validQuantity(quantity) {
  * reason one of: not_found, bad_quantity, price_changed (with `price`), max_owned (with `owned`), no_cc (with `balance`).
  */
 export async function invest(client, guildId, userId, assetQuery, quantity = 1, { expectedPrice = null, ...options } = {}) {
-    const asset = findAsset(assetQuery, options.assets);
+    const asset = findAsset(assetQuery, options.assets || assetsFor(guildId));
     if (!asset) return { ok: false, reason: 'not_found' };
     if (!validQuantity(quantity)) return { ok: false, reason: 'bad_quantity' };
 
@@ -285,7 +303,7 @@ export async function invest(client, guildId, userId, assetQuery, quantity = 1, 
         const result = await updateCCState(client, guildId, userId, (state, record) => {
             const holdings = readHoldings(record);
             const held = holdings[asset.id] || { qty: 0, cost: 0 };
-            if (held.qty + quantity > bourseSettings.maxOwnedPerAsset) return { ok: false, reason: 'max_owned', owned: held.qty, skipSave: true };
+            if (held.qty + quantity > maxOwnedOf(asset)) return { ok: false, reason: 'max_owned', owned: held.qty, skipSave: true };
             if (state.cc < cost) return { ok: false, reason: 'no_cc', balance: state.cc, skipSave: true };
             const before = state.cc;
             state.cc -= cost;
@@ -307,7 +325,7 @@ export async function invest(client, guildId, userId, assetQuery, quantity = 1, 
  * `{ ok: false, reason }` with reason one of: not_found, bad_quantity, price_changed (with `price`), not_owned (with `owned`).
  */
 export async function sell(client, guildId, userId, assetQuery, quantity = 1, { expectedPrice = null, ...options } = {}) {
-    const asset = findAsset(assetQuery, options.assets);
+    const asset = findAsset(assetQuery, options.assets || assetsFor(guildId));
     if (!asset) return { ok: false, reason: 'not_found' };
     if (!validQuantity(quantity)) return { ok: false, reason: 'bad_quantity' };
 
@@ -351,7 +369,7 @@ export async function sell(client, guildId, userId, assetQuery, quantity = 1, { 
  * totalPaid, totalIfSold }` (`quotes` as in getMarket); each row is `{ asset, qty, paid, price, value, ifSold, profit }` (`ifSold` is after the fee).
  */
 export async function getHoldings(client, guildId, userId, options = {}) {
-    const assets = options.assets || bourseAssets;
+    const assets = options.assets || assetsFor(guildId);
     const { quotes } = await getMarket(client, guildId, options);
     const record = await client.db.get(getEconomyKey(guildId, userId), {});
     const holdings = readHoldings(record || {});
