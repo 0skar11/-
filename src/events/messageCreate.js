@@ -31,6 +31,7 @@ import { handleMessageXp } from '../services/leveling/messageXp.js';
 import { countMessage } from '../services/leveling/chatCounter.js';
 import { handleAfkMessage } from '../services/afkService.js';
 import { handleSalam } from '../services/chat/salamReply.js';
+import { handleQr } from '../services/chat/qrReply.js';
 
 const AFK_COMMAND = /^\s*[^\p{L}\p{N}\s]{0,3}(?:afk|افك|أفك)(?:\s|$)/iu;
 
@@ -71,6 +72,8 @@ export default {
       const gamesOnly = isGamesOnlyFor(message);
       // "السلام عليكم" gets "عليكم السلام" (our server only); the message still goes on to the commands.
       if (!gamesOnly) await handleSalam(message);
+      // "qr" gets the QR code of our guns.lol page (our server only).
+      if (!gamesOnly && await handleQr(message)) return;
       if (!gamesOnly && await handleArabicUtilityShortcuts(message)) return;
       if (!gamesOnly && await handleMessageDeleteShortcut(message)) return;
       if (await handleCountingGame(message, client)) return;
