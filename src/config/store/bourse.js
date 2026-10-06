@@ -53,6 +53,10 @@ export const bourseSettings = {
     maxCatchUpHours: 168,
 };
 
+// `بيع كلو` / `بيع عربية كلو`: the words that mean "all of it" after بيع (our server only, owner's request).
+export const SELL_ALL_WORDS = new Set(['كلو', 'كله', 'كلهم', 'الكل', 'all']);
+export const isSellAllWord = (word) => SELL_ALL_WORDS.has(String(word || '').toLowerCase());
+
 export function normalizeName(text) {
     return String(text || '')
         .trim()

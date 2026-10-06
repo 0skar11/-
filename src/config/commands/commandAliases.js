@@ -1,5 +1,5 @@
 /** Command aliases configuration. */
-import { findAsset } from '../store/bourse.js';
+import { findAsset, isSellAllWord } from '../store/bourse.js';
 
 export const commandAliases = {
   bal: 'cc', balance: 'cc', money: 'cc', cash: 'cc', credits: 'cc', h: 'help', info: 'help',
@@ -161,6 +161,11 @@ export function isStandaloneInvocation(args) {
 export function isBourseNameInvocation(typedCommand, args) {
   const target = commandArgAliases[typedCommand];
   if (target !== 'bourse invest' && target !== 'bourse sell') return false;
+  // `بيع كلو` / `بيع عربية كلو`: sell everything, or all of one asset.
+  if (target === 'bourse sell' && isSellAllWord(args[args.length - 1])) {
+    const assetWords = args.slice(0, -1);
+    return assetWords.length === 0 || Boolean(findAsset(assetWords.join(' ')));
+  }
   const words = /^\d+$/u.test(args[args.length - 1] || '') ? args.slice(0, -1) : args;
   return words.length > 0 && Boolean(findAsset(words.join(' ')));
 }

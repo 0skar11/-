@@ -140,6 +140,40 @@ export function confirmSellPayload(asset, quantity, price, userId, { owned, paid
     };
 }
 
+/** `بيع كلو`: everything the member owns, at the prices of `hour`. The button only works for `userId`. */
+export function confirmSellAllPayload(rows, userId, hour, { note = '' } = {}) {
+    const gross = rows.reduce((sum, row) => sum + row.value, 0);
+    const received = rows.reduce((sum, row) => sum + row.ifSold, 0);
+    const paid = rows.reduce((sum, row) => sum + row.paid, 0);
+    const embed = ccEmbed('💸 تأكيد بيع الكل', [
+        ...(note ? [note, ''] : []),
+        ...rows.map((row) => `${assetLabel(row.asset)} × ${row.qty} ・ ${formatCC(row.ifSold)}`),
+        '',
+        `💵 الإجمالي: ${formatCC(gross)}`,
+        `🧾 رسوم البيع (${bourseSettings.sellFeePercent}%): ${formatCC(gross - received)}`,
+        `✅ هتاخد: ${formatCC(received)}`,
+        `📊 ${signedCC(received - paid)}`,
+    ].join('\n'));
+    const row = new ActionRowBuilder().addComponents(
+        new ButtonBuilder().setCustomId(`${BOURSE_BUTTON_PREFIX}:sellall:${hour}:${userId}`).setLabel('بيع الكل').setEmoji('✅').setStyle(ButtonStyle.Success),
+        new ButtonBuilder().setCustomId(`${BOURSE_BUTTON_PREFIX}:cancel:${userId}`).setLabel('إلغاء').setEmoji('✖️').setStyle(ButtonStyle.Secondary),
+    );
+    return { content: '', embeds: [embed], components: [row], allowedMentions: { parse: [] } };
+}
+
+/** After `بيع كلو`: every asset sold, the total and the balance. */
+export function sellAllReceiptEmbed(user, results, { before, balance }) {
+    const received = results.reduce((sum, result) => sum + result.received, 0);
+    const paid = results.reduce((sum, result) => sum + result.paid, 0);
+    return ccEmbed('✅ اتباع كله', [
+        `${user} باع كل ممتلكاته:`,
+        ...results.map((result) => `${assetLabel(result.asset)} × ${result.quantity} ・ ${formatCC(result.received)}`),
+        '',
+        `✅ خدت: ${formatCC(received)}`,
+        `📊 ${signedCC(received - paid)}`,
+    ].join('\n'), { color: 'success', fields: [balanceField(before, balance)] });
+}
+
 const balanceField = (before, after) => ({ name: '💰 رصيدك', value: `قبل: ${formatCC(before)}\nدلوقتي: ${formatCC(after)}`, inline: true });
 
 /** After buying: what was bought on top, then the numbers as cards (3 per row on a computer). */

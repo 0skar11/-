@@ -347,3 +347,58 @@ describe('top cc and other members\' holdings (reports #188, #189)', () => {
         }
     });
 });
+
+describe('بيع كلو: sell everything, or all of one asset (owner\'s request)', () => {
+    test('the words run the sell-all command, a normal sentence doesn\'t', async () => {
+        const { default: bourse } = await import('../src/commands/Games/bourse.js');
+        assert.deepEqual(applyWordAliases('بيع', ['كلو'], false), { commandName: 'bourse', args: ['sell', 'كلو'] });
+        assert.deepEqual(applyWordAliases('بيع', ['عربية', 'الكل'], false), { commandName: 'bourse', args: ['sell', 'عربية', 'الكل'] });
+        assert.equal(applyWordAliases('بيع', ['كله', 'يا', 'جماعة'], false), null);
+        assert.deepEqual(bourse.normalizePrefixArgs(['sell', 'كلو']), ['sellall']);
+        assert.deepEqual(bourse.normalizePrefixArgs(['sell', 'سبيكة', 'دهب', 'كله']), ['sellall', 'سبيكة دهب']);
+        assert.deepEqual(bourse.normalizePrefixArgs(['sell', 'عربية', '2']), ['sell', 'عربية', '2']);
+    });
+
+    test('everything is confirmed, then sold at the prices of the hour; one asset sells all its pieces', async () => {
+        const { HOME_GUILD_ID } = await import('../src/config/homeGuild.js');
+        const { GAMES_BOTS_CHANNEL_ID } = await import('../src/config/games.js');
+        const { default: bourse } = await import('../src/commands/Games/bourse.js');
+        const { default: bourseButtons } = await import('../src/interactions/buttons/store/bourse.js');
+        const [first, second] = bourseAssets;
+        const client = fakeClient();
+        await adjustCC(client, HOME_GUILD_ID, A, 100_000);
+        assert.equal((await invest(client, HOME_GUILD_ID, A, first.id, 3)).ok, true);
+        assert.equal((await invest(client, HOME_GUILD_ID, A, second.id, 2)).ok, true);
+
+        const run = async (asset = null, guildId = HOME_GUILD_ID) => {
+            const replies = [];
+            await bourse.execute({
+                id: '1', guildId, channelId: GAMES_BOTS_CHANNEL_ID, channel: { id: GAMES_BOTS_CHANNEL_ID }, user: { id: A, toString: () => `<@${A}>` },
+                options: { getSubcommand: () => 'sellall', getString: () => asset, getInteger: () => null, getUser: () => null },
+                reply: async (payload) => { replies.push(payload); },
+            }, {}, client);
+            return replies[0];
+        };
+
+        const one = await run(first.name);
+        assert.match(one.components[0].toJSON().components[0].custom_id, new RegExp(`^bourse:sell:${first.id}:3:`));
+
+        const all = await run();
+        const button = all.components[0].toJSON().components[0].custom_id;
+        assert.match(button, new RegExp(`^bourse:sellall:\\d+:${A}$`));
+        assert.match(all.embeds[0].description, new RegExp(`× 3[\\s\\S]*× 2`));
+
+        const before = (await getProfile(client, HOME_GUILD_ID, A)).cc;
+        let edited;
+        await bourseButtons.execute({
+            inGuild: () => true, guildId: HOME_GUILD_ID, user: { id: A, toString: () => `<@${A}>` },
+            deferUpdate: async () => {}, editReply: async (payload) => { edited = payload; }, reply: async () => {},
+        }, client, button.split(':').slice(1));
+        assert.match(edited.embeds[0].title, /اتباع كله/u);
+        assert.deepEqual((await getHoldings(client, HOME_GUILD_ID, A)).rows, []);
+        assert.ok((await getProfile(client, HOME_GUILD_ID, A)).cc > before);
+
+        assert.match((await run()).content, /معندكش حاجة/u);
+        assert.match((await run(null, GUILD)).content, /مش متاح/u);
+    });
+});
