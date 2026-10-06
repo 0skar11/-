@@ -44,8 +44,8 @@ SONG = SONGS['win']
 BEAT = 60 / SONG['bpm']
 SNAP = BEAT / 2                      # kills snap to half beats (the song's hi-hats/claps run at that rate)
 MUSIC_DROP, MUSIC_SLAM = SONG['drop'], SONG['slam']
-HOOK = 3.0                           # the hook runs until the first drop ("... them to WIN")
-MUSIC_START = MUSIC_DROP - HOOK      # music second at output 0
+HOOK = MUSIC_DROP                    # the whole song plays: the intro (4-square grid) runs to the first drop
+MUSIC_START = 0.0                    # music second at output 0
 SLAM = MUSIC_SLAM - MUSIC_START      # output second of the second drop, after the silent break
 SONG_LEN = 35.4 - MUSIC_START        # output second where the song ends
 def on_beat(t): return HOOK + round((t - HOOK) / SNAP) * SNAP
@@ -67,7 +67,6 @@ TITLES = [('clip1', 12.20, 'clutch')]
 # (no deaths, no walking around), clip4's ace with its last kill on the second drop, then clips 8 and 6,
 # and clip2's ace to close. An anchored cut puts its first kill at that output second; the cut before it
 # stretches or shrinks to meet it. The song is 35.4s, so everything has to fit before its end.
-HOOK_CUT = ('clip2', 18.20)
 CUTS = [
     ('clip1', 7.90, 9.50), ('clip1', 11.10, 12.70),
     ('clip3', 9.60, 10.50), ('clip3', 12.00, 12.70), ('clip3', 13.90, 14.60),
@@ -80,6 +79,15 @@ CUTS = [
     ('clip6', 4.70, 7.10),
     ('clip2', 18.10, 21.60),
 ]
+
+
+# The intro: four squares, each popping in on a word of the song's quiet intro ("IS / THING / DO /
+# THEM", vocal onsets at 0.10, 1.07, 1.80, 2.80s) and playing its own kill; on "TO" (3.9s) they all
+# punch, and on the drop ("WIN") they fly out to the corners over the first full-screen cut.
+# (appear at, clip, src second at appear), in reading order: top-left, top-right, bottom-left, bottom-right.
+TILES = [(0.10, 'clip2', 16.00), (1.07, 'clip8', 16.60), (1.80, 'clip9', 5.20), (2.80, 'clip5', 10.00)]
+TILE_IN, TILE_OUT, TILE_PUNCH = 0.3, 0.35, 3.9
+HOOK_CUT = (TILES[0][1], TILES[0][2] - TILES[0][0])   # under the grid (the post version's blurred backdrop)
 
 
 def plan():
@@ -177,6 +185,50 @@ def over(base, layer, alpha=1.0, scale=1.0):
     return (base * (1 - a) + rgb * a).astype(np.uint8)
 
 
+GRID = {}   # output frame index -> the four tile frames (None for a tile not on screen yet / any more)
+
+
+def ease_out(x): return 1 - (1 - min(max(x, 0.0), 1.0)) ** 3
+
+
+def draw_grid(canvas, t, rect, gap=10):
+    """Draw the intro's four squares into rect=(x, y, w, h) of the canvas, with their fly-in/fly-out."""
+    frames = GRID.get(int(round(t * FPS)))
+    if not frames:
+        return canvas
+    x0, y0, w, h = rect
+    cw, ch = (w - gap) // 2, (h - gap) // 2
+    punch = 1.0 + 0.05 * decay(t, TILE_PUNCH, 0.3)
+    for k, ((at, _, _), f) in enumerate(zip(TILES, frames)):
+        if f is None:
+            continue
+        col, row = k % 2, k // 2
+        dx, dy = (-1 if col == 0 else 1), (-1 if row == 0 else 1)
+        p = ease_out((t - at) / TILE_IN)
+        q = ease_out((t - HOOK) / TILE_OUT) if t >= HOOK else 0.0
+        if q >= 1:
+            continue
+        scale = (0.55 + 0.45 * p) * punch
+        # crop the source to the cell's aspect around the crosshair, then size it
+        sw = min(1280, int(720 * cw / ch)); sh = min(720, int(1280 * ch / cw))
+        tile = grade(cv2.resize(f[360 - sh // 2:360 + sh // 2, 640 - sw // 2:640 + sw // 2],
+                                (max(2, int(cw * scale)), max(2, int(ch * scale))), interpolation=cv2.INTER_AREA))
+        tile = cv2.copyMakeBorder(tile[3:-3, 3:-3], 3, 3, 3, 3, cv2.BORDER_CONSTANT, value=(85, 70, 255))
+        th, tw = tile.shape[:2]
+        cx = x0 + col * (cw + gap) + cw // 2 + int(dx * ((1 - p) * cw * 0.35 + q * cw * 1.3))
+        cy = y0 + row * (ch + gap) + ch // 2 + int(dy * ((1 - p) * ch * 0.35 + q * ch * 1.3))
+        tx, ty = cx - tw // 2, cy - th // 2
+        a0x, a0y = max(tx, 0), max(ty, 0)
+        a1x, a1y = min(tx + tw, canvas.shape[1]), min(ty + th, canvas.shape[0])
+        if a1x <= a0x or a1y <= a0y:
+            continue
+        alpha = p * (1 - q)
+        src = tile[a0y - ty:a1y - ty, a0x - tx:a1x - tx].astype(np.float32)
+        dst = canvas[a0y:a1y, a0x:a1x].astype(np.float32)
+        canvas[a0y:a1y, a0x:a1x] = (dst * (1 - alpha) + src * alpha).astype(np.uint8)
+    return canvas
+
+
 def compose_edit(t, frame, layers=None):
     """The plain version: full-frame 1920×1080 gameplay, a light zoom punch on kills, no text."""
     kick = sum(decay(t, k, 0.22) for k in KILL_OUT)
@@ -185,13 +237,13 @@ def compose_edit(t, frame, layers=None):
     sx, sy = (rng.uniform(-1, 1, 2) * 6 * kick).astype(int)
     cw, ch = 1280 / zoom, 720 / zoom
     x1 = min(max(int(640 + sx - cw / 2), 0), 1280 - int(cw)); y1 = min(max(int(360 + sy - ch / 2), 0), 720 - int(ch))
-    out = grade(cv2.resize(frame[y1:y1 + int(ch), x1:x1 + int(cw)], (1920, 1080), interpolation=cv2.INTER_CUBIC))
-    if t < HOOK:
-        out = cv2.cvtColor(cv2.cvtColor(out, cv2.COLOR_BGR2GRAY), cv2.COLOR_GRAY2BGR)
-    flash = max([0.25 * decay(t, k, 0.1) for k in KILL_OUT] + [0.35 * decay(t, c, 0.1) for c in (HOOK, SLAM)])
+    if t < HOOK:   # the intro is only the four squares, on a dark backdrop
+        out = np.full((1080, 1920, 3), 12, np.uint8)
+    else:
+        out = grade(cv2.resize(frame[y1:y1 + int(ch), x1:x1 + int(cw)], (1920, 1080), interpolation=cv2.INTER_CUBIC))
+    out = draw_grid(out, t, (0, 0, 1920, 1080))
     fade = min(1.0, max(0.0, (t - END_AT) / 1.0))  # fade to black after the last ace
-    out = out.astype(np.float32) * (1 - flash) + 255 * flash
-    return (out * (1 - fade)).astype(np.uint8)
+    return (out.astype(np.float32) * (1 - fade)).astype(np.uint8)
 
 
 def compose(t, frame, layers):
@@ -213,12 +265,12 @@ def compose(t, frame, layers):
     # Gameplay panel with a light zoom punch + shake on kills.
     cw, ch = CROP_W / zoom, CROP_H / zoom
     x1 = min(max(int(640 + sx - cw / 2), 0), 1280 - int(cw)); y1 = min(max(int(360 + sy - ch / 2), 0), 720 - int(ch))
-    panel = grade(cv2.resize(frame[y1:y1 + int(ch), x1:x1 + int(cw)], (PANEL_W, PANEL_H), interpolation=cv2.INTER_CUBIC))
-    if hook:
-        panel = cv2.cvtColor(cv2.cvtColor(panel, cv2.COLOR_BGR2GRAY), cv2.COLOR_GRAY2BGR)
-    out[PANEL_Y:PANEL_Y + PANEL_H] = panel
-    if not hook and not ending:
-        cv2.rectangle(out, (0, PANEL_Y), (W - 1, PANEL_Y + PANEL_H - 1), (85, 70, 255), 4)
+    if not hook:
+        panel = grade(cv2.resize(frame[y1:y1 + int(ch), x1:x1 + int(cw)], (PANEL_W, PANEL_H), interpolation=cv2.INTER_CUBIC))
+        out[PANEL_Y:PANEL_Y + PANEL_H] = panel
+        if not ending:
+            cv2.rectangle(out, (0, PANEL_Y), (W - 1, PANEL_Y + PANEL_H - 1), (85, 70, 255), 4)
+    out = draw_grid(out, t, (0, PANEL_Y, PANEL_W, PANEL_H))
 
     if ending:
         e = min(1.0, (t - END_AT) / 0.35)
@@ -232,11 +284,6 @@ def compose(t, frame, layers):
             seg_end = segment_at(at)[1]
             if at <= t < seg_end:
                 out = over(out, layers[name], min(1.0, (t - at) / 0.08), scale=1.0 + 0.3 * decay(t, at, 0.25))
-
-    # A soft white flash on kills and on the bigger cuts.
-    flash = max([0.3 * decay(t, k, 0.1) for k in KILL_OUT] + [0.35 * decay(t, c, 0.1) for c in (HOOK, SLAM, END_AT)])
-    if flash > 0:
-        out = (out.astype(np.float32) * (1 - flash) + 255 * flash).astype(np.uint8)
     return out
 
 
@@ -273,6 +320,16 @@ def source(t):
     return clip, a + min(t, END_AT - 1e-3) - s0
 
 
+def load_grid(indices):
+    """Fill GRID for these output frame indices (each tile read in order from its own reader)."""
+    for k, (at, clip, src) in enumerate(TILES):
+        reader = Clip(V / f'{clip}.mp4')
+        for i in sorted(indices):
+            t = i / FPS
+            if at <= t < HOOK + TILE_OUT:
+                GRID.setdefault(i, [None] * len(TILES))[k] = reader.at(src + t - at)
+
+
 VERSIONS = {  # name -> (compose, size, seconds after the last ace)
     'post': (compose, (W, H), 2.5),
     'edit': (compose_edit, (1920, 1080), 1.2),
@@ -283,6 +340,7 @@ def render(name, layers, clips):
     comp, (w, h), tail = VERSIONS[name]
     duration = min(END_AT + tail, SONG_LEN)  # never past the end of the song
     n = int(duration * FPS)
+    load_grid(range(n))
     # Decode in source order (grouped per clip), keep the composited frames as JPEG, then write in order.
     done = {}
     for clip, s, i in sorted(((*source(i / FPS), i) for i in range(n)), key=lambda r: (r[0], r[1])):
@@ -315,6 +373,7 @@ def main():
     if '--preview' in sys.argv:
         t = float(sys.argv[sys.argv.index('--preview') + 1])
         clip, s = source(t)
+        load_grid([int(round(t * FPS))])
         cv2.imwrite(str(OUT / 'v11-preview.png'), VERSIONS[names[0]][0](t, clips[clip].at(s), layers))
         return
     for name in names:
