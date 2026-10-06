@@ -4,7 +4,6 @@
 import { logger } from '../../utils/logger.js';
 import { cardReason, formatDurationMs } from '../../utils/moderationCard.js';
 import { NO_PINGS } from '../../utils/oneLine.js';
-import { logWarning } from '../logging/serverLogs.js';
 
 export const MODERATION_ACTION_LOG_CHANNEL_ID = '1552347336976498898';
 
@@ -90,8 +89,6 @@ export async function sendModerationActionLog(guild, details) {
     }
     const embed = buildModerationActionLogEmbed(details);
     const posted = await channel.send({ embeds: [embed], allowedMentions: NO_PINGS });
-    // Warnings are also copied to the moderation channel of the Logs category (our server only).
-    if (details.action === 'warn') await logWarning(guild, embed).catch(() => {});
     // The moderator's proof sent next in this channel is merged into this log (proofMergeService.js).
     const moderatorId = details.moderatorUser?.id || details.moderatorId;
     if (moderatorId && moderatorId !== guild.client?.user?.id) {
