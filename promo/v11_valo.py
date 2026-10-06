@@ -65,7 +65,7 @@ KILLS = {   # source seconds
     'clip8': [11.95, 13.00, 17.00, 18.20, 20.00],   # rescaled to 1280×720 into vo/v11/
     'clip9': [5.90, 7.10],
 }
-TITLES = [('clip1', 12.20, 'clutch')]
+TITLES = []   # no titles over the gameplay (was: ('clip1', 12.20, 'clutch'))
 
 # After the intro: (clip, src in, src out[, anchor]): tight cuts around the kills (no deaths, no walking
 # around) — the clutch, clips 3, 7 and 6, clip4's ace and clip2's ace to close. An anchored cut puts its
@@ -143,19 +143,13 @@ def text_layer(lines, stroke=10):
 
 
 def build_layers():
+    """The only text in the post version: CHAOS on top and LINK IN BIO under the gameplay, bigger at the end."""
     anton = lambda s: font('Anton-Regular.ttf', s)
-    lal = lambda s: font('Lalezar-Regular.ttf', s)
     return {
-        'hook': text_layer([('استنى للآخر', lal(120), (255, 255, 255, 255), 300),
-                            ('اللي هيحصل مش طبيعي', lal(80), (255, 210, 60, 255), 1600)]),
-        'title': text_layer([('ØSKAR', anton(130), (255, 255, 255, 255), 250),
-                             ('CHAOS  •  VALORANT', anton(46), (255, 70, 85, 255), 360),
-                             ('CHAOS ON TOP', anton(90), (255, 255, 255, 230), 1600)], stroke=6),
-        'clutch': text_layer([('CLUTCH', anton(230), (255, 255, 255, 255), PANEL_Y + PANEL_H // 2)], stroke=12),
-        'end': text_layer([('CHAOS', anton(260), (255, 255, 255, 255), 700),
-                           ('عايز تلعب فالو مع ناس جامدة؟', lal(78), (255, 255, 255, 255), 960),
-                           ('تعالى CHAOS', lal(110), (255, 70, 85, 255), 1110),
-                           ('لينك الديسكورد في البايو', lal(66), (255, 210, 60, 255), 1400)]),
+        'brand': text_layer([('CHAOS', anton(150), (255, 255, 255, 255), 270),
+                             ('LINK IN BIO', anton(76), (255, 70, 85, 255), 1610)], stroke=8),
+        'end': text_layer([('CHAOS', anton(280), (255, 255, 255, 255), 860),
+                           ('LINK IN BIO', anton(110), (255, 70, 85, 255), 1080)], stroke=12),
     }
 
 
@@ -275,10 +269,8 @@ def compose(t, frame, layers):
         e = min(1.0, (t - END_AT) / 0.35)
         out = (out.astype(np.float32) * (1 - 0.45 * e)).astype(np.uint8)
         out = over(out, layers['end'], e, scale=1.0 + 0.2 * (1 - e))
-    elif hook:
-        out = over(out, layers['hook'], min(1.0, t / 0.15))
     else:
-        out = over(out, layers['title'])
+        out = over(out, layers['brand'])
         for at, name in TITLE_OUT:
             seg_end = segment_at(at)[1]
             if at <= t < seg_end:
