@@ -4,7 +4,7 @@ import { isGamesBotsChannel } from '../../services/cc/gamesBotChannel.js';
 import { CC } from '../../config/cc.js';
 import { bourseSettings, isSellAllWord } from '../../config/store/bourse.js';
 import { getProfile } from '../../services/cc/ccService.js';
-import { findAsset, getMarket, getHoldings, hourOf } from '../../services/cc/bourseService.js';
+import { findAsset, getMarket, getHoldings, hourOf, assetsFor, maxOwnedOf } from '../../services/cc/bourseService.js';
 import { pricesEmbed, holdingsEmbed, confirmInvestPayload, confirmSellPayload, confirmSellAllPayload, bourseFailureText } from '../../services/cc/bourseUi.js';
 import { InteractionHelper } from '../../utils/interactionHelper.js';
 import { isHomeGuild } from '../../config/homeGuild.js';
@@ -84,7 +84,7 @@ export default {
             const { rows, quotes } = await getHoldings(client, guildId, user.id);
             const query = interaction.options.getString('asset');
             if (query) {
-                const one = findAsset(query);
+                const one = findAsset(query, assetsFor(guildId));
                 if (!one) return reply({ content: bourseFailureText({ reason: 'not_found' }) });
                 const row = rows.find((entry) => entry.asset.id === one.id);
                 if (!row) return reply({ content: bourseFailureText({ reason: 'not_owned', asset: one, owned: 0 }) });
@@ -95,7 +95,7 @@ export default {
             return reply(confirmSellAllPayload(rows, user.id, hourOf()));
         }
 
-        const asset = findAsset(interaction.options.getString('asset'));
+        const asset = findAsset(interaction.options.getString('asset'), assetsFor(guildId));
         if (!asset) return reply({ content: bourseFailureText({ reason: 'not_found' }) });
         const quantity = interaction.options.getInteger('quantity') || 1;
         if (quantity < 1 || quantity > bourseSettings.maxOwnedPerAsset) return reply({ content: bourseFailureText({ reason: 'bad_quantity' }) });
@@ -106,7 +106,7 @@ export default {
         const { price } = quotes.find((entry) => entry.asset.id === asset.id);
 
         if (sub === 'invest') {
-            if (owned + quantity > bourseSettings.maxOwnedPerAsset) return reply({ content: bourseFailureText({ reason: 'max_owned', asset, owned }) });
+            if (owned + quantity > maxOwnedOf(asset)) return reply({ content: bourseFailureText({ reason: 'max_owned', asset, owned }) });
             const { cc } = await getProfile(client, guildId, user.id);
             return reply(confirmInvestPayload(asset, quantity, price, user.id, cc));
         }

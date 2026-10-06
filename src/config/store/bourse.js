@@ -29,6 +29,10 @@ export const bourseAssets = [
     { id: 'building', name: 'عقار (عمارة)', emoji: '🏢', min: 4000, max: 9000, start: 6000, volatility: 0.03 },
     { id: 'ship', name: 'سفينة', emoji: '🚢', min: 6000, max: 13000, start: 9000, volatility: 0.08 },
     { id: 'plane', name: 'طيارة', emoji: '✈️', min: 8000, max: 18000, start: 12000, volatility: 0.1 },
+    // Our server only (homeOnly, report #209): the palace starts around 50,000, a member can own 5 at most
+    // (maxOwned), and its price is fully random (wild): each hour a random move of up to maxMovePercent up
+    // or down, no ceiling (it can reach 500,000 and more), never below `min`, and demand doesn't move it.
+    { id: 'palace', name: 'قصر', emoji: '🏰', min: 10000, max: Infinity, start: 50000, volatility: 0.1, maxOwned: 5, wild: true, homeOnly: true },
 ];
 
 export const bourseSettings = {

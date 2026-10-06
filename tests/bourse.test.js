@@ -38,8 +38,8 @@ function seeded(seed = 1) {
 const byId = (id) => bourseAssets.find((asset) => asset.id === id);
 
 describe('bourse config', () => {
-    test('has at most 8 valid assets', () => {
-        assert.ok(bourseAssets.length <= 8);
+    test('has at most 9 valid assets (8 everywhere, plus the palace in our server)', () => {
+        assert.ok(bourseAssets.length <= 9);
         assert.equal(new Set(bourseAssets.map((asset) => asset.id)).size, bourseAssets.length);
         for (const asset of bourseAssets) {
             assert.ok(asset.min > 0 && asset.min < asset.start && asset.start < asset.max, asset.id);
@@ -164,7 +164,8 @@ describe('bourse prices', () => {
 describe('bourse trading', () => {
     test('finds assets by number or name', () => {
         assert.equal(findAsset('1'), bourseAssets[0]);
-        assert.equal(findAsset('9'), null);
+        assert.equal(findAsset('10'), null);
+        assert.equal(findAsset('قصر').id, 'palace');
         assert.equal(findAsset('عربيه').id, 'car');
         assert.equal(findAsset('العربية').id, 'car');
         assert.equal(findAsset('طياره').id, 'plane');
@@ -260,7 +261,9 @@ describe('bourse messages', () => {
     test('the prices embed lists every asset', async () => {
         const market = await getMarket(fakeClient(), GUILD, { now: NOW });
         const embed = pricesEmbed(market);
-        for (const asset of bourseAssets) assert.ok(embed.fields.some((field) => field.name.includes(asset.name) && field.inline), asset.id);
+        // Another server: every asset but the palace (ours only).
+        for (const asset of bourseAssets.filter((entry) => !entry.homeOnly)) assert.ok(embed.fields.some((field) => field.name.includes(asset.name) && field.inline), asset.id);
+        assert.ok(!embed.fields.some((field) => field.name.includes('قصر')));
         assert.ok(embed.fields.length <= 25);
         assert.ok(embed.footer.text.includes('1.5%'));
     });
@@ -400,5 +403,36 @@ describe('بيع كلو: sell everything, or all of one asset (owner\'s request)
 
         assert.match((await run()).content, /معندكش حاجة/u);
         assert.match((await run(null, GUILD)).content, /مش متاح/u);
+    });
+});
+
+describe('the palace (report #209)', () => {
+    test('in our server: starts around 50,000, 5 at most, fully random with no ceiling, demand ignored', async () => {
+        const { HOME_GUILD_ID } = await import('../src/config/homeGuild.js');
+        const palace = byId('palace');
+        assert.equal(palace.maxOwned, 5);
+        const market = await getMarket(fakeClient(), HOME_GUILD_ID, { now: NOW, rng: seeded(4) });
+        const quote = market.quotes.find((entry) => entry.asset.id === 'palace');
+        assert.ok(quote.price >= 45_000 && quote.price <= 55_000, String(quote.price));
+
+        // No ceiling: from 480,000 a rise goes past 500,000; demand (even 100 pieces) doesn't change the move.
+        const high = { price: 480_000, previous: 480_000, raise: 0, roll: 1, flow: {} };
+        assert.equal(tickAsset(palace, high, { rng: () => 0.5 }).price, 576_000);
+        assert.equal(tickAsset(palace, { ...high, flow: { a: 100 } }, { rng: () => 0.5 }).price, 576_000);
+        assert.equal(tickAsset(palace, { ...high, roll: 0 }, { rng: () => 0.5 }).price, 384_000);
+        // Never below its floor.
+        assert.ok(tickAsset(palace, { price: 10_500, previous: 10_500, raise: 0, roll: 0, flow: {} }, { rng: () => 0 }).price > palace.min);
+
+        const client = fakeClient();
+        await adjustCC(client, HOME_GUILD_ID, A, 2_000_000);
+        assert.equal((await invest(client, HOME_GUILD_ID, A, 'قصر', 5, { now: NOW, rng: seeded(4) })).ok, true);
+        assert.equal((await invest(client, HOME_GUILD_ID, A, 'قصر', 1, { now: NOW, rng: seeded(4) })).reason, 'max_owned');
+    });
+
+    test('another server has no palace', async () => {
+        const client = fakeClient();
+        await adjustCC(client, GUILD, A, 2_000_000);
+        assert.equal((await invest(client, GUILD, A, 'قصر', 1, { now: NOW })).reason, 'not_found');
+        assert.ok(!(await getMarket(client, GUILD, { now: NOW })).quotes.some((entry) => entry.asset.id === 'palace'));
     });
 });

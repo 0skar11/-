@@ -56,6 +56,7 @@ export function buildGuideEmbeds({ boostLine = ccBoostLine(), guildId = null } =
             '🧠 **الفكرة:** اشتري والسعر واطي، وبيع لما يعلى.',
             `🔥 لو الناس اشتروا **${demand.guaranteedRiseUnits} قطعة أو أكتر** من حاجة في نفس الساعة، سعرها **لازم يزيد** الساعة الجاية.`,
             `🧾 البيع عليه رسوم **${bourseSettings.sellFeePercent}%**، وأقصى حاجة **${bourseSettings.maxOwnedPerAsset} قطعة** من كل حاجة.`,
+            ...(isHomeGuild(guildId) ? ['🏰 **القصر**: بيبدأ بحوالي 50,000، سعره عشوائي تماماً ومالوش سقف (ممكن يوصل 500,000 وأكتر)، وأقصاك **5** بس.'] : []),
         ].join('\n'), { color: 'info' }),
         ccEmbed('🔁 التحويل', [
             '`تحويل @صاحبك 100` ← تبعتله 100',

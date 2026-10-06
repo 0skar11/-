@@ -5,7 +5,7 @@
 import { ActionRowBuilder, ButtonBuilder, ButtonStyle } from 'discord.js';
 import { CC, ccEmbed, formatCC } from '../../config/cc.js';
 import { bourseSettings } from '../../config/store/bourse.js';
-import { sellFee } from './bourseService.js';
+import { sellFee, maxOwnedOf } from './bourseService.js';
 
 export const BOURSE_BUTTON_PREFIX = 'bourse';
 
@@ -32,6 +32,12 @@ function signedCC(amount) {
  * `اسعار`: a grid of cards (3 per row on a computer), one per asset with its price and its move since
  * last hour, then a card with how to buy and sell. The rules are in the small footer.
  */
+/** ` (والقصر 5 بس)` when an asset in the list has its own lower limit. */
+function limited(quotes) {
+    const special = quotes.filter(({ asset }) => asset.maxOwned).map(({ asset }) => `${asset.name} ${asset.maxOwned} بس`);
+    return special.length ? ` (وال${special.join('، ال')})` : '';
+}
+
 export function pricesEmbed({ quotes, nextChangeAt }, { balance = null } = {}) {
     const next = Math.floor(nextChangeAt / 1000);
     // With the member's balance (our server), the 🔥 demand mark and its legend are gone and the footer
@@ -49,7 +55,7 @@ export function pricesEmbed({ quotes, nextChangeAt }, { balance = null } = {}) {
         ],
     });
     embed.footer = {
-        text: `رسوم البيع ${bourseSettings.sellFeePercent}% ・ أقصى ${bourseSettings.maxOwnedPerAsset} قطعة من كل حاجة ・ ${showDemand ? '🔥 = عليها طلب' : `💰 رصيدك: ${number(balance)} ${CC.short}`}`,
+        text: `رسوم البيع ${bourseSettings.sellFeePercent}% ・ أقصى ${bourseSettings.maxOwnedPerAsset} قطعة من كل حاجة${limited(quotes)} ・ ${showDemand ? '🔥 = عليها طلب' : `💰 رصيدك: ${number(balance)} ${CC.short}`}`,
     };
     return embed;
 }
@@ -212,7 +218,7 @@ const FAILURE_TEXT = {
 export function bourseFailureText(result) {
     if (result.reason === 'no_cc') return `❌ رصيدك ${formatCC(result.balance ?? 0)} مش كفاية.`;
     if (result.reason === 'max_owned') {
-        return `❌ أقصى حاجة ${bourseSettings.maxOwnedPerAsset} قطعة من ${result.asset ? assetLabel(result.asset) : 'المنتج ده'}، ومعاك ${result.owned}.`;
+        return `❌ أقصى حاجة ${maxOwnedOf(result.asset)} قطعة من ${result.asset ? assetLabel(result.asset) : 'المنتج ده'}، ومعاك ${result.owned}.`;
     }
     if (result.reason === 'not_owned') {
         return result.owned
