@@ -11,6 +11,7 @@ import { startHomeTickets } from "../services/tickets/homeTickets.js";
 import { publishArabicModerationCommands } from "../services/moderationCommandsBoardService.js";
 import { publishTrustedBoard } from "../services/trustedBoardService.js";
 import { publishSavedIdeasBoard } from "../services/savedIdeasBoardService.js";
+import { publishHoneypotNotice } from "../services/security/honeypotNotice.js";
 import { publishProofGuide } from "../services/moderation/proofMergeService.js";
 import { startCCTopBoard } from "../services/games/ccTopBoard.js";
 import { startStoreChannel } from "../services/cc/storeChannel.js";
@@ -49,6 +50,12 @@ export default {
         startupLog(`Proof guide: ${result.status}`);
       } catch (error) {
         logger.error("Failed to publish the proof guide:", error);
+      }
+      try {
+        // The pinned notice in #dont-type-here (our server only).
+        startupLog(`Honeypot notice: ${(await publishHoneypotNotice(client)).status}`);
+      } catch (error) {
+        logger.error("Failed to post the honeypot notice:", error);
       }
       try {
         const result = await publishSavedIdeasBoard(client);
