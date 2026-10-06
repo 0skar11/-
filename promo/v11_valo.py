@@ -38,16 +38,20 @@ SONGS = {
     # The user's TikTok sound ("... to WIN / WINNING / I DREAM / BLOOD / REGRET / GUILTY / SACRIFICE MYSELF"),
     # 35.4s: quiet intro, first drop on "WIN" at 4.615, build from ~17s, silence 21.0-21.5, second drop
     # on "WIN" at 22.315, full energy to ~34.4. 74.25 BPM (0.808s beat; half beats work for fast cuts).
-    'win': {'file': 'song2.wav', 'bpm': 74.25, 'drop': 4.615, 'slam': 22.315},
+    'win': {'file': 'song2.wav', 'bpm': 74.25, 'drop': 4.615, 'slam': 22.315, 'len': 35.4},
+    # The user's third sound ("BUT IF THERE IS ONE THING I CAN DO FOR THEM / FOR THE / IT IS / WIN"), 25.15s:
+    # the words build over a beat up to a short dip at 7.5-8.0, the drop on "WIN" at 8.11, then steady to
+    # ~24.5. 112.2 BPM (0.535s beat). No second drop, so no slam.
+    'win2': {'file': 'song3.wav', 'bpm': 112.2, 'drop': 8.11, 'slam': None, 'len': 25.15},
 }
-SONG = SONGS['win']
+SONG = SONGS['win2']
 BEAT = 60 / SONG['bpm']
-SNAP = BEAT / 2                      # kills snap to half beats (the song's hi-hats/claps run at that rate)
+SNAP = BEAT                          # kills snap to beats
 MUSIC_DROP, MUSIC_SLAM = SONG['drop'], SONG['slam']
 HOOK = MUSIC_DROP                    # the whole song plays: the intro (4-square grid) runs to the first drop
 MUSIC_START = 0.0                    # music second at output 0
-SLAM = MUSIC_SLAM - MUSIC_START      # output second of the second drop, after the silent break
-SONG_LEN = 35.4 - MUSIC_START        # output second where the song ends
+SLAM = MUSIC_SLAM and MUSIC_SLAM - MUSIC_START   # output second of a second drop after a silent break, if any
+SONG_LEN = SONG['len'] - MUSIC_START             # output second where the song ends
 def on_beat(t): return HOOK + round((t - HOOK) / SNAP) * SNAP
 
 KILLS = {   # source seconds
@@ -63,30 +67,25 @@ KILLS = {   # source seconds
 }
 TITLES = [('clip1', 12.20, 'clutch')]
 
-# The hook (in grey) is clip2's ace. Then (clip, src in, src out[, anchor]): tight cuts around the kills
-# (no deaths, no walking around), clip4's ace with its last kill on the second drop, then clips 8 and 6,
-# and clip2's ace to close. An anchored cut puts its first kill at that output second; the cut before it
-# stretches or shrinks to meet it. The song is 35.4s, so everything has to fit before its end.
+# After the intro: (clip, src in, src out[, anchor]): tight cuts around the kills (no deaths, no walking
+# around) — the clutch, clips 3, 7 and 6, clip4's ace and clip2's ace to close. An anchored cut puts its
+# first kill at that output second; the cut before it stretches or shrinks to meet it. Everything has to
+# fit before the song ends (the intro already shows clips 2, 8, 9 and 5).
 CUTS = [
     ('clip1', 7.90, 9.50), ('clip1', 11.10, 12.70),
-    ('clip3', 9.60, 10.50), ('clip3', 12.00, 12.70), ('clip3', 13.90, 14.60),
-    ('clip5', 10.30, 11.90), ('clip5', 13.10, 13.80), ('clip5', 14.70, 15.50),
-    ('clip9', 5.50, 7.60),
-    ('clip7', 9.10, 10.10), ('clip7', 13.60, 14.40), ('clip7', 27.30, 28.50),
-    ('clip8', 11.50, 13.40),
-    ('clip4', 8.10, 9.00), ('clip4', 15.40, 16.00), ('clip4', 17.30, 19.00, SLAM),
-    ('clip8', 16.80, 20.30),
+    ('clip3', 9.60, 10.50), ('clip3', 13.90, 14.60),
+    ('clip7', 9.10, 10.10), ('clip7', 27.30, 28.50),
     ('clip6', 4.70, 7.10),
-    ('clip2', 18.10, 21.60),
+    ('clip4', 15.40, 16.00), ('clip4', 17.30, 18.60),
+    ('clip2', 18.10, 21.40),
 ]
 
-
-# The intro: four squares, each popping in on a word of the song's quiet intro ("IS / THING / DO /
-# THEM", vocal onsets at 0.10, 1.07, 1.80, 2.80s) and playing its own kill; on "TO" (3.9s) they all
-# punch, and on the drop ("WIN") they fly out to the corners over the first full-screen cut.
+# The intro: four squares, each popping in on a word of the song's intro (vocal onsets "BUT" 0.06,
+# "IF" 1.71, "ONE" 3.43, "FOR THE" 5.43s) and playing its own kills; on "IT IS" (7.53s) they all punch,
+# and on the drop ("WIN") they fly out to the corners over the first full-screen cut.
 # (appear at, clip, src second at appear), in reading order: top-left, top-right, bottom-left, bottom-right.
-TILES = [(0.10, 'clip2', 16.00), (1.07, 'clip8', 16.60), (1.80, 'clip9', 5.20), (2.80, 'clip5', 10.00)]
-TILE_IN, TILE_OUT, TILE_PUNCH = 0.3, 0.35, 3.9
+TILES = [(0.06, 'clip2', 14.00), (1.71, 'clip8', 14.50), (3.43, 'clip9', 3.90), (5.43, 'clip5', 9.90)]
+TILE_IN, TILE_OUT, TILE_PUNCH = 0.3, 0.35, 7.53
 HOOK_CUT = (TILES[0][1], TILES[0][2] - TILES[0][0])   # under the grid (the post version's blurred backdrop)
 
 
@@ -242,7 +241,7 @@ def compose_edit(t, frame, layers=None):
     else:
         out = grade(cv2.resize(frame[y1:y1 + int(ch), x1:x1 + int(cw)], (1920, 1080), interpolation=cv2.INTER_CUBIC))
     out = draw_grid(out, t, (0, 0, 1920, 1080))
-    fade = min(1.0, max(0.0, (t - END_AT) / 1.0))  # fade to black after the last ace
+    fade = min(1.0, max(0.0, (t - END_AT) / 1.5))  # fade to black after the last ace
     return (out.astype(np.float32) * (1 - fade)).astype(np.uint8)
 
 
@@ -332,7 +331,7 @@ def load_grid(indices):
 
 VERSIONS = {  # name -> (compose, size, seconds after the last ace)
     'post': (compose, (W, H), 2.5),
-    'edit': (compose_edit, (1920, 1080), 1.2),
+    'edit': (compose_edit, (1920, 1080), 99),
 }
 
 
@@ -365,7 +364,7 @@ def main():
         for s0, s1, clip, a in SEGS:
             print(f'{s0:6.2f}-{s1:6.2f}  {clip}  src {a:6.2f}-{a + s1 - s0:6.2f}')
         print('kills', [round(k, 2) for k in KILL_OUT], '\ntitles', [(round(t, 2), n) for t, n in TITLE_OUT],
-              f'\nslam {SLAM:.2f}, last ace ends {END_AT:.2f}')
+              f'\nslam {SLAM}, last ace ends {END_AT:.2f}, song ends {SONG_LEN:.2f}')
         return
     names = [a for a in sys.argv[1:] if a in VERSIONS] or list(VERSIONS)
     layers = build_layers()
