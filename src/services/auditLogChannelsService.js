@@ -4,7 +4,7 @@ import { logger } from '../utils/logger.js';
 
 export const AUDIT_LOG_CATEGORY_ID = '1547320311626731562';
 
-export const LOG_CHANNELS = {
+const LOG_CHANNELS = {
   moderation: 'moderation',
   timeout: 'timeout',
   ban: 'ban',

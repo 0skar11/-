@@ -7,7 +7,6 @@ import { reconcileLevelRoles } from "../services/leveling/levelRoleSyncService.j
 import { findLevelTierRoles } from "../services/leveling/levelTierRoles.js";
 import { initRiffyAfterReady } from "../services/music/riffySetup.js";
 import { ensureAuditLogChannels } from "../services/auditLogChannelsService.js";
-import { startServerLogs } from "../services/logging/serverLogs.js";
 import { startHomeTickets } from "../services/tickets/homeTickets.js";
 import { publishArabicModerationCommands } from "../services/moderationCommandsBoardService.js";
 import { publishTrustedBoard } from "../services/trustedBoardService.js";
@@ -99,12 +98,6 @@ export default {
         startupLog(`Tickets: ${tickets.status}`);
       } catch (error) {
         logger.error("Failed to set up the tickets:", error);
-      }
-      try {
-        const logs = await startServerLogs(client);
-        startupLog(`Logs rooms: ready ${logs.ready.length}, missing ${logs.missing.join(', ') || 'none'}, no access ${logs.noAccess.join(', ') || 'none'}, audit log ${logs.auditLog ? 'yes' : 'NO'}`);
-      } catch (error) {
-        logger.error("Failed to start the logs rooms:", error);
       }
 
       if (client.config?.features?.music) initRiffyAfterReady(client);
