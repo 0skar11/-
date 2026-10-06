@@ -47,7 +47,7 @@ MUSIC_DROP, MUSIC_SLAM = SONG['drop'], SONG['slam']
 HOOK = 3.0                           # the hook runs until the first drop ("... them to WIN")
 MUSIC_START = MUSIC_DROP - HOOK      # music second at output 0
 SLAM = MUSIC_SLAM - MUSIC_START      # output second of the second drop, after the silent break
-SONG_END = 34.4 - MUSIC_START        # the song's energy ends here (it fades out at 35.4)
+SONG_LEN = 35.4 - MUSIC_START        # output second where the song ends
 def on_beat(t): return HOOK + round((t - HOOK) / SNAP) * SNAP
 
 KILLS = {   # source seconds
@@ -57,23 +57,28 @@ KILLS = {   # source seconds
     'clip4': [8.55, 13.10, 15.70, 17.75],
     'clip5': [10.60, 11.50, 13.45, 14.95],
     'clip6': [4.92, 5.76, 6.84],
-    'clip7': [9.58, 14.02, 27.72],   # 852×480 Medal export, upscaled to 1280×720 into vo/v11/clip7.mp4
+    'clip7': [9.58, 14.02, 27.72],   # clips 7-9 are Medal exports (852×480, 640×360, 960×720),
+    'clip8': [11.95, 13.00, 17.00, 18.20, 20.00],   # rescaled to 1280×720 into vo/v11/
+    'clip9': [5.90, 7.10],
 }
 TITLES = [('clip1', 12.20, 'clutch')]
 
-# The hook (in grey) is clip2's ace. Then (clip, src in, src out[, anchor]): the clutch, clips 3, 5 and 7,
-# clip4's ace with its last kill on the second drop, clip6, and clip2's ace to close. Only the moments
-# around the kills are kept (no deaths, no walking around). An anchored cut puts its first kill at that
-# output second; the cut before it stretches or shrinks to meet it.
+# The hook (in grey) is clip2's ace. Then (clip, src in, src out[, anchor]): tight cuts around the kills
+# (no deaths, no walking around), clip4's ace with its last kill on the second drop, then clips 8 and 6,
+# and clip2's ace to close. An anchored cut puts its first kill at that output second; the cut before it
+# stretches or shrinks to meet it. The song is 35.4s, so everything has to fit before its end.
 HOOK_CUT = ('clip2', 18.20)
 CUTS = [
-    ('clip1', 7.70, 9.60), ('clip1', 11.10, 12.80),
-    ('clip3', 9.40, 10.70), ('clip3', 11.90, 12.80), ('clip3', 13.80, 14.70),
-    ('clip5', 10.20, 12.00), ('clip5', 13.00, 13.90), ('clip5', 14.60, 15.50),
-    ('clip7', 9.00, 10.30), ('clip7', 13.50, 14.60), ('clip7', 27.20, 28.90),
-    ('clip4', 8.00, 9.20), ('clip4', 12.60, 13.60), ('clip4', 15.30, 16.10), ('clip4', 17.30, 19.00, SLAM),
-    ('clip6', 4.50, 7.30),
-    ('clip2', 5.60, 6.60), ('clip2', 7.40, 8.30), ('clip2', 17.80, 22.00),
+    ('clip1', 7.90, 9.50), ('clip1', 11.10, 12.70),
+    ('clip3', 9.60, 10.50), ('clip3', 12.00, 12.70), ('clip3', 13.90, 14.60),
+    ('clip5', 10.30, 11.90), ('clip5', 13.10, 13.80), ('clip5', 14.70, 15.50),
+    ('clip9', 5.50, 7.60),
+    ('clip7', 9.10, 10.10), ('clip7', 13.60, 14.40), ('clip7', 27.30, 28.50),
+    ('clip8', 11.50, 13.40),
+    ('clip4', 8.10, 9.00), ('clip4', 15.40, 16.00), ('clip4', 17.30, 19.00, SLAM),
+    ('clip8', 16.80, 20.30),
+    ('clip6', 4.70, 7.10),
+    ('clip2', 18.10, 21.60),
 ]
 
 
@@ -269,14 +274,14 @@ def source(t):
 
 
 VERSIONS = {  # name -> (compose, size, seconds after the last ace)
-    'post': (compose, (W, H), 2.8),
+    'post': (compose, (W, H), 2.5),
     'edit': (compose_edit, (1920, 1080), 1.2),
 }
 
 
 def render(name, layers, clips):
     comp, (w, h), tail = VERSIONS[name]
-    duration = END_AT + tail
+    duration = min(END_AT + tail, SONG_LEN)  # never past the end of the song
     n = int(duration * FPS)
     # Decode in source order (grouped per clip), keep the composited frames as JPEG, then write in order.
     done = {}
