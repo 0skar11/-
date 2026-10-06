@@ -40,13 +40,15 @@ SONGS = {
     # on "WIN" at 22.315, full energy to ~34.4. 74.25 BPM (0.808s beat; half beats work for fast cuts).
     'win': {'file': 'song2.wav', 'bpm': 74.25, 'drop': 4.615, 'slam': 22.315},
 }
-SONG = SONGS['phonk']
+SONG = SONGS['win']
 BEAT = 60 / SONG['bpm']
+SNAP = BEAT / 2                      # kills snap to half beats (the song's hi-hats/claps run at that rate)
 MUSIC_DROP, MUSIC_SLAM = SONG['drop'], SONG['slam']
-HOOK = 1.0                           # the hook runs until the drop
+HOOK = 3.0                           # the hook runs until the first drop ("... them to WIN")
 MUSIC_START = MUSIC_DROP - HOOK      # music second at output 0
-SLAM = MUSIC_SLAM - MUSIC_START      # output second of the slam back after the silent break
-def on_beat(t): return HOOK + round((t - HOOK) / BEAT) * BEAT
+SLAM = MUSIC_SLAM - MUSIC_START      # output second of the second drop, after the silent break
+SONG_END = 34.4 - MUSIC_START        # the song's energy ends here (it fades out at 35.4)
+def on_beat(t): return HOOK + round((t - HOOK) / SNAP) * SNAP
 
 KILLS = {   # source seconds
     'clip1': [8.30, 8.88, 9.20, 11.48],
@@ -55,37 +57,39 @@ KILLS = {   # source seconds
     'clip4': [8.55, 13.10, 15.70, 17.75],
     'clip5': [10.60, 11.50, 13.45, 14.95],
     'clip6': [4.92, 5.76, 6.84],
+    'clip7': [9.58, 14.02, 27.72],   # 852×480 Medal export, upscaled to 1280×720 into vo/v11/clip7.mp4
 }
 TITLES = [('clip1', 12.20, 'clutch')]
 
-# (clip, src in, src out). The hook is the ace, in grey; then the clutch, clips 3, 5 and 6, clip4's ace,
-# and clip2's ace last. Only the moments around the kills are kept (no deaths, no walking around).
+# The hook (in grey) is clip2's ace. Then (clip, src in, src out[, anchor]): the clutch, clips 3, 5 and 7,
+# clip4's ace with its last kill on the second drop, clip6, and clip2's ace to close. Only the moments
+# around the kills are kept (no deaths, no walking around). An anchored cut puts its first kill at that
+# output second; the cut before it stretches or shrinks to meet it.
+HOOK_CUT = ('clip2', 18.20)
 CUTS = [
     ('clip1', 7.70, 9.60), ('clip1', 11.10, 12.80),
     ('clip3', 9.40, 10.70), ('clip3', 11.90, 12.80), ('clip3', 13.80, 14.70),
     ('clip5', 10.20, 12.00), ('clip5', 13.00, 13.90), ('clip5', 14.60, 15.50),
+    ('clip7', 9.00, 10.30), ('clip7', 13.50, 14.60), ('clip7', 27.20, 28.90),
+    ('clip4', 8.00, 9.20), ('clip4', 12.60, 13.60), ('clip4', 15.30, 16.10), ('clip4', 17.30, 19.00, SLAM),
     ('clip6', 4.50, 7.30),
-    ('clip4', 8.00, 9.20), ('clip4', 12.60, 13.60), ('clip4', 15.30, 16.10), ('clip4', 17.30, 19.00),
-    ('clip2', 5.60, 6.60), ('clip2', 7.40, 8.30),
+    ('clip2', 5.60, 6.60), ('clip2', 7.40, 8.30), ('clip2', 17.80, 22.00),
 ]
-FINAL = ('clip2', 17.80, 22.00)      # its kill at 20.30 lands on the slam
-FLEX = len(CUTS) - 1                 # this cut's out-point stretches/shrinks to meet FINAL
 
 
 def plan():
     """-> list of (out start, out end, clip, src at out start), the hook first."""
-    segs = [(0.0, HOOK, 'clip2', 20.20)]
+    segs = [[0.0, HOOK, HOOK_CUT[0], HOOK_CUT[1]]]
     t = HOOK
-    for clip, a, b in CUTS:
+    for clip, a, b, *anchor in CUTS:
         kills = [k for k in KILLS[clip] if a <= k <= b]
-        if kills:  # shift the in-point so the first kill lands on the nearest beat
+        if anchor:   # pin the first kill to the anchor; the previous cut absorbs the difference
+            t = anchor[0] - (kills[0] - a)
+            segs[-1][1] = t
+        elif kills:  # shift the in-point so the first kill lands on the nearest half beat
             a = kills[0] - (on_beat(t + kills[0] - a) - t)
         segs.append([t, t + b - a, clip, a])
         t += b - a
-    clip, a, b = FINAL
-    start = SLAM - (20.30 - a)
-    segs[FLEX + 1][1] = start                                   # stretch/shrink the cut before it
-    segs.append((start, start + b - a, clip, a))
     return [tuple(s) for s in segs]
 
 
@@ -179,7 +183,7 @@ def compose_edit(t, frame, layers=None):
     out = grade(cv2.resize(frame[y1:y1 + int(ch), x1:x1 + int(cw)], (1920, 1080), interpolation=cv2.INTER_CUBIC))
     if t < HOOK:
         out = cv2.cvtColor(cv2.cvtColor(out, cv2.COLOR_BGR2GRAY), cv2.COLOR_GRAY2BGR)
-    flash = max([0.25 * decay(t, k, 0.1) for k in KILL_OUT] + [0.35 * decay(t, HOOK, 0.1)])
+    flash = max([0.25 * decay(t, k, 0.1) for k in KILL_OUT] + [0.35 * decay(t, c, 0.1) for c in (HOOK, SLAM)])
     fade = min(1.0, max(0.0, (t - END_AT) / 1.0))  # fade to black after the last ace
     out = out.astype(np.float32) * (1 - flash) + 255 * flash
     return (out * (1 - fade)).astype(np.uint8)
@@ -225,7 +229,7 @@ def compose(t, frame, layers):
                 out = over(out, layers[name], min(1.0, (t - at) / 0.08), scale=1.0 + 0.3 * decay(t, at, 0.25))
 
     # A soft white flash on kills and on the bigger cuts.
-    flash = max([0.3 * decay(t, k, 0.1) for k in KILL_OUT] + [0.35 * decay(t, c, 0.1) for c in (HOOK, END_AT)])
+    flash = max([0.3 * decay(t, k, 0.1) for k in KILL_OUT] + [0.35 * decay(t, c, 0.1) for c in (HOOK, SLAM, END_AT)])
     if flash > 0:
         out = (out.astype(np.float32) * (1 - flash) + 255 * flash).astype(np.uint8)
     return out
