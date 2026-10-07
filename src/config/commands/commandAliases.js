@@ -161,10 +161,11 @@ export function isStandaloneInvocation(args) {
 export function isBourseNameInvocation(typedCommand, args) {
   const target = commandArgAliases[typedCommand];
   if (target !== 'bourse invest' && target !== 'bourse sell') return false;
-  // `بيع كلو` / `بيع عربية كلو`: sell everything, or all of one asset.
-  if (target === 'bourse sell' && isSellAllWord(args[args.length - 1])) {
+  // `بيع كلو` / `بيع عربية كلو`: sell everything, or all of one asset; `شراء عربية كلو`: buy as many as possible.
+  if (isSellAllWord(args[args.length - 1])) {
     const assetWords = args.slice(0, -1);
-    return assetWords.length === 0 || Boolean(findAsset(assetWords.join(' ')));
+    if (target === 'bourse sell' && assetWords.length === 0) return true;
+    return assetWords.length > 0 && Boolean(findAsset(assetWords.join(' ')));
   }
   const words = /^\d+$/u.test(args[args.length - 1] || '') ? args.slice(0, -1) : args;
   return words.length > 0 && Boolean(findAsset(words.join(' ')));

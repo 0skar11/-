@@ -10,7 +10,8 @@ import { InteractionHelper } from '../../utils/interactionHelper.js';
 import { isHomeGuild } from '../../config/homeGuild.js';
 
 // The CC bourse: `اسعار` (prices of the hour), `شراء عربية` / `استثمار عربية` / `شراء 3 2` (buy), `بيع عربية` /
-// `بيع 3 2` (sell), `بيع كلو` / `بيع عربية كلو` (sell everything / all of one asset, our server only) and `ممتلكاتي` / `ممتلكات @member` (holdings; another member's in our server only). Buying and selling are confirmed with a button
+// `بيع 3 2` (sell), `بيع كلو` / `بيع عربية كلو` (sell everything / all of one asset), `شراء عربية كلو` (as many as the balance
+// allows; both our server only) and `ممتلكاتي` / `ممتلكات @member` (holdings; another member's in our server only). Buying and selling are confirmed with a button
 // (src/interactions/buttons/store/bourse.js). The rules are src/config/store/bourse.js.
 const assetOption = (option) => option.setName('asset').setDescription('Asset number or name (see /bourse prices)').setRequired(true);
 const quantityOption = (option) => option
@@ -42,6 +43,7 @@ export default {
         .addSubcommand((sub) => sub.setName('prices').setDescription('Prices of the hour'))
         .addSubcommand((sub) => sub.setName('invest').setDescription('Buy an asset at the price of the hour').addStringOption(assetOption).addIntegerOption(quantityOption))
         .addSubcommand((sub) => sub.setName('sell').setDescription('Sell an asset at the price of the hour').addStringOption(assetOption).addIntegerOption(quantityOption))
+        .addSubcommand((sub) => sub.setName('buymax').setDescription('Buy as many pieces of an asset as your balance allows').addStringOption(assetOption))
         .addSubcommand((sub) => sub.setName('sellall').setDescription('Sell everything you own, or all of one asset')
             .addStringOption((option) => option.setName('asset').setDescription('Only this asset (default: everything)')))
         .addSubcommand((sub) => sub.setName('holdings').setDescription('What you (or another member) own and what it is worth')
@@ -54,6 +56,8 @@ export default {
         if (!args.length || ((sub === 'invest' || sub === 'sell') && !rest.length)) return ['prices'];
         // `بيع كلو` sells everything, `بيع عربية كلو` all of one asset.
         if (sub === 'sell' && isSellAllWord(rest[rest.length - 1])) return ['sellall', ...(rest.length > 1 ? [rest.slice(0, -1).join(' ')] : [])];
+        // `شراء عربية كلو`: as many pieces as the balance allows.
+        if (sub === 'invest' && rest.length > 1 && isSellAllWord(rest[rest.length - 1])) return ['buymax', rest.slice(0, -1).join(' ')];
         if (sub !== 'invest' && sub !== 'sell') return args;
         const quantity = rest.length > 1 && /^\d+$/u.test(rest[rest.length - 1]) ? [rest.pop()] : [];
         return [sub, rest.join(' '), ...quantity];
@@ -93,6 +97,21 @@ export default {
             }
             if (!rows.length) return reply({ content: '💼 معندكش حاجة تبيعها. اكتب `اسعار` وشوف تشتري إيه 📈' });
             return reply(confirmSellAllPayload(rows, user.id, hourOf()));
+        }
+
+        if (sub === 'buymax') {
+            if (!isHomeGuild(guildId)) return reply({ content: '❌ الأمر ده مش متاح هنا.' });
+            const one = findAsset(interaction.options.getString('asset'), assetsFor(guildId));
+            if (!one) return reply({ content: bourseFailureText({ reason: 'not_found' }) });
+            const { rows, quotes } = await getHoldings(client, guildId, user.id);
+            const owned = rows.find((row) => row.asset.id === one.id)?.qty || 0;
+            const { price } = quotes.find((entry) => entry.asset.id === one.id);
+            const { cc } = await getProfile(client, guildId, user.id);
+            const room = maxOwnedOf(one) - owned;
+            if (room <= 0) return reply({ content: bourseFailureText({ reason: 'max_owned', asset: one, owned }) });
+            const quantity = Math.min(room, Math.floor(cc / price));
+            if (quantity <= 0) return reply({ content: bourseFailureText({ reason: 'no_cc', balance: cc }) });
+            return reply(confirmInvestPayload(one, quantity, price, user.id, cc, { note: `🧺 أقصى عدد تقدر تشتريه دلوقتي: **${quantity}**` }));
         }
 
         const asset = findAsset(interaction.options.getString('asset'), assetsFor(guildId));
