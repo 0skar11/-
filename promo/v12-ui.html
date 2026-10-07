@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="ar">
+<head>
+<meta charset="utf-8">
+<title>CHAOS — v12 Discord UI</title>
+<style>
+  /* Discord's dark theme, mobile-sized, for v12_discord.py. v12_ui.mjs shoots each part to a PNG:
+     mode-bg (static UI), mode-fg (badges over the stream tile), mode-list (all chat messages, tall),
+     mode-typing (one "X is typing..." row per user). Data comes in as window.DATA (vo/v12/ui.json). */
+  @font-face { font-family: 'Noto Sans'; font-weight: 400; src: url(fonts/noto-sans-latin-400-normal.woff2); }
+  @font-face { font-family: 'Noto Sans'; font-weight: 500; src: url(fonts/noto-sans-latin-500-normal.woff2); }
+  @font-face { font-family: 'Noto Sans'; font-weight: 600; src: url(fonts/noto-sans-latin-600-normal.woff2); }
+  @font-face { font-family: 'Noto Sans Arabic'; font-weight: 400; src: url(fonts/noto-sans-arabic-arabic-400-normal.woff2); }
+  @font-face { font-family: 'Noto Sans Arabic'; font-weight: 500; src: url(fonts/noto-sans-arabic-arabic-500-normal.woff2); }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { width: 1080px; background: transparent; font-family: 'Noto Sans', 'Noto Sans Arabic', 'Noto Color Emoji', sans-serif; }
+  body > div { display: none; }
+  body.mode-bg #bg, body.mode-fg #fg, body.mode-list #list, body.mode-typing #typing { display: block; }
+
+  #bg { position: relative; width: 1080px; height: 1920px; background: #1e1f22; }
+  #bg .tile { position: absolute; border-radius: 26px; background: #111214; }
+  #bg .chat { position: absolute; left: 0; right: 0; top: 1040px; bottom: 0; background: #313338; border-radius: 28px 28px 0 0; }
+  #bg .hdr { position: absolute; left: 0; right: 0; top: 1040px; height: 90px; display: flex; align-items: center; gap: 14px;
+    padding: 0 30px; border-bottom: 2px solid #26272b; color: #f2f3f5; }
+  #bg .hdr .hash { font-size: 48px; color: #80848e; font-weight: 500; }
+  #bg .hdr .ch { font-size: 38px; font-weight: 600; }
+  #bg .hdr .srv { margin-left: auto; font-size: 30px; font-weight: 600; color: #949ba4; letter-spacing: 2px; }
+  #bg .hdr .dot { width: 14px; height: 14px; border-radius: 50%; background: #23a55a; margin-left: 10px; }
+  #bg .inp { position: absolute; left: 24px; right: 24px; top: 1806px; height: 92px; border-radius: 46px; background: #383a40;
+    display: flex; align-items: center; gap: 22px; padding: 0 22px; color: #6d6f78; font-size: 36px; }
+  #bg .inp .plus { width: 58px; height: 58px; border-radius: 50%; background: #4e5058; color: #b5bac1; display: grid; place-items: center; font-size: 44px; line-height: 1; }
+  #bg .inp .ph { flex: 1; }
+  #bg .inp svg { width: 46px; height: 46px; fill: #b5bac1; }
+
+  #fg { position: relative; width: 1080px; height: 1920px; }
+  #fg .pill { position: absolute; height: 52px; display: flex; align-items: center; gap: 10px; padding: 0 18px; border-radius: 12px;
+    font-size: 28px; font-weight: 600; color: #fff; }
+  #fg .live { background: #ed4245; letter-spacing: 1px; }
+  #fg .eye { background: rgba(0,0,0,.55); }
+  #fg .name { background: rgba(0,0,0,.6); font-size: 30px; }
+  #fg .name svg { width: 30px; height: 30px; fill: #fff; }
+
+  #list { width: 1080px; background: #313338; padding: 8px 0 18px; }
+  .msg { display: flex; gap: 22px; padding: 18px 28px 4px; }
+  .msg.cont { padding-top: 0; }
+  .msg.cont .av { visibility: hidden; height: 0; }
+  .av { width: 84px; height: 84px; border-radius: 50%; flex: none; display: grid; place-items: center; }
+  .av svg { width: 50px; height: 50px; fill: #fff; }
+  .body { flex: 1; min-width: 0; }
+  .meta { display: flex; align-items: baseline; gap: 14px; }
+  .nm { font-size: 36px; font-weight: 600; }
+  .tm { font-size: 25px; color: #949ba4; }
+  .tx { font-size: 40px; line-height: 1.38; color: #dbdee1; text-align: start; word-break: break-word; }
+
+  #typing { width: 1080px; }
+  .typing { display: inline-flex; align-items: center; gap: 12px; font-size: 28px; color: #dbdee1; padding: 2px 4px; }
+  .typing b { font-weight: 600; }
+  .typing .dots { display: inline-flex; gap: 6px; }
+  .typing .dots i { width: 11px; height: 11px; border-radius: 50%; background: #dbdee1; display: block; }
+</style>
+</head>
+<body class="mode-bg">
+<div id="bg"></div>
+<div id="fg"></div>
+<div id="list"></div>
+<div id="typing"></div>
+<script>
+const CLYDE = '<svg viewBox="0 0 24 24"><path d="M20.317 4.3698a19.7913 19.7913 0 00-4.8851-1.5152.0741.0741 0 00-.0785.0371c-.211.3753-.4447.8648-.6083 1.2495-1.8447-.2762-3.68-.2762-5.4868 0-.1636-.3933-.4058-.8742-.6177-1.2495a.077.077 0 00-.0785-.037 19.7363 19.7363 0 00-4.8852 1.515.0699.0699 0 00-.0321.0277C.5334 9.0458-.319 13.5799.0992 18.0578a.0824.0824 0 00.0312.0561c2.0528 1.5076 4.0413 2.4228 5.9929 3.0294a.0777.0777 0 00.0842-.0276c.4616-.6304.8731-1.2952 1.226-1.9942a.076.076 0 00-.0416-.1057c-.6528-.2476-1.2743-.5495-1.8722-.8923a.077.077 0 01-.0076-.1277c.1258-.0943.2517-.1923.3718-.2914a.0743.0743 0 01.0776-.0105c3.9278 1.7933 8.18 1.7933 12.0614 0a.0739.0739 0 01.0785.0095c.1202.099.246.1981.3728.2924a.077.077 0 01-.0066.1276 12.2986 12.2986 0 01-1.873.8914.0766.0766 0 00-.0407.1067c.3604.698.7719 1.3628 1.225 1.9932a.076.076 0 00.0842.0286c1.961-.6067 3.9495-1.5219 6.0023-3.0294a.077.077 0 00.0313-.0552c.5004-5.177-.8382-9.6739-3.5485-13.6604a.061.061 0 00-.0312-.0286zM8.02 15.3312c-1.1825 0-2.1569-1.0857-2.1569-2.419 0-1.3332.9555-2.4189 2.157-2.4189 1.2108 0 2.1757 1.0952 2.1568 2.419 0 1.3332-.9555 2.4189-2.1569 2.4189zm7.9748 0c-1.1825 0-2.1569-1.0857-2.1569-2.419 0-1.3332.9554-2.4189 2.1569-2.4189 1.2108 0 2.1757 1.0952 2.1568 2.419 0 1.3332-.946 2.4189-2.1568 2.4189Z"/></svg>';
+const MIC = '<svg viewBox="0 0 24 24"><path d="M12 15a3 3 0 003-3V5a3 3 0 10-6 0v7a3 3 0 003 3zm5-3a5 5 0 01-10 0H5a7 7 0 006 6.92V21h2v-2.08A7 7 0 0019 12z"/></svg>';
+const esc = s => s.replace(/[&<>]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' })[c]);
+
+window.build = () => {
+  const D = window.DATA, [tx, ty, tw, th] = D.tile;
+  document.getElementById('bg').innerHTML = `
+    <div class="tile" style="left:${tx}px;top:${ty}px;width:${tw}px;height:${th}px"></div>
+    <div class="chat"></div>
+    <div class="hdr"><span class="hash">#</span><span class="ch">chat</span><span class="dot"></span><span class="srv">CHAOS</span></div>
+    <div class="inp"><span class="plus">+</span><span class="ph">Message #chat</span>
+      <svg viewBox="0 0 24 24"><path d="M3 8.5h18v4H3zM4.2 13.5h15.6V21H4.2zM12 8.5C10.2 4.2 6.3 3.6 6.3 6c0 1.8 3.2 2.5 5.7 2.5zm0 0c1.8-4.3 5.7-4.9 5.7-2.5 0 1.8-3.2 2.5-5.7 2.5z"/></svg>
+      <svg viewBox="0 0 24 24"><path fill-rule="evenodd" d="M12 2a10 10 0 110 20 10 10 0 010-20zM8.5 8.2a1.4 1.4 0 100 2.8 1.4 1.4 0 000-2.8zm7 0a1.4 1.4 0 100 2.8 1.4 1.4 0 000-2.8zM7 13.2c.9 2.3 2.8 3.6 5 3.6s4.1-1.3 5-3.6z"/></svg></div>`;
+  document.getElementById('fg').innerHTML = `
+    <div class="pill live" style="left:${tx + 24}px;top:${ty + 24}px">LIVE</div>
+    <div class="pill eye" style="left:${tx + 132}px;top:${ty + 24}px">👁 6</div>
+    <div class="pill name" style="left:${tx + 24}px;top:${ty + th - 76}px">${MIC}oskar</div>`;
+  let prev = null;
+  document.getElementById('list').innerHTML = D.chat.map((m, i) => {
+    const [name, color, avc] = D.users[m.who];
+    const cont = prev && prev.who === m.who && m.t - prev.t < 2.5;
+    prev = m;
+    const mins = 42 + Math.floor(m.t / 12);
+    return `<div class="msg${cont ? ' cont' : ''}" id="m${i}">
+      <div class="av" style="background:${avc}">${CLYDE}</div>
+      <div class="body">${cont ? '' : `<div class="meta"><span class="nm" style="color:${color}">${name}</span><span class="tm">11:${mins} PM</span></div>`}
+        <div class="tx" dir="${/[\u0600-\u06FF]/.test(m.text) ? 'rtl' : 'auto'}">${esc(m.text)}</div></div></div>`;
+  }).join('');
+  document.getElementById('typing').innerHTML = Object.entries(D.users).map(([k, [name]]) =>
+    `<div><span class="typing" id="typing-${k}"><span class="dots"><i></i><i></i><i style="opacity:.5"></i></span><span><b>${name}</b> is typing...</span></span></div>`).join('');
+};
+
+window.listMeta = () => {
+  const list = document.getElementById('list'), top0 = list.getBoundingClientRect().top;
+  const els = DATA.chat.map((_, i) => document.getElementById('m' + i).getBoundingClientRect());
+  return { tops: els.map(r => Math.round(r.top - top0)), bottoms: els.map(r => Math.round(r.bottom - top0 + 12)),
+           height: Math.round(list.getBoundingClientRect().height), bg: [49, 51, 56] };
+};
+</script>
+</body>
+</html>
