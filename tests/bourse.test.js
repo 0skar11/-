@@ -436,3 +436,44 @@ describe('the palace (report #209)', () => {
         assert.ok(!(await getMarket(client, GUILD, { now: NOW })).quotes.some((entry) => entry.asset.id === 'palace'));
     });
 });
+
+describe('شراء عربية كلو: buy as many as the balance allows (owner\'s request)', () => {
+    test('the words route to buymax; alone they are chat', async () => {
+        const { default: bourse } = await import('../src/commands/Games/bourse.js');
+        assert.deepEqual(applyWordAliases('شراء', ['عربية', 'كلو'], false), { commandName: 'bourse', args: ['invest', 'عربية', 'كلو'] });
+        assert.equal(applyWordAliases('شراء', ['كلو'], false), null);
+        assert.deepEqual(bourse.normalizePrefixArgs(['invest', 'سبيكة', 'دهب', 'كله']), ['buymax', 'سبيكة دهب']);
+    });
+
+    test('confirms the most pieces the balance and the limit allow; another server: not available', async () => {
+        const { HOME_GUILD_ID } = await import('../src/config/homeGuild.js');
+        const { GAMES_BOTS_CHANNEL_ID } = await import('../src/config/games.js');
+        const { default: bourse } = await import('../src/commands/Games/bourse.js');
+        const asset = bourseAssets[0];
+        const run = async (client, guildId) => {
+            const replies = [];
+            await bourse.execute({
+                id: '1', guildId, channelId: GAMES_BOTS_CHANNEL_ID, channel: { id: GAMES_BOTS_CHANNEL_ID }, user: { id: A, toString: () => `<@${A}>` },
+                options: { getSubcommand: () => 'buymax', getString: () => asset.name, getInteger: () => null, getUser: () => null },
+                reply: async (payload) => { replies.push(payload); },
+            }, {}, client);
+            return replies[0];
+        };
+
+        const client = fakeClient();
+        const { quotes } = await getMarket(client, HOME_GUILD_ID);
+        const { price } = quotes.find((entry) => entry.asset.id === asset.id);
+        await adjustCC(client, HOME_GUILD_ID, A, price * 3 + 1);
+        const three = await run(client, HOME_GUILD_ID);
+        assert.match(three.components[0].toJSON().components[0].custom_id, new RegExp(`^bourse:buy:${asset.id}:3:${price}:`));
+
+        // A big balance stops at the asset's limit.
+        await adjustCC(client, HOME_GUILD_ID, A, price * 1000);
+        const capped = await run(client, HOME_GUILD_ID);
+        assert.match(capped.components[0].toJSON().components[0].custom_id, new RegExp(`^bourse:buy:${asset.id}:${bourseSettings.maxOwnedPerAsset}:`));
+
+        const poor = fakeClient();
+        assert.match((await run(poor, HOME_GUILD_ID)).content, /مش كفاية/u);
+        assert.match((await run(poor, GUILD)).content, /مش متاح/u);
+    });
+});
