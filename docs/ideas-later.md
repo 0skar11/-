@@ -79,3 +79,14 @@ server no longer needs a staff team.
 - The owner keeps the last word: the bot logs every action, and big decisions (bans, role changes,
   anything it isn't sure about) go to the owner to confirm instead of a staff member.
 
+
+## Free LLM APIs list (reference link)
+
+The owner saved this link: https://github.com/mnfst/awesome-free-llm-apis
+
+- A curated list of LLM APIs with a free tier for text inference, each with a link to get an API key.
+- Two sections: provider APIs (companies with their own models, e.g. Google Gemini, Mistral AI) and
+  inference providers (platforms hosting open-weight models, e.g. Groq, OpenRouter).
+- Each entry gives the base URL, models, context and output limits, modalities and rate limits.
+- Not built yet: no feature decided. Pick it up when asked (e.g. an AI chat command or smart replies
+  on a free tier).
