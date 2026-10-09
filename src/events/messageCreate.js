@@ -32,6 +32,7 @@ import { countMessage } from '../services/leveling/chatCounter.js';
 import { handleAfkMessage } from '../services/afkService.js';
 import { handleSalam } from '../services/chat/salamReply.js';
 import { handleQr } from '../services/chat/qrReply.js';
+import { handleDangerCommand, handleDangerMessage, punishDanger, blockDangerCommand, DANGER_COMMAND_WORD } from '../services/moderation/dangerList.js';
 
 const AFK_COMMAND = /^\s*[^\p{L}\p{N}\s]{0,3}(?:afk|افك|أفك)(?:\s|$)/iu;
 
@@ -52,12 +53,20 @@ export default {
       if (message.author.bot || !message.guild) return;
       logger.debug(`Message received from ${message.author.tag}: ${message.content}`);
 
+      // Danger list (`خطر @member`): @everyone/@here or an invite link from a listed member = a week of timeout.
+      if (await handleDangerMessage(message)) return;
       if (await handleEveryoneMention(message)) return;
       // A moderator's proof in the moderation log channel is merged into their log message.
       if (await handleProofMessage(message)) return;
       // Insults and banned words (chatFilterService), then spam and repeated owner mentions (antiSpamService).
-      if (await handleChatFilter(message)) return;
-      if (await handleSpam(message)) return;
+      if (await handleChatFilter(message)) {
+        await punishDanger(message.guild, message.author.id, 'شتيمة أو كلام ممنوع');
+        return;
+      }
+      if (await handleSpam(message)) {
+        await punishDanger(message.guild, message.author.id, 'سبام');
+        return;
+      }
       if (await handleOwnerMentionSpam(message)) return;
       if (await handleForeignInviteLink(message)) return;
       if (await handleImageOnlyChannelMessage(message)) return;
@@ -104,7 +113,7 @@ async function isBotCommand(message, client) {
   const parsed = parseTypedCommand(message.content, guildConfig?.prefix || getCommandPrefix());
   if (!parsed) return false;
   const typedCommand = parsed.commandName.toLowerCase();
-  if (['trusted', 'purge'].includes(typedCommand)) return true;
+  if (['trusted', 'purge', DANGER_COMMAND_WORD].includes(typedCommand)) return true;
   const aliased = applyWordAliases(typedCommand, parsed.args, parsed.prefixed);
   return Boolean(aliased && client.commands.get(resolveCommandAlias(aliased.commandName)));
 }
@@ -134,6 +143,7 @@ async function handlePrefixCommand(message, client, gamesOnly = false) {
       await handlePurgeMessage(message);
       return;
     }
+    if (typedCommand === DANGER_COMMAND_WORD && await handleDangerCommand(message, args)) return;
     if (typedCommand === 'مسح' && args[0] === 'تحذيرات') {
       await handleClearWarningsShortcut(message, args.slice(1));
       return;
@@ -156,6 +166,10 @@ async function handlePrefixCommand(message, client, gamesOnly = false) {
       return;
     }
     if (!isCommandCategoryEnabled(command.category)) return;
+    if (await blockDangerCommand(message.guild, message.author.id, resolvedCommandName)) {
+      await message.channel.send({ content: `🚫 <@${message.author.id}> انت في قائمة الخطر.`, allowedMentions: { parse: [] } }).catch(() => {});
+      return;
+    }
 
     args = await applyReplyTarget(message, command.data, args);
     if (typeof command.normalizePrefixArgs === 'function') args = command.normalizePrefixArgs(args);

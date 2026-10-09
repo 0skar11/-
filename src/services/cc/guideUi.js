@@ -2,6 +2,7 @@
 // (src/commands/Games/guide.js). Every number comes from the config, so the guide never goes stale.
 // Plain embed objects so the emojis stay.
 
+import { inviteConditions } from '../inviteRewardService.js';
 import { CC, ccEmbed, ccBoostLine, gamesBotReward } from '../../config/cc.js';
 import { bourseSettings } from '../../config/store/bourse.js';
 import { INVITE_REWARDS } from '../../config/inviteRewards.js';
@@ -25,7 +26,7 @@ export function buildGuideEmbeds({ boostLine = ccBoostLine(), guildId = null } =
         ccEmbed('💡 تكسب CC ازاي؟', [
             `🎮 **الألعاب** في <#${GAMES_BOTS_CHANNEL_ID}>: الفوز في لعبة جماعية **${n(gamesBotReward('group', guildId))}**، وأول واحد يكتب الإجابة **${n(gamesBotReward('answer', guildId))}**`,
             `⭐ **اللفل**: كل لفل جديد بيديك (رقم اللفل × ${n(levelUp.perLevel)})، يعني لفل 10 = ${n(levelUp.perLevel * 10)}`,
-            `📨 **الدعوات**: **${n(INVITE_REWARDS.reward)}** لكل حد تدعوه ويوصل لفل ${INVITE_REWARDS.level} ويكتب ${INVITE_REWARDS.minMessages} رسالة ويقعد ${INVITE_REWARDS.minStayDays} أيام`,
+            `📨 **الدعوات**: **${n(INVITE_REWARDS.reward)}** لكل حد تدعوه و${inviteConditions()}`,
             '🔁 **التحويل**: صحابك يقدروا يحوّلولك',
         ].join('\n\n'), { color: 'success' }),
         ccEmbed('🛒 المتجر', [

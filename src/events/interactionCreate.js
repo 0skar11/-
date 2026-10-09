@@ -21,6 +21,7 @@ import { isBlockedSlashCommand, GAMES_ONLY_NOTICE } from '../services/games/game
 import { isBlockedStoreSlashCommand, STORE_ONLY_NOTICE } from '../services/cc/storeChannel.js';
 import { ResponseCoordinator } from '../utils/responseCoordinator.js';
 import { enforceDefaultCommandPermissions } from '../utils/permissionGuard.js';
+import { blockDangerCommand } from '../services/moderation/dangerList.js';
 
 const COMMAND_ERROR_SUBTYPES = {
   warn: 'warn_failed',
@@ -177,6 +178,11 @@ export default {
               guildConfig,
             });
             if (!permissionAllowed) {
+              return;
+            }
+
+            if (await blockDangerCommand(interaction.guild, interaction.user.id, interaction.commandName)) {
+              await interaction.reply({ content: '🚫 انت في قائمة الخطر.', flags: MessageFlags.Ephemeral }).catch(() => {});
               return;
             }
 
