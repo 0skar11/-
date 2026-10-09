@@ -1,6 +1,6 @@
 import { test, describe, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
-import { AuditLogEvent } from 'discord.js';
+import { AuditLogEvent, PermissionsBitField } from 'discord.js';
 import { HOME_GUILD_ID } from '../src/config/homeGuild.js';
 import {
   handleDangerCommand, handleDangerAuditEntry, handleDangerMessage, blockDangerCommand, punishDanger,
@@ -116,6 +116,31 @@ describe('خطر: the danger list (reports #218, #219)', () => {
     assert.equal(await blockDangerCommand(guild, BAD, 'rank'), false);
     assert.equal(timeouts.length, 3);
     assert.equal(await blockDangerCommand(guild, STRANGER, 'ban'), false);
+  });
+
+  test('adding takes the admin roles off, removing gives them back', async () => {
+    const { guild, sent, message } = setup();
+    const role = (id, permissions = 0n, editable = true) => ({ id, name: id, managed: false, editable, permissions: new PermissionsBitField(permissions) });
+    const NORMAL = role('400000000000000001');
+    const MOD = role('400000000000000002', PermissionsBitField.Flags.ManageMessages);
+    const HIGH = role('400000000000000003', PermissionsBitField.Flags.Administrator, false);
+    guild.roles = { cache: new Map([NORMAL, MOD, HIGH].map((r) => [r.id, r])) };
+    const cache = new Map([NORMAL, MOD, HIGH].map((r) => [r.id, r]));
+    const bad = await guild.members.fetch(BAD);
+    bad.roles = {
+      cache,
+      remove: async (ids) => ids.forEach((id) => cache.delete(id)),
+      add: async (ids) => ids.forEach((id) => cache.set(id, guild.roles.cache.get(id))),
+    };
+
+    await handleDangerCommand(message(TRUSTED, `خطر ${BAD}`), [BAD]);
+    assert.deepEqual([...cache.keys()].sort(), [NORMAL.id, HIGH.id]);
+    assert.match(sent.notice[0].content, new RegExp(`اتشالت منه رولات الإدارة: <@&${MOD.id}>`));
+    assert.match(sent.notice[0].content, new RegExp(`فوق رول البوت\\): <@&${HIGH.id}>`));
+
+    await handleDangerCommand(message(TRUSTED, `خطر شيل ${BAD}`), ['شيل', BAD]);
+    assert.equal(cache.has(MOD.id), true);
+    assert.match(sent.reply.at(-1).content, /رجعتله رولات الإدارة/u);
   });
 
   test('another server keeps nothing of this', async () => {

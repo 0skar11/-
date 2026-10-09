@@ -4,8 +4,9 @@
 //   • `خطر @member` (or `خطر ID`, or `خطر` as a reply to their message) adds them;
 //   • `خطر شيل @member` removes them;
 //   • `خطر` alone shows the list.
-// Adding or removing posts a notice in the trusted channel and updates the danger board there (under the
-// trusted board). Anything dangerous a listed member does gives them a one-week timeout, and the bot writes
+// Adding someone also takes their admin roles off (staff roles and roles with a dangerous permission,
+// as in rejoinRestore.js); `خطر شيل` gives them back. Adding or removing posts a notice in the trusted
+// channel and updates the danger board there (under the trusted board). Anything dangerous a listed member does gives them a one-week timeout, and the bot writes
 // what happened in the Anti-Nuke log: a dangerous audit-log action (ban, kick, channels, roles, webhooks,
 // bots, server settings, timing someone out…), @everyone/@here or an invite link, an insult or spam caught
 // by the filters, or a dangerous moderation command run through the bot. The owners are never punished.
@@ -17,6 +18,7 @@ import { getGuildConfig } from '../config/guildConfig.js';
 import { TRUSTED_BOARD_CHANNEL_ID } from '../trustedBoardService.js';
 import { isTrusted } from '../../utils/antiNukeLogging.js';
 import { findBoardMessage, rememberBoardMessage } from '../../utils/boardMessage.js';
+import { staffAndDangerousRoles } from './rejoinRestore.js';
 import { logger } from '../../utils/logger.js';
 
 export const DANGER_NOTICE_CHANNEL_ID = TRUSTED_BOARD_CHANNEL_ID;
@@ -95,23 +97,69 @@ export async function isOnDangerList(client, guildId, userId) {
 
 const isOwner = (guild, userId) => isServerOwner(userId) || guild.ownerId === userId;
 
-/** Adds a member. Returns { ok: true } or { ok: false, reason } with reason one of: owner, bot, already. */
+/**
+ * Takes the member's admin roles off. Returns { removed, kept }: role IDs taken off, and those the bot
+ * couldn't take off (above its own role).
+ */
+async function takeAdminRoles(guild, userId) {
+  const member = await guild.members.fetch(userId).catch(() => null);
+  if (!member) return { removed: [], kept: [] };
+  const admin = await staffAndDangerousRoles(guild, [...(member.roles?.cache?.values?.() || [])].filter((role) => role.id !== guild.id));
+  const canTake = admin.filter((role) => role.editable !== false).map((role) => role.id);
+  let kept = admin.filter((role) => role.editable === false).map((role) => role.id);
+  let removed = canTake;
+  if (canTake.length) {
+    await member.roles.remove(canTake, 'قائمة الخطر: شيل رولات الإدارة').catch((error) => {
+      logger.warn(`[DANGER] Could not take admin roles off ${userId}: ${error.message}`);
+      kept = [...kept, ...canTake];
+      removed = [];
+    });
+  }
+  return { removed, kept };
+}
+
+/** Gives back the admin roles taken off when the member was added. Returns the role IDs given back. */
+async function giveAdminRolesBack(guild, userId, roleIds = []) {
+  if (!roleIds.length) return [];
+  const member = await guild.members.fetch(userId).catch(() => null);
+  if (!member) return [];
+  const roles = roleIds.map((id) => guild.roles?.cache?.get(id)).filter((role) => role && role.editable !== false);
+  const ids = roles.map((role) => role.id).filter((id) => !member.roles.cache.has(id));
+  if (!ids.length) return [];
+  return member.roles.add(ids, 'اتشال من قائمة الخطر: رجوع رولات الإدارة').then(() => ids).catch((error) => {
+    logger.warn(`[DANGER] Could not give admin roles back to ${userId}: ${error.message}`);
+    return [];
+  });
+}
+
+/**
+ * Adds a member and takes their admin roles off. Returns { ok: true, removed, kept } (role IDs taken off,
+ * and those above the bot's role) or { ok: false, reason } with reason one of: owner, bot, already.
+ */
 export async function addToDangerList(guild, userId, addedBy, now = Date.now()) {
   if (isOwner(guild, userId)) return { ok: false, reason: 'owner' };
   if (userId === guild.client.user?.id) return { ok: false, reason: 'bot' };
   const list = await getDangerList(guild.client, guild.id);
   if (list.some((entry) => entry.userId === userId)) return { ok: false, reason: 'already' };
-  await saveDangerList(guild.client, guild.id, [...list, { userId, addedBy, addedAt: now }]);
-  return { ok: true };
+  const { removed, kept } = await takeAdminRoles(guild, userId);
+  await saveDangerList(guild.client, guild.id, [...list, { userId, addedBy, addedAt: now, roles: removed }]);
+  return { ok: true, removed, kept };
 }
 
-/** Removes a member. Returns true when they were on the list. */
+/**
+ * Removes a member and gives back the admin roles taken off when they were added. Returns null when they
+ * were not on the list, otherwise { restored, notRestored }.
+ */
 export async function removeFromDangerList(guild, userId) {
   const list = await getDangerList(guild.client, guild.id);
-  if (!list.some((entry) => entry.userId === userId)) return false;
-  await saveDangerList(guild.client, guild.id, list.filter((entry) => entry.userId !== userId));
-  return true;
+  const entry = list.find((item) => item.userId === userId);
+  if (!entry) return null;
+  await saveDangerList(guild.client, guild.id, list.filter((item) => item.userId !== userId));
+  const restored = await giveAdminRolesBack(guild, userId, entry.roles);
+  return { restored, notRestored: (entry.roles || []).filter((id) => !restored.includes(id)) };
 }
+
+const roleMentions = (ids) => ids.map((id) => `<@&${id}>`).join('، ');
 
 async function fetchChannel(guild, channelId) {
   const channel = guild.channels.cache.get(channelId) || await guild.channels.fetch(channelId).catch(() => null);
@@ -126,8 +174,8 @@ export function dangerBoardPayload(list) {
       color: 0xe74c3c,
       title: BOARD_TITLE,
       description: [
-        'أي حد في القايمة دي يعمل حاجة خطر ياخد **تايم أوت أسبوع**، والبوت يكتب اللي حصل في اللوج.',
-        '`خطر @عضو` يضيف ・ `خطر شيل @عضو` يشيل ・ `خطر` يعرض القايمة (للتراستد بس).',
+        'أي حد في القايمة دي بتتشال منه رولات الإدارة، ولو عمل حاجة خطر ياخد **تايم أوت أسبوع**، والبوت يكتب اللي حصل في اللوج.',
+        '`خطر @عضو` يضيف ・ `خطر شيل @عضو` يشيل ويرجعله رولاته ・ `خطر` يعرض القايمة (للتراستد بس).',
         '',
         lines.join('\n') || '> *القايمة فاضية*',
       ].join('\n').slice(0, 4000),
@@ -199,10 +247,15 @@ export async function handleDangerCommand(message, args = []) {
   }
 
   if (removing) {
-    if (!(await removeFromDangerList(guild, targetId))) return reply(message, `⚠️ <@${targetId}> مش في قائمة الخطر.`);
-    await postNotice(guild, `✅ <@${targetId}> اتشال من قائمة الخطر — بواسطة <@${message.author.id}>`);
+    const removed = await removeFromDangerList(guild, targetId);
+    if (!removed) return reply(message, `⚠️ <@${targetId}> مش في قائمة الخطر.`);
+    const rolesLines = [
+      ...(removed.restored.length ? [`🛡️ رجعتله رولات الإدارة: ${roleMentions(removed.restored)}`] : []),
+      ...(removed.notRestored.length ? [`⚠️ مرجعتش (مش في السيرفر أو فوق رول البوت): ${roleMentions(removed.notRestored)}`] : []),
+    ];
+    await postNotice(guild, [`✅ <@${targetId}> اتشال من قائمة الخطر — بواسطة <@${message.author.id}>`, ...rolesLines].join('\n'));
     await refreshDangerBoard(guild);
-    return reply(message, `✅ <@${targetId}> اتشال من قائمة الخطر.`);
+    return reply(message, [`✅ <@${targetId}> اتشال من قائمة الخطر.`, ...rolesLines].join('\n'));
   }
 
   const added = await addToDangerList(guild, targetId, message.author.id);
@@ -210,9 +263,13 @@ export async function handleDangerCommand(message, args = []) {
     const why = { owner: '🚫 مينفعش تضيف صاحب السيرفر.', bot: '🚫 مينفعش تضيف البوت.', already: `⚠️ <@${targetId}> في قائمة الخطر أصلاً.` };
     return reply(message, why[added.reason]);
   }
-  await postNotice(guild, `☢️ <@${targetId}> اتضاف لقائمة الخطر — بواسطة <@${message.author.id}>\nلو عمل أي حاجة خطر هياخد تايم أوت أسبوع.`);
+  const rolesLines = [
+    ...(added.removed.length ? [`🛡️ اتشالت منه رولات الإدارة: ${roleMentions(added.removed)}`] : []),
+    ...(added.kept.length ? [`⚠️ ماتشالتش (فوق رول البوت): ${roleMentions(added.kept)}`] : []),
+  ];
+  await postNotice(guild, [`☢️ <@${targetId}> اتضاف لقائمة الخطر — بواسطة <@${message.author.id}>`, 'لو عمل أي حاجة خطر هياخد تايم أوت أسبوع.', ...rolesLines].join('\n'));
   await refreshDangerBoard(guild);
-  return reply(message, `☢️ <@${targetId}> اتضاف لقائمة الخطر، وأي حاجة خطر يعملها = تايم أوت أسبوع.`);
+  return reply(message, [`☢️ <@${targetId}> اتضاف لقائمة الخطر، وأي حاجة خطر يعملها = تايم أوت أسبوع.`, ...rolesLines].join('\n'));
 }
 
 export function dangerLogPayload(userId, action, result) {
