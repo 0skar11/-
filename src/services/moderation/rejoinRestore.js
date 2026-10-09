@@ -52,6 +52,12 @@ function needsApproval(role, staffIds) {
     return staffIds.has(role.id) || Boolean(role.permissions?.any?.(DANGEROUS));
 }
 
+/** The staff roles and the roles with a dangerous permission among `roles` (the "admin" roles). */
+export async function staffAndDangerousRoles(guild, roles) {
+    const staffIds = new Set((await filterStaffRoles(guild, roles)).map((role) => role.id));
+    return [...roles].filter((role) => !role.managed && needsApproval(role, staffIds));
+}
+
 export function approvalPayload(userId, roles) {
     // A role at or above the bot's highest role can't be given until the bot's role is moved above it.
     const above = roles.filter((role) => role.editable === false);
