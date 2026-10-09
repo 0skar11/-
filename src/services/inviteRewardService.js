@@ -86,12 +86,18 @@ export function inviteRoleChanges(count, tierRoleIds = {}, heldRoleIds = new Set
   };
 }
 
+/** `يوصل لفل 5 ويكتب 50 رسالة` (and `ويكمّل N أيام في السيرفر` when a stay is required). */
+export function inviteConditions() {
+  const stay = INVITE_REWARDS.minStayDays > 0 ? ` ويكمّل ${INVITE_REWARDS.minStayDays} أيام في السيرفر` : '';
+  return `يوصل لفل ${INVITE_REWARDS.level} ويكتب ${INVITE_REWARDS.minMessages} رسالة${stay}`;
+}
+
 /** The small message under the welcome: who invited the member and what the inviter gets. null when nobody did. */
 export function inviteWelcomeNotice(memberId, join) {
   if (!join?.inviterId || ['unknown', 'self', 'bot'].includes(join.reason)) return null;
   const lines = [`-# 📨 دعاه <@${join.inviterId}>`];
   if (!join.reason) {
-    lines.push(`-# 🎁 <@${join.inviterId}> هياخد ${reward()} لما <@${memberId}> يوصل لفل ${INVITE_REWARDS.level} ويكتب ${INVITE_REWARDS.minMessages} رسالة ويكمّل ${INVITE_REWARDS.minStayDays} أيام في السيرفر`);
+    lines.push(`-# 🎁 <@${join.inviterId}> هياخد ${reward()} لما <@${memberId}> ${inviteConditions()}`);
   } else if (join.reason === 'fake') {
     lines.push(`-# ⚠️ الدعوة دي مش محسوبة: الحساب عمره أقل من ${INVITE_REWARDS.minAccountAgeDays} أيام`);
   } else if (join.reason === 'rejoin') {
@@ -279,7 +285,7 @@ export async function inviteTopEmbed(client, guild, userId = null) {
     '',
     summary.join('\n'),
     '',
-    `🎁 ${reward()} لكل عضو تدعيه يوصل لفل ${INVITE_REWARDS.level} ويكتب ${INVITE_REWARDS.minMessages} رسالة ويكمّل ${INVITE_REWARDS.minStayDays} أيام في السيرفر (الحسابات الأقل من ${INVITE_REWARDS.minAccountAgeDays} أيام واللي كانوا في السيرفر قبل كده مش بيتحسبوا)`,
+    `🎁 ${reward()} لكل عضو تدعيه ${inviteConditions()} (الحسابات الأقل من ${INVITE_REWARDS.minAccountAgeDays} أيام واللي كانوا في السيرفر قبل كده مش بيتحسبوا)`,
     `🏅 رولات الدعوات: ${tiers}`,
   ].join('\n'));
 }

@@ -75,10 +75,11 @@ function fakeSetup() {
 }
 
 describe('invite rewards rules', () => {
-  test('the owner asked for 1000 CC at level 5 after 3 days, and roles at 5, 10 and 25 invites', () => {
+  test('the owner asked for 1000 CC at level 5 and 50 messages, no stay (report #223), and roles at 5, 10 and 25 invites', () => {
     assert.equal(INVITE_REWARDS.reward, 1000);
     assert.equal(INVITE_REWARDS.level, 5);
-    assert.equal(INVITE_REWARDS.minStayDays, 3);
+    assert.equal(INVITE_REWARDS.minMessages, 50);
+    assert.equal(INVITE_REWARDS.minStayDays, 0);
     assert.deepEqual(INVITE_REWARDS.tiers.map((tier) => tier.count), [5, 10, 25]);
   });
 
@@ -99,6 +100,8 @@ describe('invite rewards rules', () => {
     assert.equal(isReadyToPay(record, 5, NOW, talked), true);
     assert.equal(isReadyToPay(record, 5, NOW, talked - 1), false, 'level 5 without really talking (report #167)');
     assert.equal(isReadyToPay(record, 4, NOW, talked), false);
+    // No stay (report #223): an hour after joining is enough with level 5 and 50 messages.
+    assert.equal(isReadyToPay({ ...record, joinedAt: NOW - 60 * 60 * 1000 }, 5, NOW, talked), true);
     assert.equal(isReadyToPay({ ...record, joinedAt: NOW - 2 * DAY }, 10, NOW), false);
     assert.equal(isReadyToPay({ ...record, status: STATUS.PAID }, 10, NOW), false);
     assert.equal(isReadyToPay({ ...record, status: STATUS.LEFT }, 10, NOW), false);
@@ -123,7 +126,9 @@ describe('invite rewards rules', () => {
     assert.match(counted, new RegExp(`دعاه <@${INVITER}>`));
     assert.match(counted, /1,000/);
     assert.match(counted, /لفل 5/);
-    assert.match(counted, /3 أيام/);
+    assert.match(counted, /50 رسالة/);
+    // No stay condition any more (report #223).
+    assert.doesNotMatch(counted, /أيام/);
     assert.match(inviteWelcomeNotice(NEWBIE, { inviterId: INVITER, reason: 'fake' }), /مش محسوبة/);
     assert.match(inviteWelcomeNotice(NEWBIE, { inviterId: INVITER, reason: 'rejoin' }), /قبل كده/);
     assert.equal(inviteWelcomeNotice(NEWBIE, { inviterId: null, reason: 'unknown' }), null);
