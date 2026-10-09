@@ -2,6 +2,7 @@ import { PermissionFlagsBits } from 'discord.js';
 import { logger } from '../utils/logger.js';
 import { openReportIssue } from './reportIssueService.js';
 import { isServerOwner } from '../config/serverOwners.js';
+import { isHomeGuild } from '../config/homeGuild.js';
 
 // Any message posted in this channel is turned into a report; no command needed.
 // `/report file` sends its reports here as well.
@@ -73,12 +74,35 @@ function canRunCommandsHere(message) {
   return Boolean(message.member?.permissionsIn?.(message.channel)?.has(PermissionFlagsBits.ManageMessages));
 }
 
+// In our server only these may write in the report channel (report #222): the owners, the member below
+// and whoever has the PSYCHO role. Anyone else's message (a reply too) is deleted with a short notice;
+// members still report with `/report`, which the bot posts here itself.
+export const REPORT_WRITER_IDS = new Set(['1270702393612570665']);
+const REPORT_WRITER_ROLE = /psycho/iu;
+const BLOCKED_NOTICE_DELETE_MS = 5_000;
+
+export function canWriteInReports(message) {
+  if (!isHomeGuild(message.guild?.id)) return true;
+  const authorId = message.author?.id;
+  if (isServerOwner(authorId) || message.guild.ownerId === authorId || REPORT_WRITER_IDS.has(authorId)) return true;
+  return [...(message.member?.roles?.cache?.values?.() || [])].some((role) => REPORT_WRITER_ROLE.test(role.name || ''));
+}
+
 // Turns a plain message in the report channel into a report embed and removes the original.
 // Replies are left alone so staff and the reporter can talk under a report.
 // `isCommand(message)` tells whether the message is a bot command; staff commands run instead of becoming reports.
 // Returns true when the message belonged to the report channel (handled), false otherwise.
 export async function handleReportChannelMessage(message, { isCommand = async () => false } = {}) {
   if (message.channelId !== REPORT_CHANNEL_ID) return false;
+  if (!canWriteInReports(message)) {
+    await message.delete().catch(() => null);
+    const notice = await message.channel.send({
+      content: `🚫 <@${message.author.id}> الروم ده مش للكتابة، لو عندك بلاغ استخدم \`/report\`.`,
+      allowedMentions: { users: [message.author.id] },
+    }).catch(() => null);
+    if (notice) setTimeout(() => notice.delete().catch(() => {}), BLOCKED_NOTICE_DELETE_MS).unref?.();
+    return true;
+  }
   if (message.reference?.messageId) return true;
   if (canRunCommandsHere(message) && await isCommand(message)) return false;
 
