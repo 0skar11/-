@@ -32,6 +32,7 @@ import { countMessage } from '../services/leveling/chatCounter.js';
 import { handleAfkMessage } from '../services/afkService.js';
 import { handleSalam } from '../services/chat/salamReply.js';
 import { handleQr } from '../services/chat/qrReply.js';
+import { handleMentionGroupCommand } from '../services/mentionGroup.js';
 import { handleDangerCommand, handleDangerMessage, punishDanger, blockDangerCommand, DANGER_COMMAND_WORD } from '../services/moderation/dangerList.js';
 
 const AFK_COMMAND = /^\s*[^\p{L}\p{N}\s]{0,3}(?:afk|افك|أفك)(?:\s|$)/iu;
@@ -113,7 +114,7 @@ async function isBotCommand(message, client) {
   const parsed = parseTypedCommand(message.content, guildConfig?.prefix || getCommandPrefix());
   if (!parsed) return false;
   const typedCommand = parsed.commandName.toLowerCase();
-  if (['trusted', 'purge', DANGER_COMMAND_WORD].includes(typedCommand)) return true;
+  if (['trusted', 'purge', DANGER_COMMAND_WORD, 'منشن'].includes(typedCommand)) return true;
   const aliased = applyWordAliases(typedCommand, parsed.args, parsed.prefixed);
   return Boolean(aliased && client.commands.get(resolveCommandAlias(aliased.commandName)));
 }
@@ -123,8 +124,10 @@ async function handlePrefixCommand(message, client, gamesOnly = false) {
     const guildConfig = await getGuildConfig(client, message.guild.id);
     const prefix = guildConfig?.prefix || getCommandPrefix();
     if (gamesOnly && !isGameCommandMessage(message.content, [prefix])) return;
-    if (await handleArabicRoleShortcut(message, [prefix, getCommandPrefix()])) return;
     const parsed = parseTypedCommand(message.content, prefix);
+    // `منشن` group (our server): runs before the role shortcuts so `شيل منشن @x` isn't "remove role منشن".
+    if (parsed && await handleMentionGroupCommand(message, parsed.commandName, parsed.args)) return;
+    if (await handleArabicRoleShortcut(message, [prefix, getCommandPrefix()])) return;
     if (!parsed) return;
 
     let { commandName, args } = parsed;
